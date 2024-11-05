@@ -229,7 +229,7 @@
         <mxCell id="0hvrwg1Qblv52Qt3PdIn-85" value="服务发现" style="rounded=1;whiteSpace=wrap;html=1;strokeColor=#000000;strokeWidth=1;fillColor=#97D077;" vertex="1" parent="1">
           <mxGeometry x="630" y="190" width="67.5" height="17" as="geometry" />
         </mxCell>
-        <mxCell id="0hvrwg1Qblv52Qt3PdIn-86" value="动态配置" style="rounded=1;whiteSpace=wrap;html=1;strokeColor=#000000;strokeWidth=1;fillColor=#97D077;" vertex="1" parent="1">
+        <mxCell id="0hvrwg1Qblv52Qt3PdIn-86" value="服务配置" style="rounded=1;whiteSpace=wrap;html=1;strokeColor=#000000;strokeWidth=1;fillColor=#97D077;" vertex="1" parent="1">
           <mxGeometry x="710" y="190" width="67.5" height="17" as="geometry" />
         </mxCell>
         <mxCell id="0hvrwg1Qblv52Qt3PdIn-87" value="" style="edgeStyle=elbowEdgeStyle;elbow=vertical;endArrow=classic;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.25;entryY=0;entryDx=0;entryDy=0;startArrow=classic;startFill=1;" edge="1" parent="1" source="0hvrwg1Qblv52Qt3PdIn-51" target="0hvrwg1Qblv52Qt3PdIn-27">
