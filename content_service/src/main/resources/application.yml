@@ -1,0 +1,17 @@
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: update    # 自动更新表结构
+    show-sql: true        # 显示SQL语句
+    properties:
+      hibernate:
+        format_sql: true  # 格式化SQL语句
+        dialect: org.hibernate.dialect.MySQLDialect
+        # 添加以下配置来设置InnoDB引擎
+        storage_engine: innodb
+    database-platform: org.hibernate.dialect.MySQLDialect
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    password: Zzq664450274
+    username: root
+    url: jdbc:mysql://118.89.115.79:3306/content?characterEncoding=utf8&useSSL=false&serverTimezone=UTC&createDatabaseIfNotExist=true&useUnicode=true&allowPublicKeyRetrieval=true
