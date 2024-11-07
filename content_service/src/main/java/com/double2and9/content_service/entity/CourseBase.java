@@ -69,6 +69,14 @@ public class CourseBase {
     private String charge;
 
     /**
+     * 课程状态
+     * 对应数据字典: course_status
+     * 例如：未发布、已发布、已下线等
+     */
+    @Column(length = 20)
+    private String status;
+
+    /**
      * 课程有效性，true有效，false无效
      */
     @Column

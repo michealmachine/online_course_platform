@@ -1,0 +1,31 @@
+### 查询课程计划树
+GET http://localhost:8080/teachplan/tree/1
+Content-Type: application/json
+
+### 创建课程计划（章节）
+POST http://localhost:8080/teachplan
+Content-Type: application/json
+
+{
+  "courseId": 1,
+  "parentId": 0,
+  "level": 1,
+  "name": "第一章",
+  "orderBy": 1
+}
+
+### 创建课程计划（小节）
+POST http://localhost:8080/teachplan
+Content-Type: application/json
+
+{
+  "courseId": 1,
+  "parentId": 2,
+  "level": 2,
+  "name": "第一节",
+  "orderBy": 1
+}
+
+### 删除课程计划
+DELETE http://localhost:8080/teachplan/1
+Content-Type: application/json 

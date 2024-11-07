@@ -1,9 +1,13 @@
 package com.double2and9.base.model;
 
+import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 import lombok.ToString;
 
 @Data
+@NoArgsConstructor
+@AllArgsConstructor
 @ToString
 public class PageParams {
     //当前页码
@@ -12,12 +16,4 @@ public class PageParams {
     //每页记录数默认值
     private Long pageSize =10L;
 
-    public PageParams(){
-
-    }
-
-    public PageParams(long pageNo,long pageSize){
-        this.pageNo = pageNo;
-        this.pageSize = pageSize;
-    }
 }
