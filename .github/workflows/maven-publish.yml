@@ -29,7 +29,6 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     
-    # 设置JDK并配置Maven缓存
     - name: Set up JDK 17
       uses: actions/setup-java@v4
       with:
@@ -37,7 +36,6 @@ jobs:
         distribution: 'temurin'
         cache: maven
     
-    # 缓存Maven本地仓库
     - name: Cache Maven packages
       uses: actions/cache@v3
       with:
@@ -46,17 +44,14 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-m2-
     
-    # 缓存构建产物
-    - name: Cache Build Output
-      uses: actions/cache@v3
-      with:
-        path: |
-          **/target
-          !**/target/test-classes
-        key: ${{ runner.os }}-build-${{ github.sha }}
-        restore-keys: |
-          ${{ runner.os }}-build-
+    # 首先安装父项目
+    - name: Install Parent Project
+      run: mvn clean install -N
     
+    # 然后构建并安装base模块
+    - name: Build and Install Base Module
+      run: mvn clean install -pl base
+      
     # 等待MySQL启动
     - name: Wait for MySQL
       run: |
@@ -64,15 +59,11 @@ jobs:
           sleep 1
         done
     
-    # 构建并安装base模块
-    - name: Build and Install Base Module
-      run: mvn clean install -pl base
-      
-    # 构建并测试content_service模块，使用test配置
+    # 构建并测试content_service模块，添加debug信息
     - name: Build and Test Content Service Module
-      run: mvn clean verify -pl content_service -Dspring.profiles.active=test
+      run: mvn clean verify -pl content_service -Dspring.profiles.active=test -X
       
-    # 构建整个项目
+    # 最后构建整个项目
     - name: Build with Maven
       run: mvn -B package --file pom.xml
 
