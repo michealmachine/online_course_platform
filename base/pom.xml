@@ -26,5 +26,26 @@
         </dependency>
     </dependencies>
 
-
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <configuration>
+                    <!--  指定主启动类  -->
+                    <mainClass>com.double2and9.base.BaseApplication</mainClass>
+                    <!--  指定编译为可执行包  -->
+                    <classifier>exec</classifier>
+                    <!--  排除不需要编译的包  -->
+                    <excludes>
+                        <exclude>
+                            <!--  springboot自定义配置注释处理器  -->
+                            <groupId>org.springframework.boot</groupId>
+                            <artifactId>spring-boot-configuration-processor</artifactId>
+                        </exclude>
+                    </excludes>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
 </project>

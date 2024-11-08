@@ -45,6 +45,7 @@
             <groupId>com.double2and9</groupId>
             <artifactId>base</artifactId>
             <version>0.0.1-SNAPSHOT</version>
+            <scope>compile</scope>
         </dependency>
 
 

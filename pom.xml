@@ -87,6 +87,12 @@
                 <version>${spring-cloud.version}</version>
                 <type>pom</type>
                 <scope>import</scope>
+
+            </dependency>
+            <dependency>
+                <groupId>com.double2and9</groupId>
+                <artifactId>base</artifactId>
+                <version>${project.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>
