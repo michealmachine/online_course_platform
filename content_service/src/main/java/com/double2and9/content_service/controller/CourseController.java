@@ -11,12 +11,16 @@ import com.double2and9.content_service.dto.CoursePreviewDTO;
 import com.double2and9.content_service.dto.CourseAuditDTO;
 import com.double2and9.content_service.service.CourseBaseService;
 import com.double2and9.content_service.common.model.ContentResponse;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.validation.annotation.Validated;
 
 import java.util.List;
 
+@Tag(name = "课程管理", description = "提供课程的增删改查接口")
 @Slf4j
 @RestController
 @RequestMapping("/course")
@@ -28,106 +32,55 @@ public class CourseController {
         this.courseBaseService = courseBaseService;
     }
 
-    /**
-     * 课程列表分页查询
-     * @param pageParams 分页参数
-     * @param queryParams 查询条件
-     * @return 分页结果
-     */
+    @Operation(summary = "分页查询课程列表")
     @GetMapping("/list")
-    public ContentResponse<PageResult<CourseBaseDTO>> list(PageParams pageParams, QueryCourseParamsDTO queryParams) {
-        log.info("课程查询，分页参数：{}，查询参数：{}", pageParams, queryParams);
-        PageResult<CourseBaseDTO> result = courseBaseService.queryCourseList(pageParams, queryParams);
-        return ContentResponse.success(result);
+    public ContentResponse<PageResult<CourseBaseDTO>> list(
+            @Parameter(description = "分页参数") PageParams pageParams,
+            @Parameter(description = "查询条件") QueryCourseParamsDTO queryParams) {
+        return ContentResponse.success(courseBaseService.queryCourseList(pageParams, queryParams));
     }
 
-    /**
-     * 根据课程状态查询课程列表
-     * @param status 课程状态
-     * @param pageParams 分页参数
-     * @return 分页结果
-     */
-    @GetMapping("/list/status/{status}")
-    public PageResult<CourseBaseDTO> listByStatus(
-            @PathVariable String status,
-            PageParams pageParams) {
-        QueryCourseParamsDTO queryParams = new QueryCourseParamsDTO();
-        queryParams.setStatus(status);
-        return courseBaseService.queryCourseList(pageParams, queryParams);
-    }
-
-    /**
-     * 根据课程分类查询课程列表
-     * @param mt 课程大分类
-     * @param st 课程小分类
-     * @param pageParams 分页参数
-     * @return 分页结果
-     */
-    @GetMapping("/list/category")
-    public PageResult<CourseBaseDTO> listByCategory(
-            @RequestParam(required = false) Long mt,
-            @RequestParam(required = false) Long st,
-            PageParams pageParams) {
-        QueryCourseParamsDTO queryParams = new QueryCourseParamsDTO();
-        queryParams.setMt(mt);
-        queryParams.setSt(st);
-        return courseBaseService.queryCourseList(pageParams, queryParams);
-    }
-
-    /**
-     * 查询课程分类树
-     * @return 课程分类树
-     */
-    @GetMapping("/category/tree")
-    public List<CourseCategoryTreeDTO> categoryTree() {
-        return courseBaseService.queryCourseCategoryTree();
-    }
-
-    /**
-     * 创建课程
-     */
+    @Operation(summary = "创建课程", description = "创建新的课程，包含基本信息和营销信息")
     @PostMapping
-    public Long createCourse(@RequestBody @Validated AddCourseDTO addCourseDTO) {
-        return courseBaseService.createCourse(addCourseDTO);
+    public ContentResponse<Long> createCourse(
+            @Parameter(description = "课程信息") @RequestBody @Validated AddCourseDTO addCourseDTO) {
+        return ContentResponse.success(courseBaseService.createCourse(addCourseDTO));
     }
 
-    /**
-     * 修改课程
-     */
+    @Operation(summary = "修改课程信息")
     @PutMapping
-    public void updateCourse(@RequestBody @Validated EditCourseDTO editCourseDTO) {
+    public ContentResponse<Void> updateCourse(
+            @Parameter(description = "课程更新信息") @RequestBody @Validated EditCourseDTO editCourseDTO) {
         courseBaseService.updateCourse(editCourseDTO);
+        return ContentResponse.success(null);
     }
 
-    /**
-     * 课程预览
-     */
+    @Operation(summary = "获取课程分类树")
+    @GetMapping("/category/tree")
+    public ContentResponse<List<CourseCategoryTreeDTO>> categoryTree() {
+        return ContentResponse.success(courseBaseService.queryCourseCategoryTree());
+    }
+
+    @Operation(summary = "预览课程")
     @GetMapping("/preview/{courseId}")
-    public CoursePreviewDTO previewCourse(@PathVariable Long courseId) {
-        return courseBaseService.preview(courseId);
+    public ContentResponse<CoursePreviewDTO> previewCourse(
+            @Parameter(description = "课程ID") @PathVariable Long courseId) {
+        return ContentResponse.success(courseBaseService.preview(courseId));
     }
 
-    /**
-     * 提交课程审核
-     */
+    @Operation(summary = "提交课程审核")
     @PostMapping("/{courseId}/audit/submit")
-    public void submitForAudit(@PathVariable Long courseId) {
+    public ContentResponse<Void> submitForAudit(
+            @Parameter(description = "课程ID") @PathVariable Long courseId) {
         courseBaseService.submitForAudit(courseId);
+        return ContentResponse.success(null);
     }
 
-    /**
-     * 审核课程
-     */
+    @Operation(summary = "审核课程")
     @PostMapping("/audit")
-    public void auditCourse(@RequestBody @Validated CourseAuditDTO auditDTO) {
+    public ContentResponse<Void> auditCourse(
+            @Parameter(description = "审核信息") @RequestBody @Validated CourseAuditDTO auditDTO) {
         courseBaseService.auditCourse(auditDTO);
-    }
-
-    /**
-     * 获取课程审核状态
-     */
-    @GetMapping("/{courseId}/audit/status")
-    public String getAuditStatus(@PathVariable Long courseId) {
-        return courseBaseService.getAuditStatus(courseId);
+        return ContentResponse.success(null);
     }
 } 

@@ -2,18 +2,24 @@ package com.double2and9.content_service.dto;
 
 import lombok.Data;
 import lombok.ToString;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 @Data
 @ToString
+@Schema(description = "课程查询参数DTO")
 public class QueryCourseParamsDTO {
-    //课程名称
+    @Schema(description = "课程名称")
     private String courseName;
-    //课程状态
+    
+    @Schema(description = "课程状态")
     private String status;
-    //课程审核状态
+    
+    @Schema(description = "课程审核状态")
     private String auditStatus;
-    //课程大分类
+    
+    @Schema(description = "课程大分类")
     private Long mt;
-    //课程小分类
+    
+    @Schema(description = "课程小分类")
     private Long st;
 } 
