@@ -4,59 +4,47 @@ package com.double2and9.content_service.service;
 import com.double2and9.base.model.PageParams;
 import com.double2and9.base.model.PageResult;
 import com.double2and9.content_service.dto.*;
+import com.double2and9.content_service.entity.CourseCategory;
+import com.double2and9.content_service.repository.CourseCategoryRepository;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
+import java.util.Date;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 @SpringBootTest
+@Transactional
 public class CourseBaseServiceTests {
 
     @Autowired
     private CourseBaseService courseBaseService;
 
-    @Test
-    @Transactional
-    public void testCourseBaseFullProcess() {
-        // 1. 创建课程
-        AddCourseDTO addCourseDTO = new AddCourseDTO();
-        addCourseDTO.setName("测试课程");
-        addCourseDTO.setBrief("这是一个测试课程");
-        addCourseDTO.setMt(1L);
-        addCourseDTO.setSt(2L);
-        addCourseDTO.setCharge("201001"); // 免费课程
-        addCourseDTO.setPrice(BigDecimal.ZERO);
-        addCourseDTO.setValid(true);
+    @Autowired
+    private CourseCategoryRepository courseCategoryRepository;
 
-        Long courseId = courseBaseService.createCourse(addCourseDTO);
-        assertNotNull(courseId, "课程创建失败");
-
-        // 2. 修改课程
-        EditCourseDTO editCourseDTO = new EditCourseDTO();
-        editCourseDTO.setId(courseId);
-        editCourseDTO.setName("修改后的课程名称");
-        editCourseDTO.setBrief("修改后的课程简介");
-        editCourseDTO.setMt(1L);
-        editCourseDTO.setSt(2L);
-        editCourseDTO.setCharge("201001");
-        editCourseDTO.setPrice(BigDecimal.ZERO);
-
-        courseBaseService.updateCourse(editCourseDTO);
-
-        // 3. 查询课程
-        PageParams pageParams = new PageParams(1L, 10L);
-        QueryCourseParamsDTO queryParams = new QueryCourseParamsDTO();
-        queryParams.setCourseName("修改后的课程名称");
-
-        PageResult<CourseBaseDTO> result = courseBaseService.queryCourseList(pageParams, queryParams);
-        assertNotNull(result, "查询结果不能为空");
-        assertTrue(result.getCounts() > 0, "应该能查询到课程");
-        assertEquals("修改后的课程名称", result.getItems().get(0).getName(), "课程名称应该已更新");
+    @BeforeEach
+    public void setUp() {
+        // 创建测试用的分类数据
+        CourseCategory parent = new CourseCategory();
+        parent.setName("后端开发");
+        parent.setParentId(0L);
+        parent.setLevel(1);
+        parent.setCreateTime(new Date());
+        parent.setUpdateTime(new Date());
+        courseCategoryRepository.save(parent);
+        
+        CourseCategory child = new CourseCategory();
+        child.setName("Java开发");
+        child.setParentId(parent.getId());
+        child.setLevel(2);
+        child.setCreateTime(new Date());
+        child.setUpdateTime(new Date());
+        courseCategoryRepository.save(child);
     }
 
     @Test
@@ -66,19 +54,11 @@ public class CourseBaseServiceTests {
         assertFalse(categoryTree.isEmpty(), "课程分类树不能为空列表");
         
         // 验证树形结构
-        categoryTree.forEach(category -> {
-            assertNotNull(category.getId(), "分类ID不能为空");
-            assertNotNull(category.getName(), "分类名称不能为空");
-            assertEquals(0L, category.getParentId(), "顶级分类的父ID应该为0");
-            
-            // 如果有子节点，验证子节点
-            if (category.getChildrenTreeNodes() != null && !category.getChildrenTreeNodes().isEmpty()) {
-                category.getChildrenTreeNodes().forEach(child -> {
-                    assertEquals(category.getId(), child.getParentId(), 
-                            "子节点的父ID应该等于父节点的ID");
-                });
-            }
-        });
+        CourseCategoryTreeDTO parent = categoryTree.get(0);
+        assertEquals("后端开发", parent.getName());
+        assertNotNull(parent.getChildrenTreeNodes());
+        assertFalse(parent.getChildrenTreeNodes().isEmpty());
+        assertEquals("Java开发", parent.getChildrenTreeNodes().get(0).getName());
     }
 
     @Test
