@@ -25,6 +25,16 @@ jobs:
           --health-interval=10s
           --health-timeout=5s
           --health-retries=3
+          
+      consul:
+        image: consul:1.15.4
+        ports:
+          - 8500:8500
+        options: >-
+          --health-cmd "consul info"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
 
     steps:
     - uses: actions/checkout@v4

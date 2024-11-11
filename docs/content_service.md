@@ -349,3 +349,172 @@ POST /teachplan
   - 错误率告警
   - 响应时间告警
   - 容量预警
+
+## 10. API使用指南
+
+### 10.1 课程管理接口
+#### 10.1.1 课程列表查询
+GET /course/list
+**请求参数：**
+- pageNo: 页码（从1开始）
+- pageSize: 每页大小
+- courseName: 课程名称（可选）
+- status: 课程状态（可选）
+- mt: 课程大分类（可选）
+- st: 课程小分类（可选）
+
+**响应示例：**
+json
+{
+"code": 0,
+"message": "success",
+"data": {
+"items": [
+{
+"id": 1,
+"name": "测试课程",
+"brief": "课程简介",
+"mtName": "后端开发",
+"stName": "Java开发",
+"charge": "201001",
+"price": 0.00
+}
+],
+"counts": 100,
+"page": 1,
+"pageSize": 10
+}
+}
+#### 10.1.2 创建课程
+http
+POST /course
+
+**请求体：**
+json
+{
+"name": "课程名称",
+"brief": "课程简介",
+"mt": 1,
+"st": 2,
+"charge": "201001",
+"price": 0,
+"valid": true
+}
+
+**响应示例：**
+json
+{
+"code": 0,
+"message": "success",
+"data": 1 // 返回课程ID
+}
+
+### 10.2 课程计划接口
+#### 10.2.1 查询课程计划树
+http
+GET /teachplan/tree/{courseId}
+**响应示例：**
+json
+{
+"code": 0,
+"message": "success",
+"data": [
+{
+"id": 1,
+"name": "第一章",
+"level": 1,
+"orderBy": 1,
+"teachPlanTreeNodes": [
+{
+"id": 2,
+"name": "第一节",
+"level": 2,
+"orderBy": 1
+}
+]
+}
+]
+}
+#### 10.2.2 章节移动
+http
+POST /teachplan/{teachplanId}/moveup // 向上移动
+POST /teachplan/{teachplanId}/movedown // 向下移动
+
+**响应示例：**
+son
+{
+"code": 0,
+"message": "success",
+"data": null
+}
+
+### 10.3 课程教师接口
+#### 10.3.1 教师列表查询
+http
+GET /course-teacher/list/{courseId}
+
+**响应示例：**
+json
+{
+"code": 0,
+"message": "success",
+"data": [
+{
+"id": 1,
+"name": "张老师",
+"position": "高级讲师",
+"description": "教师简介"
+}
+]
+}
+#### 10.3.2 添加/修改教师
+**请求体：**
+http
+POST /course-teacher
+json
+{
+"courseId": 1,
+"name": "张老师",
+"position": "高级讲师",
+"description": "教师简介"
+}
+
+### 10.4 课程审核接口
+#### 10.4.1 提交审核
+http
+POST /course/{courseId}/audit/submit
+#### 10.4.2 审核课程
+http
+POST /course/audit
+**请求体：**
+json
+{
+"courseId": 1,
+"auditStatus": "202303",
+"auditMind": "审核通过"
+}
+
+### 10.5 媒资关联接口
+#### 10.5.1 绑定媒资
+http
+POST /teachplan-media
+
+**请求体：**
+json
+{
+"teachplanId": 1,
+"mediaId": 1,
+"mediaFileName": "示例视频.mp4"
+}
+#### 10.5.2 解除绑定
+http
+DELETE /teachplan-media/{teachplanId}/{mediaId}
+### 10.6 错误码说明
+| 错误码 | 说明 |
+|--------|------|
+| 100101 | 课程不存在 |
+| 100102 | 课程名称不能为空 |
+| 100201 | 课程计划不存在 |
+| 100202 | 课程计划层级错误 |
+| 100301 | 教师不存在 |
+| 100401 | 媒资不存在 |
