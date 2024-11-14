@@ -49,13 +49,10 @@ jobs:
           --health-interval=10s
           --health-timeout=5s
           --health-retries=3
-        args:
-          - server
-          - /data
-          - --address
-          - ":9000"
-          - --console-address
-          - ":9001"
+        run: |
+          minio server /data --address ":9000" --console-address ":9001"
+
+
           
       consul:
         image: consul:1.15.4
