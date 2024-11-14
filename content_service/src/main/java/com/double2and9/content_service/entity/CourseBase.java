@@ -33,9 +33,9 @@ public class CourseBase {
     private String brief;
 
     /**
-     * 课程封面图片
+     * 课程封面图片URL，来自文件系统的访问地址
      */
-    @Column(length = 255)
+    @Column(length = 1024)
     private String logo;
 
     /**

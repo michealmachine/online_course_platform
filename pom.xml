@@ -24,6 +24,8 @@
     <modules>
         <module>base</module>
         <module>content_service</module>
+        <module>gateway</module>
+        <module>media</module>
     </modules>
     <scm>
         <connection/>

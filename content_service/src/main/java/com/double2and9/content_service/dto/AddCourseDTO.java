@@ -20,7 +20,7 @@ public class AddCourseDTO {
     @NotEmpty(message = "课程简介不能为空")
     private String brief;
     
-    @Schema(description = "课程封面图片URL")
+    @Schema(description = "课程封面图片URL，非必填", requiredMode = Schema.RequiredMode.NOT_REQUIRED)
     private String logo;
     
     @Schema(description = "课程大分类ID", requiredMode = Schema.RequiredMode.REQUIRED)

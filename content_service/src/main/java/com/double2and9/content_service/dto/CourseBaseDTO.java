@@ -18,7 +18,7 @@ public class CourseBaseDTO {
     @Schema(description = "课程简介")
     private String brief;
     
-    @Schema(description = "课程封面图片URL")
+    @Schema(description = "课程封面图片URL，为空时使用默认图片")
     private String logo;
     
     @Schema(description = "收费规则")

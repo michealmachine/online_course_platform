@@ -52,6 +52,7 @@
 - GitHub Actions：CI/CD
 
 ### 2.2 项目结构
+```angular2html
 content_service/
 ├── controller/ # 控制层，处理HTTP请求
 │ ├── CourseController.java
@@ -74,6 +75,7 @@ content_service/
 │ ├── request/ # 请求DTO
 │ └── response/ # 响应DTO
 └── config/ # 配置类
+```
 
 
 ## 3. 数据模型设计

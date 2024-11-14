@@ -26,6 +26,31 @@ jobs:
           --health-timeout=5s
           --health-retries=3
           
+      redis:
+        image: redis:6.2
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=3
+          
+      minio:
+        image: minio/minio
+        ports:
+          - 9000:9000
+          - 9001:9001
+        env:
+          MINIO_ROOT_USER: root
+          MINIO_ROOT_PASSWORD: rootroot
+        options: >-
+          --name=minio
+          --health-cmd="curl -f http://localhost:9000/minio/health/live"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=3
+          
       consul:
         image: consul:1.15.4
         ports:
@@ -69,6 +94,10 @@ jobs:
           sleep 1
         done
     
-    # 只构建和测试content_service模块
+    # 构建和测试content_service模块
     - name: Build and Test Content Service Module
       run: mvn clean verify -pl content_service -Dspring.profiles.active=test
+
+    # 构建和测试media模块
+    - name: Build and Test Media Module
+      run: mvn clean verify -pl media -Dspring.profiles.active=test
