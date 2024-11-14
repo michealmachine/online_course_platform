@@ -37,7 +37,7 @@ jobs:
           --health-retries=3
           
       minio:
-        image: minio/minio
+        image: quay.io/minio/minio:latest
         ports:
           - 9000:9000
           - 9001:9001
@@ -45,11 +45,11 @@ jobs:
           MINIO_ROOT_USER: root
           MINIO_ROOT_PASSWORD: rootroot
         options: >-
-          --name=minio
-          --health-cmd="curl -f http://localhost:9000/minio/health/live"
+          --health-cmd="curl -f http://localhost:9000/minio/health/ready || exit 1"
           --health-interval=10s
           --health-timeout=5s
           --health-retries=3
+          --entrypoint server /data --address ":9000" --console-address ":9001"
           
       consul:
         image: consul:1.15.4
