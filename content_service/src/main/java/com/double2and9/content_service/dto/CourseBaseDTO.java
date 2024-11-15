@@ -3,24 +3,42 @@ package com.double2and9.content_service.dto;
 import java.math.BigDecimal;
 import lombok.Data;
 import lombok.ToString;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 @Data
 @ToString
+@Schema(description = "课程基本信息DTO")
 public class CourseBaseDTO {
-    // 课程基本信息
+    @Schema(description = "课程ID")
     private Long id;
+    
+    @Schema(description = "课程名称")
     private String name;
+    
+    @Schema(description = "课程简介")
     private String brief;
+    
+    @Schema(description = "课程封面图片URL，为空时使用默认图片")
     private String logo;
+    
+    @Schema(description = "收费规则")
     private String charge;
+    
+    @Schema(description = "课程状态")
     private String status;
+    
+    @Schema(description = "课程价格")
     private BigDecimal price;
     
-    // 课程分类名称
+    @Schema(description = "课程大分类名称")
     private String mtName;
+    
+    @Schema(description = "课程小分类名称")
     private String stName;
     
-    // 课程营销信息
+    @Schema(description = "优惠信息")
     private String discounts;
+    
+    @Schema(description = "教学模式")
     private String teachmode;
 } 

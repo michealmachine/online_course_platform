@@ -1,3 +1,11 @@
 spring:
   profiles:
     active: dev
+springdoc:
+  api-docs:
+    enabled: true
+  swagger-ui:
+    path: /swagger-ui.html
+    tags-sorter: alpha
+    operations-sorter: alpha
+  packages-to-scan: com.double2and9.content_service.controller

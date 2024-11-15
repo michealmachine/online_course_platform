@@ -1,4 +1,4 @@
-package com.double2and9.content_service.common.enums;
+package com.double2and9.base.enums;
 
 import lombok.Getter;
 
@@ -15,6 +15,7 @@ public enum ContentErrorCode {
     TEACHPLAN_NOT_EXISTS(100201, "课程计划不存在"),
     TEACHPLAN_LEVEL_ERROR(100202, "课程计划层级错误"),
     TEACHPLAN_DELETE_ERROR(100203, "课程计划包含子节点，无法删除"),
+    TEACHPLAN_MOVE_ERROR(100204, "课程计划移动失败"),
 
     // 教师相关错误 1003xx
     TEACHER_NOT_EXISTS(100301, "教师不存在"),

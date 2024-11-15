@@ -1,0 +1,50 @@
+### 1. 上传图片到临时存储
+POST http://localhost:8082/images/temp
+Content-Type: multipart/form-data; boundary=WebAppBoundary
+
+--WebAppBoundary
+Content-Disposition: form-data; name="file"; filename="test.jpg"
+Content-Type: image/jpeg
+
+< ./src/test/resources/test.jpg
+--WebAppBoundary--
+
+### 2. 更新临时存储的图片
+PUT http://localhost:8082/images/temp/media:temp:image:a029698e-9b14-43ca-8e1b-acb84b18be81
+Content-Type: multipart/form-data; boundary=WebAppBoundary
+
+--WebAppBoundary
+Content-Disposition: form-data; name="file"; filename="new_test.jpg"
+Content-Type: image/jpeg
+
+< ./src/test/resources/new_test.jpg
+--WebAppBoundary--
+
+### 3. 保存临时文件到永久存储
+POST http://localhost:8082/images/temp/save
+Content-Type: application/json
+
+{
+    "tempKey": "media:temp:image:a029698e-9b14-43ca-8e1b-acb84b18be81"
+}
+
+### 4. 更新不存在的临时图片(测试错误处理)
+PUT http://localhost:8082/images/temp/media:temp:image:not-exists
+Content-Type: multipart/form-data; boundary=WebAppBoundary
+
+--WebAppBoundary
+Content-Disposition: form-data; name="file"; filename="test.jpg"
+Content-Type: image/jpeg
+
+< ./src/test/resources/test.jpg
+--WebAppBoundary--
+
+### 5. 更新时不传文件(测试参数校验)
+PUT http://localhost:8082/images/temp/media:temp:image:exists
+Content-Type: multipart/form-data; boundary=WebAppBoundary
+
+--WebAppBoundary
+Content-Disposition: form-data; name="file"; filename=""
+Content-Type: application/octet-stream
+
+--WebAppBoundary-- 

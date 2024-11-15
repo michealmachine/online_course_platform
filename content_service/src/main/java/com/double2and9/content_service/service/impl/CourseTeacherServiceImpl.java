@@ -1,6 +1,6 @@
 package com.double2and9.content_service.service.impl;
 
-import com.double2and9.content_service.common.enums.ContentErrorCode;
+import com.double2and9.base.enums.ContentErrorCode;
 import com.double2and9.content_service.common.exception.ContentException;
 import com.double2and9.content_service.dto.CourseTeacherDTO;
 import com.double2and9.content_service.dto.SaveCourseTeacherDTO;

@@ -1,6 +1,6 @@
 package com.double2and9.content_service.service.impl;
 
-import com.double2and9.content_service.common.enums.ContentErrorCode;
+import com.double2and9.base.enums.ContentErrorCode;
 import com.double2and9.content_service.common.exception.ContentException;
 import com.double2and9.content_service.dto.SaveTeachplanDTO;
 import com.double2and9.content_service.dto.TeachplanDTO;
@@ -15,7 +15,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.*;
-import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -113,5 +112,51 @@ public class TeachplanServiceImpl implements TeachplanService {
         teachplanRepository.delete(teachplan);
         
         log.info("课程计划删除成功，课程计划ID：{}", teachplanId);
+    }
+
+    @Override
+    @Transactional
+    public void moveUp(Long teachplanId) {
+        // 获取当前节点
+        Teachplan current = teachplanRepository.findById(teachplanId)
+                .orElseThrow(() -> new ContentException(ContentErrorCode.TEACHPLAN_NOT_EXISTS));
+        
+        // 查找上一个节点
+        Teachplan previous = teachplanRepository.findPreviousNode(current.getParentId(), current.getOrderBy())
+                .orElseThrow(() -> new ContentException(ContentErrorCode.TEACHPLAN_MOVE_ERROR, "已经是第一个节点"));
+        
+        // 交换排序号
+        Integer currentOrder = current.getOrderBy();
+        current.setOrderBy(previous.getOrderBy());
+        previous.setOrderBy(currentOrder);
+        
+        // 保存更改
+        teachplanRepository.save(current);
+        teachplanRepository.save(previous);
+        
+        log.info("课程计划上移成功，当前节点：{}，上一节点：{}", current.getId(), previous.getId());
+    }
+
+    @Override
+    @Transactional
+    public void moveDown(Long teachplanId) {
+        // 获取当前节点
+        Teachplan current = teachplanRepository.findById(teachplanId)
+                .orElseThrow(() -> new ContentException(ContentErrorCode.TEACHPLAN_NOT_EXISTS));
+        
+        // 查找下一个节点
+        Teachplan next = teachplanRepository.findNextNode(current.getParentId(), current.getOrderBy())
+                .orElseThrow(() -> new ContentException(ContentErrorCode.TEACHPLAN_MOVE_ERROR, "已经是最后一个节点"));
+        
+        // 交换排序号
+        Integer currentOrder = current.getOrderBy();
+        current.setOrderBy(next.getOrderBy());
+        next.setOrderBy(currentOrder);
+        
+        // 保存更改
+        teachplanRepository.save(current);
+        teachplanRepository.save(next);
+        
+        log.info("课程计划下移成功，当前节点：{}，下一节点：{}", current.getId(), next.getId());
     }
 } 

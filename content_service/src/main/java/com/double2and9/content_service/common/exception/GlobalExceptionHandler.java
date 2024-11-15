@@ -1,6 +1,6 @@
 package com.double2and9.content_service.common.exception;
 
-import com.double2and9.content_service.common.enums.ContentErrorCode;
+import com.double2and9.base.enums.ContentErrorCode;
 import com.double2and9.content_service.common.model.ContentResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;

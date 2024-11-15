@@ -25,9 +25,50 @@ jobs:
           --health-interval=10s
           --health-timeout=5s
           --health-retries=3
+          
+      redis:
+        image: redis:6.2
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=3
+      consul:
+        image: consul:1.15.4
+        ports:
+          - 8500:8500
+        options: >-
+          --health-cmd "consul info"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
 
     steps:
     - uses: actions/checkout@v4
+    
+    # 添加MinIO初始化步骤
+    - name: Setup MinIO
+      run: |
+        docker pull quay.io/minio/minio:latest
+        docker run -d \
+          --name minio \
+          -p 9000:9000 \
+          -p 9001:9001 \
+          -e "MINIO_ROOT_USER=root" \
+          -e "MINIO_ROOT_PASSWORD=rootroot" \
+          quay.io/minio/minio:latest \
+          server /data --address ":9000" --console-address ":9001"
+        
+        # 等待MinIO启动
+        sleep 10
+        curl -f http://localhost:9000/minio/health/ready || exit 1
+    
+    - name: Configure System Settings
+      run: |
+        echo "vm.overcommit_memory = 1" | sudo tee -a /etc/sysctl.conf
+        sudo sysctl vm.overcommit_memory=1
     
     - name: Set up JDK 17
       uses: actions/setup-java@v4
@@ -59,6 +100,10 @@ jobs:
           sleep 1
         done
     
-    # 只构建和测试content_service模块
+    # 构建和测试content_service模块
     - name: Build and Test Content Service Module
       run: mvn clean verify -pl content_service -Dspring.profiles.active=test
+
+    # 构建和测试media模块
+    - name: Build and Test Media Module
+      run: mvn clean verify -pl media -Dspring.profiles.active=test

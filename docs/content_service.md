@@ -16,6 +16,7 @@
   - 小节管理（二级）
   - 树形结构展示
   - 排序功能
+  - 章节上下移动
 - 课程教师管理
   - 教师信息的增删改查
   - 支持多个教师
@@ -27,6 +28,10 @@
   - 媒资绑定到课程计划
   - 支持解除绑定
   - 媒资信息查询
+- API文档
+  - 集成Swagger
+  - 详细的接口说明
+  - 完整的参数描述
 
 ### 1.2 待实现功能
 - 课程发布功能
@@ -43,8 +48,11 @@
 - MySQL：数据存储
 - JUnit 5：单元测试
 - Validation：参数校验
+- Swagger/OpenAPI：接口文档
+- GitHub Actions：CI/CD
 
 ### 2.2 项目结构
+```angular2html
 content_service/
 ├── controller/ # 控制层，处理HTTP请求
 │ ├── CourseController.java
@@ -67,6 +75,7 @@ content_service/
 │ ├── request/ # 请求DTO
 │ └── response/ # 响应DTO
 └── config/ # 配置类
+```
 
 
 ## 3. 数据模型设计
@@ -276,3 +285,238 @@ POST /teachplan
     - 数据库索引优化
     - N+1问题处理
     - 大数据量分页优化
+
+## 9. 微服务架构规划
+
+### 9.1 事件机制
+- 课程状态变更事件
+  - 发布状态变更
+  - 审核状态变更
+  - 为消息队列集成做准备
+- 操作日志事件
+  - 课程操作记录
+  - 审核操作记录
+- 统计数据事件
+  - 访问量统计
+  - 学习人数统计
+
+### 9.2 分布式功能
+- 分布式锁
+  - 课程审核锁
+  - 课程发布锁
+  - 防止并发操作冲突
+- 接口幂等性
+  - 重复提交保护
+  - 操作日志记录
+  - 分布式事务支持
+
+### 9.3 微服务集成
+- 媒资服务集成
+  - MinIO存储集成
+  - 媒资上传接口
+  - 媒资处理回调
+- 搜索服务集成
+  - 课程索引创建
+  - 搜索条件优化
+  - 数据同步机制
+- 任务调度集成
+  - 定时统计任务
+  - 数据同步任务
+  - 缓存更新任务
+
+### 9.4 性能优化规划
+- 缓存策略
+  - 热门课程缓存
+  - 分类数据缓存
+  - 统计数据缓存
+- 数据库优化
+  - 读写分离
+  - 分库分表预案
+  - 索引优化
+- 接口优化
+  - 批量操作接口
+  - 异步处理机制
+  - 限流降级策略
+
+### 9.5 监控告警
+- 业务监控
+  - 课程发布监控
+  - 审核流程监控
+  - 关键指标监控
+- 性能监控
+  - 接口响应时间
+  - 资源使用情况
+  - 并发处理能力
+- 告警机制
+  - 错误率告警
+  - 响应时间告警
+  - 容量预警
+
+## 10. API使用指南
+
+### 10.1 课程管理接口
+#### 10.1.1 课程列表查询
+GET /course/list
+**请求参数：**
+- pageNo: 页码（从1开始）
+- pageSize: 每页大小
+- courseName: 课程名称（可选）
+- status: 课程状态（可选）
+- mt: 课程大分类（可选）
+- st: 课程小分类（可选）
+
+**响应示例：**
+json
+{
+"code": 0,
+"message": "success",
+"data": {
+"items": [
+{
+"id": 1,
+"name": "测试课程",
+"brief": "课程简介",
+"mtName": "后端开发",
+"stName": "Java开发",
+"charge": "201001",
+"price": 0.00
+}
+],
+"counts": 100,
+"page": 1,
+"pageSize": 10
+}
+}
+#### 10.1.2 创建课程
+http
+POST /course
+
+**请求体：**
+json
+{
+"name": "课程名称",
+"brief": "课程简介",
+"mt": 1,
+"st": 2,
+"charge": "201001",
+"price": 0,
+"valid": true
+}
+
+**响应示例：**
+json
+{
+"code": 0,
+"message": "success",
+"data": 1 // 返回课程ID
+}
+
+### 10.2 课程计划接口
+#### 10.2.1 查询课程计划树
+http
+GET /teachplan/tree/{courseId}
+**响应示例：**
+json
+{
+"code": 0,
+"message": "success",
+"data": [
+{
+"id": 1,
+"name": "第一章",
+"level": 1,
+"orderBy": 1,
+"teachPlanTreeNodes": [
+{
+"id": 2,
+"name": "第一节",
+"level": 2,
+"orderBy": 1
+}
+]
+}
+]
+}
+#### 10.2.2 章节移动
+http
+POST /teachplan/{teachplanId}/moveup // 向上移动
+POST /teachplan/{teachplanId}/movedown // 向下移动
+
+**响应示例：**
+son
+{
+"code": 0,
+"message": "success",
+"data": null
+}
+
+### 10.3 课程教师接口
+#### 10.3.1 教师列表查询
+http
+GET /course-teacher/list/{courseId}
+
+**响应示例：**
+json
+{
+"code": 0,
+"message": "success",
+"data": [
+{
+"id": 1,
+"name": "张老师",
+"position": "高级讲师",
+"description": "教师简介"
+}
+]
+}
+#### 10.3.2 添加/修改教师
+**请求体：**
+http
+POST /course-teacher
+json
+{
+"courseId": 1,
+"name": "张老师",
+"position": "高级讲师",
+"description": "教师简介"
+}
+
+### 10.4 课程审核接口
+#### 10.4.1 提交审核
+http
+POST /course/{courseId}/audit/submit
+#### 10.4.2 审核课程
+http
+POST /course/audit
+**请求体：**
+json
+{
+"courseId": 1,
+"auditStatus": "202303",
+"auditMind": "审核通过"
+}
+
+### 10.5 媒资关联接口
+#### 10.5.1 绑定媒资
+http
+POST /teachplan-media
+
+**请求体：**
+json
+{
+"teachplanId": 1,
+"mediaId": 1,
+"mediaFileName": "示例视频.mp4"
+}
+#### 10.5.2 解除绑定
+http
+DELETE /teachplan-media/{teachplanId}/{mediaId}
+### 10.6 错误码说明
+| 错误码 | 说明 |
+|--------|------|
+| 100101 | 课程不存在 |
+| 100102 | 课程名称不能为空 |
+| 100201 | 课程计划不存在 |
+| 100202 | 课程计划层级错误 |
+| 100301 | 教师不存在 |
+| 100401 | 媒资不存在 |
