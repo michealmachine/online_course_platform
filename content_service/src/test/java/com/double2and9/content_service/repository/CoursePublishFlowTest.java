@@ -19,6 +19,8 @@ import static org.junit.jupiter.api.Assertions.*;
 @Rollback
 public class CoursePublishFlowTest {
 
+    private static final Long TEST_ORG_ID = 1234L;
+
     @Autowired
     private CourseBaseRepository courseBaseRepository;
 
@@ -36,6 +38,7 @@ public class CoursePublishFlowTest {
         courseBase.setBrief("测试课程简介");
         courseBase.setMt(1L);
         courseBase.setSt(1L);
+        courseBase.setOrganizationId(TEST_ORG_ID);
         courseBase.setCharge("201001");
         courseBase.setValid(true);
         courseBase.setCreateTime(new Date());
@@ -90,6 +93,7 @@ public class CoursePublishFlowTest {
         courseBase.setBrief("测试课程简介");
         courseBase.setMt(1L);
         courseBase.setSt(1L);
+        courseBase.setOrganizationId(TEST_ORG_ID);
         courseBase.setCharge("201001");
         courseBase.setValid(true);
         courseBase.setCreateTime(new Date());

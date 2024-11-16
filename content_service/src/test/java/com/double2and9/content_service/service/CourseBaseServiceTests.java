@@ -12,6 +12,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.Date;
 import java.util.List;
 
@@ -20,6 +21,8 @@ import static org.junit.jupiter.api.Assertions.*;
 @SpringBootTest
 @Transactional
 public class CourseBaseServiceTests {
+
+    private static final Long TEST_ORG_ID = 1234L;
 
     @Autowired
     private CourseBaseService courseBaseService;
@@ -63,18 +66,21 @@ public class CourseBaseServiceTests {
 
     @Test
     public void testCoursePreview() {
-        // 假设数据库中已有课程数据
-        PageParams pageParams = new PageParams(1L, 1L);
-        QueryCourseParamsDTO queryParams = new QueryCourseParamsDTO();
-        PageResult<CourseBaseDTO> courses = courseBaseService.queryCourseList(pageParams, queryParams);
+        // 创建测试课程
+        AddCourseDTO courseDTO = new AddCourseDTO();
+        courseDTO.setName("测试课程");
+        courseDTO.setBrief("测试课程简介");
+        courseDTO.setMt(1L);
+        courseDTO.setSt(1L);
+        courseDTO.setOrganizationId(TEST_ORG_ID);
+        courseDTO.setCharge("201001");
+        courseDTO.setPrice(BigDecimal.ZERO);
+        courseDTO.setValid(true);
+
+        Long courseId = courseBaseService.createCourse(courseDTO);
         
-        if (courses.getCounts() > 0) {
-            Long courseId = courses.getItems().get(0).getId();
-            CoursePreviewDTO preview = courseBaseService.preview(courseId);
-            
-            assertNotNull(preview, "预览数据不能为空");
-            assertNotNull(preview.getCourseBase(), "课程基本信息不能为空");
-            assertEquals(courseId, preview.getCourseBase().getId(), "课程ID应该匹配");
-        }
+        CoursePreviewDTO preview = courseBaseService.preview(courseId);
+        assertNotNull(preview);
+        assertEquals(TEST_ORG_ID, preview.getCourseBase().getOrganizationId());
     }
 } 

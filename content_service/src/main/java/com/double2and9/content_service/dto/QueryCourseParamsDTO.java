@@ -22,4 +22,7 @@ public class QueryCourseParamsDTO {
     
     @Schema(description = "课程小分类")
     private Long st;
+    
+    @Schema(description = "机构ID")
+    private Long organizationId;
 } 

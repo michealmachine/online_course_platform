@@ -18,6 +18,8 @@ import static org.junit.jupiter.api.Assertions.*;
 @Rollback
 public class CourseTeacherRepositoryTest {
 
+    private static final Long TEST_ORG_ID = 1234L;
+
     @Autowired
     private CourseTeacherRepository courseTeacherRepository;
     
@@ -29,6 +31,7 @@ public class CourseTeacherRepositoryTest {
         // 准备测试数据
         CourseBase courseBase = new CourseBase();
         courseBase.setName("测试课程");
+        courseBase.setOrganizationId(TEST_ORG_ID);
         courseBase = courseBaseRepository.save(courseBase);
 
         CourseTeacher teacher = new CourseTeacher();

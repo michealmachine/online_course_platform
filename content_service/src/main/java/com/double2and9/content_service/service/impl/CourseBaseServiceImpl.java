@@ -15,8 +15,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.modelmapper.ModelMapper;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.transaction.annotation.Transactional;
@@ -66,51 +64,17 @@ public class CourseBaseServiceImpl implements CourseBaseService {
      */
     @Override
     public PageResult<CourseBaseDTO> queryCourseList(PageParams params, QueryCourseParamsDTO queryParams) {
-        //构建查询条件
-        Specification<CourseBase> specification = (root, query, cb) -> {
-            List<Predicate> predicates = new ArrayList<>();
-            
-            //课程名称模糊查询
-            if (StringUtils.hasText(queryParams.getCourseName())) {
-                predicates.add(cb.like(root.get("name"), 
-                    "%" + queryParams.getCourseName() + "%"));
-            }
-
-            //课程状态
-            if (StringUtils.hasText(queryParams.getStatus())) {
-                predicates.add(cb.equal(root.get("status"), 
-                    queryParams.getStatus()));
-            }
-
-            //课程审核状态
-            if (StringUtils.hasText(queryParams.getAuditStatus())) {
-                // 关联预发布表查询审核状态
-                predicates.add(cb.equal(
-                    root.join("coursePublishPre").get("status"), 
-                    queryParams.getAuditStatus()));
-            }
-
-            //课程分类
-            if (queryParams.getMt() != null) {
-                predicates.add(cb.equal(root.get("mt"), 
-                    queryParams.getMt()));
-            }
-            if (queryParams.getSt() != null) {
-                predicates.add(cb.equal(root.get("st"), 
-                    queryParams.getSt()));
-            }
-
-            return cb.and(predicates.toArray(new Predicate[0]));
-        };
-
-        //分页参数
-        Pageable pageable = PageRequest.of(
-            params.getPageNo().intValue() - 1, 
-            params.getPageSize().intValue());
-
-        //分页查询
-        Page<CourseBase> page = courseBaseRepository.findAll(specification, pageable);
-
+        // 使用查询参数中的机构ID
+        Long organizationId = queryParams.getOrganizationId();
+        
+        // 使用机构ID进行查询
+        Page<CourseBase> page = courseBaseRepository.findByConditions(
+            organizationId,
+            queryParams.getCourseName(),
+            queryParams.getStatus(),
+            PageRequest.of(params.getPageNo().intValue() - 1, params.getPageSize().intValue())
+        );
+        
         //数据转换
         List<CourseBaseDTO> items = page.getContent().stream()
             .map(this::convertToCourseBaseDTO)
@@ -133,8 +97,11 @@ public class CourseBaseServiceImpl implements CourseBaseService {
     @Override
     @Transactional
     public Long createCourse(AddCourseDTO addCourseDTO) {
-        // 转换DTO为实体
-        CourseBase courseBase = convertToEntity(addCourseDTO);
+        // 直接使用DTO中的机构ID
+        Long organizationId = addCourseDTO.getOrganizationId();
+        
+        CourseBase courseBase = modelMapper.map(addCourseDTO, CourseBase.class);
+        courseBase.setOrganizationId(organizationId);
         
         // 先保存CourseBase以获取ID
         CourseBase savedCourse = courseBaseRepository.save(courseBase);

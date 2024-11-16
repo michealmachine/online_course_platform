@@ -1,9 +1,6 @@
 package com.double2and9.content_service.service;
 
-import com.double2and9.content_service.dto.AddCourseDTO;
-import com.double2and9.content_service.dto.CourseAuditDTO;
-import com.double2and9.content_service.dto.SaveTeachplanDTO;
-import com.double2and9.content_service.dto.SaveCourseTeacherDTO;
+import com.double2and9.content_service.dto.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -11,11 +8,14 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 @SpringBootTest
 public class CourseAuditServiceTests {
+
+    private static final Long TEST_ORG_ID = 1234L;
 
     @Autowired
     private CourseBaseService courseBaseService;
@@ -40,6 +40,7 @@ public class CourseAuditServiceTests {
         courseDTO.setCharge("201001");
         courseDTO.setPrice(BigDecimal.ZERO);
         courseDTO.setValid(true);
+        courseDTO.setOrganizationId(TEST_ORG_ID);
 
         courseId = courseBaseService.createCourse(courseDTO);
         assertNotNull(courseId, "课程创建失败");
@@ -52,6 +53,15 @@ public class CourseAuditServiceTests {
         teachplanDTO.setName("第一章");
         teachplanDTO.setOrderBy(1);
         teachplanService.saveTeachplan(teachplanDTO);
+
+        // 添加小节
+        SaveTeachplanDTO sectionDTO = new SaveTeachplanDTO();
+        sectionDTO.setCourseId(courseId);
+        sectionDTO.setParentId(teachplanDTO.getId());
+        sectionDTO.setLevel(2);
+        sectionDTO.setName("第一节");
+        sectionDTO.setOrderBy(1);
+        teachplanService.saveTeachplan(sectionDTO);
 
         // 3. 添加课程教师
         SaveCourseTeacherDTO teacherDTO = new SaveCourseTeacherDTO();
@@ -104,9 +114,26 @@ public class CourseAuditServiceTests {
     @Test
     @Transactional
     public void testSubmitAuditWithoutTeachplan() {
-        // 删除课程计划
-        teachplanService.findTeachplanTree(courseId)
-            .forEach(chapter -> teachplanService.deleteTeachplan(chapter.getId()));
+        // 删除课程计划 - 先删除小节，再删除章节
+        List<TeachplanDTO> chapters = teachplanService.findTeachplanTree(courseId);
+        
+        // 1. 先删除所有小节
+        for (TeachplanDTO chapter : chapters) {
+            if (chapter.getTeachPlanTreeNodes() != null) {
+                for (TeachplanDTO section : chapter.getTeachPlanTreeNodes()) {
+                    if (section != null && section.getId() != null) {
+                        teachplanService.deleteTeachplan(section.getId());
+                    }
+                }
+            }
+        }
+        
+        // 2. 再删除所有章节
+        for (TeachplanDTO chapter : chapters) {
+            if (chapter != null && chapter.getId() != null) {
+                teachplanService.deleteTeachplan(chapter.getId());
+            }
+        }
 
         // 提交审核应该失败
         assertThrows(RuntimeException.class, () -> courseBaseService.submitForAudit(courseId),

@@ -45,10 +45,12 @@ public class TeachplanServiceImpl implements TeachplanService {
             TeachplanDTO dto = modelMapper.map(teachplan, TeachplanDTO.class);
             teachplanMap.put(dto.getId(), dto);
             
-            if (teachplan.getParentId() == 0L) {
+            // 处理parentId为null的情况
+            Long parentId = teachplan.getParentId();
+            if (parentId == null || parentId == 0L) {
                 chapters.add(dto);
             } else {
-                TeachplanDTO parentNode = teachplanMap.get(teachplan.getParentId());
+                TeachplanDTO parentNode = teachplanMap.get(parentId);
                 if (parentNode != null) {
                     if (parentNode.getTeachPlanTreeNodes() == null) {
                         parentNode.setTeachPlanTreeNodes(new ArrayList<>());

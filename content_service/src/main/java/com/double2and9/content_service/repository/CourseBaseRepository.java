@@ -1,9 +1,12 @@
 package com.double2and9.content_service.repository;
 
 import com.double2and9.content_service.entity.CourseBase;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -23,4 +26,19 @@ public interface CourseBaseRepository extends JpaRepository<CourseBase, Long>, J
     // 自定义查询示例
     @Query("SELECT c FROM CourseBase c WHERE c.mt = ?1 AND c.valid = true ORDER BY c.createTime DESC")
     List<CourseBase> findLatestCoursesByMt(Long mt);
+    
+    // 添加按机构ID查询的方法
+    Page<CourseBase> findByOrganizationId(Long organizationId, Pageable pageable);
+    
+    // 按机构ID和其他条件查询
+    @Query("SELECT c FROM CourseBase c WHERE " +
+           "(:organizationId IS NULL OR c.organizationId = :organizationId) AND " +
+           "(:name IS NULL OR c.name LIKE %:name%) AND " +
+           "(:status IS NULL OR c.status = :status)")
+    Page<CourseBase> findByConditions(
+        @Param("organizationId") Long organizationId,
+        @Param("name") String name,
+        @Param("status") String status,
+        Pageable pageable
+    );
 } 

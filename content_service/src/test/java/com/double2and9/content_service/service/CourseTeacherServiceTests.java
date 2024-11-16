@@ -17,6 +17,8 @@ import static org.junit.jupiter.api.Assertions.*;
 @SpringBootTest
 public class CourseTeacherServiceTests {
 
+    private static final Long TEST_ORG_ID = 1234L;
+
     @Autowired
     private CourseTeacherService courseTeacherService;
     
@@ -37,9 +39,10 @@ public class CourseTeacherServiceTests {
         courseDTO.setCharge("201001");
         courseDTO.setPrice(BigDecimal.ZERO);
         courseDTO.setValid(true);
+        courseDTO.setOrganizationId(TEST_ORG_ID);
 
         courseId = courseBaseService.createCourse(courseDTO);
-        assertNotNull(courseId, "课程创建失败");
+        assertNotNull(courseId);
     }
 
     @Test

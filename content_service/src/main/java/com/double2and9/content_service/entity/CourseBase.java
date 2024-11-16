@@ -129,4 +129,10 @@ public class CourseBase {
      */
     @OneToOne(mappedBy = "courseBase", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
     private CoursePublishPre coursePublishPre;
+
+    /**
+     * 机构ID
+     */
+    @Column(name = "organization_id", nullable = false)
+    private Long organizationId;
 }

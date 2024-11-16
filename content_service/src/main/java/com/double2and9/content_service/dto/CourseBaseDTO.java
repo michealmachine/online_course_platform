@@ -41,4 +41,7 @@ public class CourseBaseDTO {
     
     @Schema(description = "教学模式")
     private String teachmode;
+    
+    @Schema(description = "机构ID")
+    private Long organizationId;
 } 
