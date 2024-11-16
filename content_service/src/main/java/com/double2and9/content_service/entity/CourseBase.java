@@ -1,10 +1,14 @@
 package com.double2and9.content_service.entity;
 import jakarta.persistence.*;
 import lombok.Data;
+import lombok.ToString;
+import lombok.EqualsAndHashCode;
 
 import java.math.BigDecimal;
 import java.util.Date;
 import java.util.List;
+import java.util.Set;
+import java.util.HashSet;
 
 /**
  * 课程基本信息
@@ -103,31 +107,41 @@ public class CourseBase {
     /**
      * 课程营销信息
      */
-    @OneToOne(mappedBy = "courseBase", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToOne(mappedBy = "courseBase", cascade = CascadeType.ALL, orphanRemoval = true)
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
     private CourseMarket courseMarket;
 
     /**
      * 课程教师列表
      */
-    @OneToMany(mappedBy = "courseBase", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<CourseTeacher> teachers;
+    @ManyToMany(mappedBy = "courses", fetch = FetchType.LAZY)
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
+    private Set<CourseTeacher> teachers = new HashSet<>();
 
     /**
      * 课程计划列表
      */
     @OneToMany(mappedBy = "courseBase", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
     private List<Teachplan> teachplans;
 
     /**
      * 课程发布信息
      */
     @OneToOne(mappedBy = "courseBase", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
     private CoursePublish coursePublish;
 
     /**
      * 课程预发布信息
      */
     @OneToOne(mappedBy = "courseBase", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
     private CoursePublishPre coursePublishPre;
 
     /**

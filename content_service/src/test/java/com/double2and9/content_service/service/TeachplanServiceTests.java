@@ -3,7 +3,6 @@ package com.double2and9.content_service.service;
 import com.double2and9.content_service.common.exception.ContentException;
 import com.double2and9.content_service.entity.CourseBase;
 import com.double2and9.content_service.entity.Teachplan;
-import com.double2and9.content_service.BaseTest;
 import com.double2and9.content_service.repository.CourseBaseRepository;
 import com.double2and9.content_service.repository.TeachplanRepository;
 import org.junit.jupiter.api.BeforeEach;

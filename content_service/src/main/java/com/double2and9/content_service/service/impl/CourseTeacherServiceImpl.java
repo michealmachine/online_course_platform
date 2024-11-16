@@ -2,6 +2,7 @@ package com.double2and9.content_service.service.impl;
 
 import com.double2and9.base.enums.ContentErrorCode;
 import com.double2and9.content_service.common.exception.ContentException;
+import com.double2and9.content_service.dto.CourseBaseDTO;
 import com.double2and9.content_service.dto.CourseTeacherDTO;
 import com.double2and9.content_service.dto.SaveCourseTeacherDTO;
 import com.double2and9.content_service.entity.CourseBase;
@@ -16,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Date;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -36,18 +38,22 @@ public class CourseTeacherServiceImpl implements CourseTeacherService {
 
     @Override
     public List<CourseTeacherDTO> listByCourseId(Long courseId) {
-        List<CourseTeacher> teachers = courseTeacherRepository.findByCourseBaseId(courseId);
+        List<CourseTeacher> teachers = courseTeacherRepository.findByCourseId(courseId);
         return teachers.stream()
-                .map(teacher -> modelMapper.map(teacher, CourseTeacherDTO.class))
+                .map(teacher -> {
+                    CourseTeacherDTO dto = modelMapper.map(teacher, CourseTeacherDTO.class);
+                    dto.setCourseIds(teacher.getCourses().stream()
+                        .map(CourseBase::getId)
+                        .collect(Collectors.toSet()));
+                    return dto;
+                })
                 .collect(Collectors.toList());
     }
 
     @Override
     @Transactional
     public void saveCourseTeacher(SaveCourseTeacherDTO teacherDTO) {
-        CourseBase courseBase = courseBaseRepository.findById(teacherDTO.getCourseId())
-                .orElseThrow(() -> new ContentException(ContentErrorCode.COURSE_NOT_EXISTS));
-
+        // 获取或创建教师
         CourseTeacher teacher;
         if (teacherDTO.getId() != null) {
             teacher = courseTeacherRepository.findById(teacherDTO.getId())
@@ -57,13 +63,25 @@ public class CourseTeacherServiceImpl implements CourseTeacherService {
             teacher.setCreateTime(new Date());
         }
 
-        // 更新教师信息
+        // 设置基本信息
         modelMapper.map(teacherDTO, teacher);
-        teacher.setCourseBase(courseBase);
         teacher.setUpdateTime(new Date());
 
+        // 处理课程关联
+        Set<CourseBase> courses = courseBaseRepository.findAllById(teacherDTO.getCourseIds())
+                .stream()
+                .collect(Collectors.toSet());
+        
+        // 验证所有课程都属于同一机构
+        if (!courses.stream().allMatch(course -> 
+                course.getOrganizationId().equals(teacherDTO.getOrganizationId()))) {
+            throw new ContentException(ContentErrorCode.COURSE_ORG_NOT_MATCH);
+        }
+
+        teacher.setCourses(courses);
         courseTeacherRepository.save(teacher);
-        log.info("保存课程教师信息成功，课程ID：{}，教师ID：{}", courseBase.getId(), teacher.getId());
+        
+        log.info("保存教师信息成功，教师ID：{}，关联课程数：{}", teacher.getId(), courses.size());
     }
 
     @Override
@@ -72,12 +90,67 @@ public class CourseTeacherServiceImpl implements CourseTeacherService {
         CourseTeacher teacher = courseTeacherRepository.findById(teacherId)
                 .orElseThrow(() -> new ContentException(ContentErrorCode.TEACHER_NOT_EXISTS));
 
-        // 验证课程ID是否匹配
-        if (!teacher.getCourseBase().getId().equals(courseId)) {
+        // 获取要解除关联的课程
+        CourseBase courseBase = courseBaseRepository.findById(courseId)
+                .orElseThrow(() -> new ContentException(ContentErrorCode.COURSE_NOT_EXISTS));
+
+        // 验证课程是否与教师关联
+        if (!teacher.getCourses().contains(courseBase)) {
             throw new ContentException(ContentErrorCode.TEACHER_COURSE_NOT_MATCH);
         }
 
-        courseTeacherRepository.delete(teacher);
-        log.info("删除课程教师成功，课程ID：{}，教师ID：{}", courseId, teacherId);
+        // 解除课程关联
+        teacher.getCourses().remove(courseBase);
+
+        // 如果教师不再关联任何课程，则删除教师
+        if (teacher.getCourses().isEmpty()) {
+            courseTeacherRepository.delete(teacher);
+            log.info("教师已删除，教师ID：{}", teacherId);
+        } else {
+            courseTeacherRepository.save(teacher);
+            log.info("解除教师与课程的关联，教师ID：{}，课程ID：{}", teacherId, courseId);
+        }
+    }
+
+    @Override
+    public List<CourseTeacherDTO> listByOrganizationId(Long organizationId) {
+        List<CourseTeacher> teachers = courseTeacherRepository.findByOrganizationId(organizationId);
+        return teachers.stream()
+                .map(teacher -> {
+                    CourseTeacherDTO dto = modelMapper.map(teacher, CourseTeacherDTO.class);
+                    dto.setCourseIds(teacher.getCourses().stream()
+                        .map(CourseBase::getId)
+                        .collect(Collectors.toSet()));
+                    return dto;
+                })
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<CourseBaseDTO> listCoursesByTeacherId(Long teacherId) {
+        CourseTeacher teacher = courseTeacherRepository.findById(teacherId)
+                .orElseThrow(() -> new ContentException(ContentErrorCode.TEACHER_NOT_EXISTS));
+        
+        return teacher.getCourses().stream()
+                .map(course -> modelMapper.map(course, CourseBaseDTO.class))
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public CourseTeacherDTO getTeacherDetail(Long organizationId, Long teacherId) {
+        CourseTeacher teacher = courseTeacherRepository.findById(teacherId)
+                .orElseThrow(() -> new ContentException(ContentErrorCode.TEACHER_NOT_EXISTS));
+        
+        if (!teacher.getOrganizationId().equals(organizationId)) {
+            throw new ContentException(ContentErrorCode.COURSE_ORG_NOT_MATCH);
+        }
+        
+        CourseTeacherDTO dto = modelMapper.map(teacher, CourseTeacherDTO.class);
+        dto.setCourseIds(teacher.getCourses().stream()
+            .map(CourseBase::getId)
+            .collect(Collectors.toSet()));
+        return dto;
     }
 } 

@@ -33,11 +33,11 @@ public interface CourseBaseRepository extends JpaRepository<CourseBase, Long>, J
     // 按机构ID和其他条件查询
     @Query("SELECT c FROM CourseBase c WHERE " +
            "(:organizationId IS NULL OR c.organizationId = :organizationId) AND " +
-           "(:name IS NULL OR c.name LIKE %:name%) AND " +
+           "(:courseName IS NULL OR c.name LIKE CONCAT('%', :courseName, '%')) AND " +
            "(:status IS NULL OR c.status = :status)")
     Page<CourseBase> findByConditions(
         @Param("organizationId") Long organizationId,
-        @Param("name") String name,
+        @Param("courseName") String courseName,
         @Param("status") String status,
         Pageable pageable
     );

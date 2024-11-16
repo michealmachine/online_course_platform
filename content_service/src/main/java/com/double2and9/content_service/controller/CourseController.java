@@ -2,6 +2,7 @@ package com.double2and9.content_service.controller;
 
 import com.double2and9.base.model.PageParams;
 import com.double2and9.base.model.PageResult;
+import com.double2and9.content_service.common.exception.ContentException;
 import com.double2and9.content_service.dto.CourseBaseDTO;
 import com.double2and9.content_service.dto.QueryCourseParamsDTO;
 import com.double2and9.content_service.dto.CourseCategoryTreeDTO;
@@ -61,10 +62,11 @@ public class CourseController {
         return ContentResponse.success(courseBaseService.queryCourseCategoryTree());
     }
 
-    @Operation(summary = "预览课程")
+    @Operation(summary = "课程预览", description = "获取课程详细信息，包括基本信息、课程计划和教师信息")
     @GetMapping("/preview/{courseId}")
     public ContentResponse<CoursePreviewDTO> previewCourse(
-            @Parameter(description = "课程ID") @PathVariable Long courseId) {
+            @Parameter(description = "课程ID", required = true) 
+            @PathVariable Long courseId) {
         return ContentResponse.success(courseBaseService.preview(courseId));
     }
 

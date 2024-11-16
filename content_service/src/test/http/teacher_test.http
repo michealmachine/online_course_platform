@@ -1,30 +1,63 @@
-### 查询课程教师列表
-GET http://localhost:8080/course-teacher/list/1
+### 创建一个测试课程（用于后续测试）
+POST http://localhost:8080/course
 Content-Type: application/json
+
+{
+  "name": "测试课程",
+  "brief": "这是一个测试课程",
+  "mt": 1,
+  "st": 2,
+  "charge": "201001",
+  "price": 0,
+  "valid": true,
+  "organizationId": 1234
+}
+
+> {% client.global.set("courseId", response.body.data); %}
 
 ### 添加课程教师
 POST http://localhost:8080/course-teacher
 Content-Type: application/json
 
 {
-  "courseId": 1,
+  "organizationId": 1234,
   "name": "测试教师",
   "position": "讲师",
-  "description": "测试教师简介"
+  "description": "测试教师简介",
+  "courseIds": ["211"]
 }
+
+> {% client.global.set("teacherId", response.body.data); %}
+
+### 查询课程教师列表
+GET http://localhost:8080/course-teacher/list/{{courseId}}
+Content-Type: application/json
+
+### 查询教师详情
+GET http://localhost:8080/course-teacher/1234/{{teacherId}}
+Content-Type: application/json
+
+### 查询教师关联的课程
+GET http://localhost:8080/course-teacher/courses/{{teacherId}}
+Content-Type: application/json
+
+### 查询机构教师列表
+GET http://localhost:8080/course-teacher/organization/1234
+Content-Type: application/json
 
 ### 修改课程教师
 POST http://localhost:8080/course-teacher
 Content-Type: application/json
 
 {
-  "id": 1,
-  "courseId": 1,
+  "id": "{{teacherId}}",
+  "organizationId": 1234,
   "name": "测试教师",
   "position": "高级讲师",
-  "description": "修改后的简介"
+  "description": "修改后的简介",
+  "courseIds": ["{{courseId}}"]
 }
 
-### 删除课程教师
-DELETE http://localhost:8080/course-teacher/1/1
+### 解除教师与课程的关联
+DELETE http://localhost:8080/course-teacher/{{courseId}}/{{teacherId}}
 Content-Type: application/json 

@@ -1,5 +1,22 @@
+### 创建一个测试课程（用于后续测试）
+POST http://localhost:8080/course
+Content-Type: application/json
+
+{
+  "name": "测试课程",
+  "brief": "这是一个测试课程",
+  "mt": 1,
+  "st": 2,
+  "charge": "201001",
+  "price": 0,
+  "valid": true,
+  "organizationId": 1234
+}
+
+> {% client.global.set("courseId", response.body.data); %}
+
 ### 查询课程计划树
-GET http://localhost:8080/teachplan/tree/1
+GET http://localhost:8080/teachplan/tree/{{courseId}}
 Content-Type: application/json
 
 ### 创建课程计划（章节）
@@ -7,25 +24,41 @@ POST http://localhost:8080/teachplan
 Content-Type: application/json
 
 {
-  "courseId": 1,
+  "courseId": "{{courseId}}",
   "parentId": 0,
   "level": 1,
   "name": "第一章",
   "orderBy": 1
 }
 
+> {% client.global.set("chapterId", response.body.data); %}
+
 ### 创建课程计划（小节）
 POST http://localhost:8080/teachplan
 Content-Type: application/json
 
 {
-  "courseId": 1,
-  "parentId": 2,
+  "courseId": "211",
+  "parentId": "1",
   "level": 2,
   "name": "第一节",
   "orderBy": 1
 }
 
-### 删除课程计划
-DELETE http://localhost:8080/teachplan/1
+> {% client.global.set("sectionId", response.body.data); %}
+
+### 上移课程计划
+POST http://localhost:8080/teachplan/moveup/{{sectionId}}
+Content-Type: application/json
+
+### 下移课程计划
+POST http://localhost:8080/teachplan/movedown/{{sectionId}}
+Content-Type: application/json
+
+### 删除课程计划（小节）
+DELETE http://localhost:8080/teachplan/{{sectionId}}
+Content-Type: application/json
+
+### 删除课程计划（章节）
+DELETE http://localhost:8080/teachplan/{{chapterId}}
 Content-Type: application/json 

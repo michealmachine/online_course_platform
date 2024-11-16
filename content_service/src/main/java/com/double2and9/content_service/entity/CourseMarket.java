@@ -1,6 +1,9 @@
 package com.double2and9.content_service.entity;
 import jakarta.persistence.*;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.ToString;
+
 import java.math.BigDecimal;
 import java.util.Date;
 
@@ -63,6 +66,9 @@ public class CourseMarket {
      * 对应的课程基本信息
      */
     @OneToOne(fetch = FetchType.LAZY)
+    @MapsId
     @JoinColumn(name = "id")
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
     private CourseBase courseBase;
 }

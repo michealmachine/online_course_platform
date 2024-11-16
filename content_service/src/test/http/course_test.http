@@ -1,9 +1,9 @@
 ### 课程分页查询
-GET http://localhost:8080/course/list?pageNo=1&pageSize=10
+GET http://localhost:8080/course/list?pageNo=1&pageSize=10&organizationId=1234
 Content-Type: application/json
 
 ### 按课程名称查询
-GET http://localhost:8080/course/list?pageNo=1&pageSize=10&courseName=测试
+GET http://localhost:8080/course/list?pageNo=1&pageSize=10&courseName=测试&organizationId=1234
 Content-Type: application/json
 
 ### 创建课程
@@ -17,21 +17,25 @@ Content-Type: application/json
   "st": 2,
   "charge": "201001",
   "price": 0,
-  "valid": true
+  "valid": true,
+  "organizationId": 1234
 }
+
+> {% client.global.set("courseId", response.body.data); %}
 
 ### 修改课程
 PUT http://localhost:8080/course
 Content-Type: application/json
 
 {
-  "id": 78,
+  "id": "{{courseId}}",
   "name": "修改后的课程名称",
   "brief": "修改后的课程简介",
   "mt": 1,
   "st": 2,
   "charge": "201001",
-  "price": 0
+  "price": 0,
+  "organizationId": 1234
 }
 
 ### 查询课程分类树
@@ -39,5 +43,19 @@ GET http://localhost:8080/course/category/tree
 Content-Type: application/json
 
 ### 课程预览
-GET http://localhost:8080/course/preview/78
-Content-Type: application/json 
+GET http://localhost:8080/course/preview/{{courseId}}
+Content-Type: application/json
+
+### 提交课程审核
+POST http://localhost:8080/course/211/audit/submit
+Content-Type: application/json
+
+### 审核课程
+POST http://localhost:8080/course/audit
+Content-Type: application/json
+
+{
+  "courseId": "{{courseId}}",
+  "auditStatus": "202303",
+  "auditMind": "课程内容符合要求"
+} 

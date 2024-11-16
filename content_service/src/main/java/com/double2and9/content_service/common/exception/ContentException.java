@@ -5,16 +5,20 @@ import lombok.Getter;
 
 @Getter
 public class ContentException extends RuntimeException {
-    private final int code;
-    private final String message;
+    private final ContentErrorCode errorCode;
 
     public ContentException(ContentErrorCode errorCode) {
-        this.code = errorCode.getCode();
-        this.message = errorCode.getMessage();
+        super(errorCode.getMessage());
+        this.errorCode = errorCode;
     }
 
     public ContentException(ContentErrorCode errorCode, String message) {
-        this.code = errorCode.getCode();
-        this.message = message;
+        super(message);
+        this.errorCode = errorCode;
+    }
+
+    public ContentException(ContentErrorCode errorCode, String message, Throwable cause) {
+        super(message, cause);
+        this.errorCode = errorCode;
     }
 } 

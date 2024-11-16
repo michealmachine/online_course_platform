@@ -41,11 +41,11 @@ public class TeachplanMediaServiceImpl implements TeachplanMediaService {
     @Override
     @Transactional
     public void associateMedia(TeachplanMediaDTO teachplanMediaDTO) {
-        // 获取课程计划
+        // 验证课程计划是否存在
         Teachplan teachplan = teachplanRepository.findById(teachplanMediaDTO.getTeachplanId())
                 .orElseThrow(() -> new ContentException(ContentErrorCode.TEACHPLAN_NOT_EXISTS));
-
-        // 获取媒资文件
+        
+        // 验证媒资是否存在
         MediaFile mediaFile = mediaFileRepository.findById(teachplanMediaDTO.getMediaId())
                 .orElseThrow(() -> new ContentException(ContentErrorCode.MEDIA_NOT_EXISTS));
 

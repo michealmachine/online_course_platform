@@ -9,8 +9,11 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
+
+import com.double2and9.content_service.common.exception.ContentException;
 
 @SpringBootTest
 public class CourseAuditServiceTests {
@@ -65,10 +68,11 @@ public class CourseAuditServiceTests {
 
         // 3. 添加课程教师
         SaveCourseTeacherDTO teacherDTO = new SaveCourseTeacherDTO();
-        teacherDTO.setCourseId(courseId);
+        teacherDTO.setOrganizationId(TEST_ORG_ID);
         teacherDTO.setName("测试教师");
         teacherDTO.setPosition("讲师");
         teacherDTO.setDescription("测试教师简介");
+        teacherDTO.setCourseIds(Set.of(courseId));
         courseTeacherService.saveCourseTeacher(teacherDTO);
     }
 
@@ -90,31 +94,34 @@ public class CourseAuditServiceTests {
         status = courseBaseService.getAuditStatus(courseId);
         assertEquals("202303", status, "审核后状态应为'通过'");
 
-        // 3. 审核不通过
-        auditDTO.setAuditStatus("202304");  // 不通过
-        auditDTO.setAuditMind("课程内容需要完善");
-        
-        courseBaseService.auditCourse(auditDTO);
-        status = courseBaseService.getAuditStatus(courseId);
-        assertEquals("202304", status, "审核后状态应为'不通过'");
+        // 3. 验证CoursePublishPre记录
+        CoursePreviewDTO preview = courseBaseService.preview(courseId);
+        assertNotNull(preview.getCourseBase());
+        assertEquals(courseId, preview.getCourseBase().getId());
+        assertEquals("测试课程", preview.getCourseBase().getName());
     }
 
     @Test
     @Transactional
-    public void testSubmitAuditWithoutTeacher() {
-        // 删除教师信息
-        courseTeacherService.listByCourseId(courseId)
-            .forEach(teacher -> courseTeacherService.deleteCourseTeacher(courseId, teacher.getId()));
-
-        // 提交审核应该失败
-        assertThrows(RuntimeException.class, () -> courseBaseService.submitForAudit(courseId),
-            "没有教师信息时不应该能提交审核");
+    public void testAuditReject() {
+        // 1. 提交审核
+        courseBaseService.submitForAudit(courseId);
+        
+        // 2. 审核不通过
+        CourseAuditDTO auditDTO = new CourseAuditDTO();
+        auditDTO.setCourseId(courseId);
+        auditDTO.setAuditStatus("202302");  // 不通过
+        auditDTO.setAuditMind("课程内容需要完善");
+        
+        courseBaseService.auditCourse(auditDTO);
+        String status = courseBaseService.getAuditStatus(courseId);
+        assertEquals("202302", status, "审核后状态应为'不通过'");
     }
 
     @Test
     @Transactional
     public void testSubmitAuditWithoutTeachplan() {
-        // 删除课程计划 - 先删除小节，再删除章节
+        // 删除课程计划
         List<TeachplanDTO> chapters = teachplanService.findTeachplanTree(courseId);
         
         // 1. 先删除所有小节
@@ -136,7 +143,21 @@ public class CourseAuditServiceTests {
         }
 
         // 提交审核应该失败
-        assertThrows(RuntimeException.class, () -> courseBaseService.submitForAudit(courseId),
-            "没有课程计划时不应该能提交审核");
+        assertThrows(ContentException.class, 
+            () -> courseBaseService.submitForAudit(courseId));
+    }
+
+    @Test
+    @Transactional
+    public void testSubmitAuditWithoutTeacher() {
+        // 删除教师信息
+        List<CourseTeacherDTO> teachers = courseTeacherService.listByCourseId(courseId);
+        for (CourseTeacherDTO teacher : teachers) {
+            courseTeacherService.deleteCourseTeacher(courseId, teacher.getId());
+        }
+
+        // 提交审核应该失败
+        assertThrows(ContentException.class, 
+            () -> courseBaseService.submitForAudit(courseId));
     }
 } 

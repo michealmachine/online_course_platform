@@ -75,12 +75,12 @@ public class CourseBaseServiceImpl implements CourseBaseService {
             PageRequest.of(params.getPageNo().intValue() - 1, params.getPageSize().intValue())
         );
         
-        //数据转换
+        // 数据转换
         List<CourseBaseDTO> items = page.getContent().stream()
             .map(this::convertToCourseBaseDTO)
             .collect(Collectors.toList());
 
-        //构建结果
+        // 构建结果
         return new PageResult<>(
             items, 
             page.getTotalElements(), 
@@ -198,11 +198,11 @@ public class CourseBaseServiceImpl implements CourseBaseService {
     public CoursePreviewDTO preview(Long courseId) {
         // 获取课程基本信息
         CourseBase courseBase = courseBaseRepository.findById(courseId)
-                .orElseThrow(() -> new RuntimeException("课程不存在"));
+                .orElseThrow(() -> new ContentException(ContentErrorCode.COURSE_NOT_EXISTS));
         
         CoursePreviewDTO previewDTO = new CoursePreviewDTO();
         
-        // 设置课程基本信息
+        // 设��课程基本信息
         previewDTO.setCourseBase(convertToCourseBaseDTO(courseBase));
         
         // 获取课程计划信息
@@ -212,8 +212,8 @@ public class CourseBaseServiceImpl implements CourseBaseService {
                 .collect(Collectors.toList());
         previewDTO.setTeachplans(teachplanDTOs);
         
-        // 获取课程教师信息 - 使用JOIN FETCH避免N+1问题
-        List<CourseTeacher> teachers = courseTeacherRepository.findByCourseBaseId(courseId);
+        // 获取课程教师信息
+        List<CourseTeacher> teachers = courseTeacherRepository.findByCourseId(courseId);
         List<CourseTeacherDTO> teacherDTOs = teachers.stream()
                 .map(teacher -> modelMapper.map(teacher, CourseTeacherDTO.class))
                 .collect(Collectors.toList());
@@ -233,7 +233,7 @@ public class CourseBaseServiceImpl implements CourseBaseService {
     public void submitForAudit(Long courseId) {
         // 获取课程信息
         CourseBase courseBase = courseBaseRepository.findById(courseId)
-                .orElseThrow(() -> new RuntimeException("课程不存在"));
+                .orElseThrow(() -> new ContentException(ContentErrorCode.COURSE_NOT_EXISTS));
         
         // 检查课程基本信息是否完整
         validateCourseInfo(courseBase);
@@ -246,8 +246,10 @@ public class CourseBaseServiceImpl implements CourseBaseService {
             publishPre.setCourseBase(courseBase);
         }
         
-        // 更新预发布状态
+        // 设置预发布信息
+        publishPre.setName(courseBase.getName());  // 设置课程名称
         publishPre.setStatus("202301"); // 已提交
+        publishPre.setPreviewTime(new Date());
         publishPre.setCreateTime(new Date());
         publishPre.setUpdateTime(new Date());
         
@@ -279,19 +281,19 @@ public class CourseBaseServiceImpl implements CourseBaseService {
      */
     private void validateCourseInfo(CourseBase courseBase) {
         if (courseBase.getName() == null || courseBase.getBrief() == null) {
-            throw new RuntimeException("课程基本信息不完整");
+            throw new ContentException(ContentErrorCode.COURSE_NAME_EMPTY);
         }
         
         // 验证课程计划
         List<Teachplan> teachplans = teachplanRepository.findByCourseBaseIdOrderByOrderBy(courseBase.getId());
         if (teachplans.isEmpty()) {
-            throw new RuntimeException("请添加课程计划");
+            throw new ContentException(ContentErrorCode.TEACHPLAN_NOT_EXISTS, "请添加课程计划");
         }
         
         // 验证课程教师
-        List<CourseTeacher> teachers = courseTeacherRepository.findByCourseBaseId(courseBase.getId());
+        List<CourseTeacher> teachers = courseTeacherRepository.findByCourseId(courseBase.getId());
         if (teachers.isEmpty()) {
-            throw new RuntimeException("请添加课程教师");
+            throw new ContentException(ContentErrorCode.TEACHER_NOT_EXISTS, "请添加课程教师");
         }
     }
 
@@ -323,17 +325,14 @@ public class CourseBaseServiceImpl implements CourseBaseService {
     private CourseBaseDTO convertToCourseBaseDTO(CourseBase courseBase) {
         CourseBaseDTO dto = modelMapper.map(courseBase, CourseBaseDTO.class);
         
-        // 设置课程分类名称
-        courseCategoryRepository.findById(courseBase.getMt())
-            .ifPresent(category -> dto.setMtName(category.getName()));
-        courseCategoryRepository.findById(courseBase.getSt())
-            .ifPresent(category -> dto.setStName(category.getName()));
-        
-        // 设置课程营销信息
-        CourseMarket courseMarket = courseBase.getCourseMarket();
-        if (courseMarket != null) {
-            dto.setPrice(courseMarket.getPrice());
-            dto.setDiscounts(courseMarket.getDiscounts());
+        // 设置课程分类名称 - 添加空值检查
+        if (courseBase.getMt() != null) {
+            courseCategoryRepository.findById(courseBase.getMt())
+                .ifPresent(category -> dto.setMtName(category.getName()));
+        }
+        if (courseBase.getSt() != null) {
+            courseCategoryRepository.findById(courseBase.getSt())
+                .ifPresent(category -> dto.setStName(category.getName()));
         }
         
         return dto;

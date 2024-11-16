@@ -105,6 +105,11 @@ public class TeachplanServiceImpl implements TeachplanService {
         Teachplan teachplan = teachplanRepository.findById(teachplanId)
             .orElseThrow(() -> new ContentException(ContentErrorCode.TEACHPLAN_NOT_EXISTS));
         
+        // 检查是否有子节点
+        if (teachplanRepository.countByParentId(teachplanId) > 0) {
+            throw new ContentException(ContentErrorCode.TEACHPLAN_DELETE_ERROR);
+        }
+        
         // 如果是章节，先删除其下的所有小节
         if (teachplan.getLevel() == 1) {
             teachplanRepository.deleteByParentId(teachplanId);

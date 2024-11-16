@@ -1,6 +1,9 @@
 package com.double2and9.content_service.entity;
 import jakarta.persistence.*;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.ToString;
+
 import java.util.Date;
 
 /**
@@ -34,6 +37,8 @@ public class TeachplanMedia {
      */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "teachplan_id", referencedColumnName = "id")
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
     private Teachplan teachplan;
 
     /**
@@ -41,5 +46,7 @@ public class TeachplanMedia {
      */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "media_id", referencedColumnName = "id")
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
     private MediaFile mediaFile;
 }

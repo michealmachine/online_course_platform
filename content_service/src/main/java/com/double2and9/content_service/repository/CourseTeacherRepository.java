@@ -2,6 +2,7 @@ package com.double2and9.content_service.repository;
 
 import com.double2and9.content_service.entity.CourseTeacher;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -9,15 +10,11 @@ import java.util.List;
 @Repository
 public interface CourseTeacherRepository extends JpaRepository<CourseTeacher, Long> {
     
-    // 根据课程ID查询教师列表
-    List<CourseTeacher> findByCourseBaseId(Long courseId);
+    List<CourseTeacher> findByOrganizationId(Long organizationId);
     
-    // 根据教师名称模糊查询
-    List<CourseTeacher> findByNameContaining(String name);
+    @Query("SELECT ct FROM CourseTeacher ct JOIN ct.courses c WHERE c.id = :courseId")
+    List<CourseTeacher> findByCourseId(Long courseId);
     
-    // 根据职位查询
-    List<CourseTeacher> findByPosition(String position);
-    
-    // 根据课程ID和教师名称查询
-    List<CourseTeacher> findByCourseBaseIdAndName(Long courseId, String name);
+    @Query("SELECT ct FROM CourseTeacher ct JOIN ct.courses c WHERE c.id = :courseId AND ct.organizationId = :organizationId")
+    List<CourseTeacher> findByCourseIdAndOrganizationId(Long courseId, Long organizationId);
 } 
