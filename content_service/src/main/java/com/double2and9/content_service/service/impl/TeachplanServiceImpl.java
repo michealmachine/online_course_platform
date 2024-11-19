@@ -124,46 +124,48 @@ public class TeachplanServiceImpl implements TeachplanService {
     @Override
     @Transactional
     public void moveUp(Long teachplanId) {
-        // 获取当前节点
+        // 获取当前课程计划
         Teachplan current = teachplanRepository.findById(teachplanId)
                 .orElseThrow(() -> new ContentException(ContentErrorCode.TEACHPLAN_NOT_EXISTS));
-        
-        // 查找上一个节点
-        Teachplan previous = teachplanRepository.findPreviousNode(current.getParentId(), current.getOrderBy())
-                .orElseThrow(() -> new ContentException(ContentErrorCode.TEACHPLAN_MOVE_ERROR, "已经是第一个节点"));
-        
-        // 交换排序号
-        Integer currentOrder = current.getOrderBy();
-        current.setOrderBy(previous.getOrderBy());
-        previous.setOrderBy(currentOrder);
-        
+
+        // 获取上一个课程计划
+        Optional<Teachplan> previous = teachplanRepository.findPreviousNode(current.getParentId(), current.getOrderBy());
+        if (previous.isEmpty()) {
+            // 已经是第一个，抛出异常
+            throw new ContentException(ContentErrorCode.TEACHPLAN_MOVE_ERROR, "已经是第一个，无法上移");
+        }
+
+        // 交换orderBy
+        int tempOrderBy = current.getOrderBy();
+        current.setOrderBy(previous.get().getOrderBy());
+        previous.get().setOrderBy(tempOrderBy);
+
         // 保存更改
         teachplanRepository.save(current);
-        teachplanRepository.save(previous);
-        
-        log.info("课程计划上移成功，当前节点：{}，上一节点：{}", current.getId(), previous.getId());
+        teachplanRepository.save(previous.get());
     }
 
     @Override
     @Transactional
     public void moveDown(Long teachplanId) {
-        // 获取当前节点
+        // 获取当前课程计划
         Teachplan current = teachplanRepository.findById(teachplanId)
                 .orElseThrow(() -> new ContentException(ContentErrorCode.TEACHPLAN_NOT_EXISTS));
-        
-        // 查找下一个节点
-        Teachplan next = teachplanRepository.findNextNode(current.getParentId(), current.getOrderBy())
-                .orElseThrow(() -> new ContentException(ContentErrorCode.TEACHPLAN_MOVE_ERROR, "已经是最后一个节点"));
-        
-        // 交换排序号
-        Integer currentOrder = current.getOrderBy();
-        current.setOrderBy(next.getOrderBy());
-        next.setOrderBy(currentOrder);
-        
+
+        // 获取下一个课程计划
+        Optional<Teachplan> next = teachplanRepository.findNextNode(current.getParentId(), current.getOrderBy());
+        if (next.isEmpty()) {
+            // 已经是最后一个，抛出异常
+            throw new ContentException(ContentErrorCode.TEACHPLAN_MOVE_ERROR, "已经是最后一个，无法下移");
+        }
+
+        // 交换orderBy
+        int tempOrderBy = current.getOrderBy();
+        current.setOrderBy(next.get().getOrderBy());
+        next.get().setOrderBy(tempOrderBy);
+
         // 保存更改
         teachplanRepository.save(current);
-        teachplanRepository.save(next);
-        
-        log.info("课程计划下移成功，当前节点：{}，下一节点：{}", current.getId(), next.getId());
+        teachplanRepository.save(next.get());
     }
 } 

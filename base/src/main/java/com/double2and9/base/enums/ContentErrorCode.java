@@ -23,8 +23,11 @@ public enum ContentErrorCode {
     TEACHER_COURSE_NOT_MATCH(100302, "教师与课程不匹配"),
 
     // 媒资相关错误 1004xx
-    MEDIA_NOT_EXISTS(100401, "媒资不存在"),
+    MEDIA_NOT_EXISTS(100401, "媒资文件不存在"),
     MEDIA_BIND_ERROR(100402, "媒资绑定失败"),
+    MEDIA_ORG_NOT_MATCH(100403, "媒资文件不属于该机构"),
+    MEDIA_TYPE_NOT_SUPPORT(100404, "不支持的媒体类型"),
+    MEDIA_ALREADY_EXISTS(100405, "媒资文件已存在"),
 
     // 系统错误 1999xx
     SYSTEM_ERROR(199999, "系统内部错误");

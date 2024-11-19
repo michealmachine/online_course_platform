@@ -121,7 +121,7 @@ public class TeachplanController {
             @Parameter(description = "媒资ID", required = true) 
             @PathVariable Long mediaId) {
         log.info("解除媒资绑定，课程计划ID：{}，媒资ID：{}", teachplanId, mediaId);
-        teachplanMediaService.dissociateMedia(teachplanId, mediaId);
+        teachplanMediaService.dissociateMedia(teachplanId, String.valueOf(mediaId));
         return ContentResponse.success(null);
     }
 } 
