@@ -1,33 +1,40 @@
 package com.double2and9.base.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import lombok.Data;
-import lombok.ToString;
 
 @Data
-@ToString
-@Schema(description = "媒资文件DTO")
+@Schema(description = "媒资文件信息")
 public class MediaFileDTO {
-    @Schema(description = "媒资文件ID")
-    private String mediaFileId;  // media服务的文件ID
     
-    @Schema(description = "文件名称")
+    @NotBlank(message = "媒资文件ID不能为空")
+    @Schema(description = "媒资文件ID", required = true)
+    private String mediaFileId;
+    
+    @NotNull(message = "机构ID不能为空")
+    @Schema(description = "机构ID", required = true)
+    private Long organizationId;  // 添加机构ID字段
+    
+    @NotBlank(message = "文件名不能为空")
+    @Schema(description = "文件名", required = true)
     private String fileName;
     
-    @Schema(description = "文件类型")
-    private String mediaType;    // IMAGE/VIDEO
+    @NotBlank(message = "媒体类型不能为空")
+    @Schema(description = "媒体类型：IMAGE/VIDEO", required = true)
+    private String mediaType;
+    
+    @NotBlank(message = "文件用途不能为空")
+    @Schema(description = "文件用途：COVER(封面)/VIDEO(视频)", required = true)
+    private String purpose;
+    
+    @Schema(description = "访问地址")
+    private String url;
     
     @Schema(description = "文件大小")
     private Long fileSize;
     
-    @Schema(description = "文件MIME类型")
+    @Schema(description = "文件类型")
     private String mimeType;
-    
-    @Schema(description = "文件用途")
-    private String purpose;      // COVER/VIDEO
-    
-    @Schema(description = "文件访问地址")
-    private String url;         // 图片直接使用，视频需要请求临时地址
-    
-    // organizationId不需要在DTO中，因为会从Security上下文获取
 } 

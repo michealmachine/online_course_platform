@@ -88,7 +88,7 @@ public class CourseAuditServiceTests {
         CourseAuditDTO auditDTO = new CourseAuditDTO();
         auditDTO.setCourseId(courseId);
         auditDTO.setAuditStatus("202303");  // 通过
-        auditDTO.setAuditMind("课程内容符合要求");
+        auditDTO.setAuditMessage("课程内容符合要求");
         
         courseBaseService.auditCourse(auditDTO);
         status = courseBaseService.getAuditStatus(courseId);
@@ -111,7 +111,7 @@ public class CourseAuditServiceTests {
         CourseAuditDTO auditDTO = new CourseAuditDTO();
         auditDTO.setCourseId(courseId);
         auditDTO.setAuditStatus("202302");  // 不通过
-        auditDTO.setAuditMind("课程内容需要完善");
+        auditDTO.setAuditMessage("课程内容需要完善");
         
         courseBaseService.auditCourse(auditDTO);
         String status = courseBaseService.getAuditStatus(courseId);

@@ -64,28 +64,32 @@ public class CourseBaseServiceImpl implements CourseBaseService {
      */
     @Override
     public PageResult<CourseBaseDTO> queryCourseList(PageParams params, QueryCourseParamsDTO queryParams) {
+        log.info("分页查询课程列表，参数：params={}, queryParams={}", params, queryParams);
+        
         // 使用查询参数中的机构ID
         Long organizationId = queryParams.getOrganizationId();
+        String courseName = queryParams.getCourseName();
+        String status = queryParams.getStatus();
+        
+        log.info("查询参数：organizationId={}, courseName={}, status={}", 
+            organizationId, courseName, status);
         
         // 使用机构ID进行查询
         Page<CourseBase> page = courseBaseRepository.findByConditions(
             organizationId,
-            queryParams.getCourseName(),
-            queryParams.getStatus(),
+            courseName,
+            status,
             PageRequest.of(params.getPageNo().intValue() - 1, params.getPageSize().intValue())
         );
+        
+        log.info("查询结果：total={}, content.size={}", page.getTotalElements(), page.getContent().size());
         
         // 数据转换
         List<CourseBaseDTO> items = page.getContent().stream()
             .map(this::convertToCourseBaseDTO)
             .collect(Collectors.toList());
 
-        // 构建结果
-        return new PageResult<>(
-            items, 
-            page.getTotalElements(), 
-            params.getPageNo(), 
-            params.getPageSize());
+        return new PageResult<>(items, page.getTotalElements(), params.getPageNo(), params.getPageSize());
     }
 
     /**
@@ -202,7 +206,7 @@ public class CourseBaseServiceImpl implements CourseBaseService {
         
         CoursePreviewDTO previewDTO = new CoursePreviewDTO();
         
-        // 设��课程基本信息
+        // 设课程基本信息
         previewDTO.setCourseBase(convertToCourseBaseDTO(courseBase));
         
         // 获取课程计划信息
@@ -306,7 +310,37 @@ public class CourseBaseServiceImpl implements CourseBaseService {
     }
 
     @Override
+    @Transactional
     public void publishCourse(Long courseId) {
+        CourseBase courseBase = courseBaseRepository.findById(courseId)
+                .orElseThrow(() -> new ContentException(ContentErrorCode.COURSE_NOT_EXISTS));
+                
+        CoursePublishPre publishPre = courseBase.getCoursePublishPre();
+        if (publishPre == null || !"202303".equals(publishPre.getStatus())) {
+            throw new ContentException(ContentErrorCode.COURSE_AUDIT_STATUS_ERROR, "课程未通过审核，不能发布");
+        }
+        
+        // 创建发布记录
+        CoursePublish coursePublish = courseBase.getCoursePublish();
+        if (coursePublish == null) {
+            coursePublish = new CoursePublish();
+            coursePublish.setId(courseId);
+            coursePublish.setCourseBase(courseBase);
+        }
+        
+        // 设置发布信息
+        coursePublish.setName(courseBase.getName());
+        coursePublish.setStatus("202002");  // 已发布
+        coursePublish.setPublishTime(new Date());
+        coursePublish.setUpdateTime(new Date());
+        
+        // 更新课程状态
+        courseBase.setStatus("202002");  // 已发布
+        courseBase.setCoursePublish(coursePublish);
+        
+        courseBaseRepository.save(courseBase);
+        
+        log.info("课程发布成功，课程ID：{}", courseId);
     }
 
     @Override
@@ -356,15 +390,78 @@ public class CourseBaseServiceImpl implements CourseBaseService {
         
         // 更新审核状态
         publishPre.setStatus(auditDTO.getAuditStatus());
+        publishPre.setAuditMessage(auditDTO.getAuditMessage());  // 设置审核意见
         publishPre.setUpdateTime(new Date());
         
         // 如果审核通过，更新课程状态为待发布
         if ("202303".equals(auditDTO.getAuditStatus())) {
-            courseBase.setStatus("202001"); // 未发布
+            courseBase.setStatus("202001");  // 修改这里：审核通过后状态为未发布，等待机构主动发布
+        } else {
+            // 如果审核不通过，状态保持未发布
+            courseBase.setStatus("202001");
         }
+        courseBase.setUpdateTime(new Date());
+        
+        // 保存更新
+        courseBaseRepository.save(courseBase);
+        
+        log.info("课程审核完成，课程ID：{}，审核状态：{}, 课程状态：{}", 
+            auditDTO.getCourseId(), 
+            auditDTO.getAuditStatus(),
+            courseBase.getStatus());
+    }
+
+    @Override
+    public CourseBaseDTO getCourseById(Long courseId) {
+        log.info("获取课程信息，courseId：{}", courseId);
+        
+        // 查询课程基本信息
+        CourseBase courseBase = courseBaseRepository.findById(courseId)
+                .orElseThrow(() -> new ContentException(ContentErrorCode.COURSE_NOT_EXISTS));
+                
+        // 使用modelMapper替代BeanUtils
+        CourseBaseDTO courseBaseDTO = modelMapper.map(courseBase, CourseBaseDTO.class);
+        
+        log.info("获取课程信息成功，courseId：{}", courseId);
+        return courseBaseDTO;
+    }
+
+    @Override
+    @Transactional
+    public void deleteCourse(Long courseId) {
+        log.info("删除课程，courseId：{}", courseId);
+        
+        CourseBase courseBase = courseBaseRepository.findById(courseId)
+                .orElseThrow(() -> new ContentException(ContentErrorCode.COURSE_NOT_EXISTS));
+                
+        // 检查课程状态，已发布的课程不能删除
+        if ("202002".equals(courseBase.getStatus())) {
+            throw new ContentException(ContentErrorCode.COURSE_STATUS_ERROR, "已发布的课程不能删除");
+        }
+        
+        // 删除课程相关数据
+        courseBaseRepository.delete(courseBase);
+        
+        log.info("删除课程成功，courseId：{}", courseId);
+    }
+
+    @Override
+    @Transactional
+    public void offlineCourse(Long courseId) {
+        CourseBase courseBase = courseBaseRepository.findById(courseId)
+                .orElseThrow(() -> new ContentException(ContentErrorCode.COURSE_NOT_EXISTS));
+                
+        // 只有已发布的课程才能下架
+        if (!"202002".equals(courseBase.getStatus())) {
+            throw new ContentException(ContentErrorCode.COURSE_STATUS_ERROR, "只有已发布的课程才能下架");
+        }
+        
+        // 更新课程状态为已下架
+        courseBase.setStatus("202003");  // 已下架
+        courseBase.setUpdateTime(new Date());
         
         courseBaseRepository.save(courseBase);
         
-        log.info("课程审核完成，课程ID：{}，审核状态：{}", auditDTO.getCourseId(), auditDTO.getAuditStatus());
+        log.info("课程下架成功，课程ID：{}", courseId);
     }
 } 

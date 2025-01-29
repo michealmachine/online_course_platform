@@ -368,10 +368,13 @@ erDiagram
   GET  /list                    # 分页查询课程列表
   POST /                        # 创建课程
   PUT  /                        # 修改课程
+  GET  /{courseId}             # 获取课程详情
   GET  /category/tree          # 获取课程分类树
   GET  /preview/{courseId}     # 课程预览
   POST /{courseId}/audit/submit # 提交课程审核
   POST /audit                  # 审核课程
+  POST /{courseId}/publish     # 发布课程
+  POST /{courseId}/offline     # 下架课程
   ```
 
 - 关键接口说明:
@@ -425,6 +428,8 @@ erDiagram
   DELETE /{teachplanId}        # 删除课程计划
   POST   /moveup/{teachplanId} # 上移课程计划
   POST   /movedown/{teachplanId} # 下移课程计划
+  POST   /media               # 绑定媒资
+  DELETE /media/{teachplanId}/{mediaId} # 解除媒资绑定
   ```
 
 - 关键接口说明:
@@ -512,12 +517,12 @@ erDiagram
        ```
 
 ### 5. MediaFileController (媒资文件管理接口)
-- 基础路径: `/media`
+- 基础路径: `/media-files`
 - 主要接口:
   ```
-  POST   /{organizationId}                    # 保存媒资文件信息
-  GET    /list/{organizationId}               # 查询媒资文件列表
-  GET    /url/{organizationId}/{mediaFileId}  # 获取媒资文件访问地址
+  POST   /                     # 保存媒资文件信息
+  GET    /list/{organizationId} # 查询媒资文件列表
+  GET    /url/{organizationId}/{mediaFileId} # 获取媒资文件访问地址
   ```
 
 - 关键接口说明:
@@ -529,7 +534,8 @@ erDiagram
          "fileName": "test.mp4",
          "mediaType": "VIDEO",
          "purpose": "VIDEO",
-         "url": "http://xxx"
+         "url": "http://xxx",
+         "organizationId": 1234
        }
        ```
 

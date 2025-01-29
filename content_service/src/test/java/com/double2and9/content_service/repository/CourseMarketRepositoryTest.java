@@ -64,43 +64,38 @@ public class CourseMarketRepositoryTest {
     @Test
     @Transactional
     void testFindByPriceBetween() {
-        // 1. 先创建并保存CourseBase
+        // 1. 创建并保存CourseBase
         CourseBase courseBase = new CourseBase();
         courseBase.setName("测试课程");
+        courseBase.setBrief("测试课程简介");
         courseBase.setOrganizationId(TEST_ORG_ID);
         courseBase.setCreateTime(new Date());
         courseBase.setUpdateTime(new Date());
         courseBase = courseBaseRepository.save(courseBase);
-
-        // 2. 创建CourseMarket
+        
+        // 2. 创建并保存CourseMarket
         CourseMarket courseMarket = new CourseMarket();
-        courseMarket.setId(courseBase.getId());  // 先设置ID
-        courseMarket.setPrice(new BigDecimal("150.00"));
+        courseMarket.setId(courseBase.getId());  // 设置ID，与CourseBase共享ID
+        courseMarket.setCourseBase(courseBase);  // 设置关联关系
+        courseMarket.setPrice(BigDecimal.valueOf(100));
+        courseMarket.setCharge("201001");       // 设置收费规则
         courseMarket.setValid(true);
         courseMarket.setCreateTime(new Date());
         courseMarket.setUpdateTime(new Date());
         
-        // 3. 建立双向关联
-        courseMarket.setCourseBase(courseBase);
+        // 建立双向关联
         courseBase.setCourseMarket(courseMarket);
+        courseBaseRepository.save(courseBase);   // 通过级联保存CourseMarket
         
-        // 4. 通过CourseBase保存（利用级联保存）
-        courseBase = courseBaseRepository.save(courseBase);
-
-        // 5. 测试查询
-        List<CourseMarket> markets = courseMarketRepository.findByPriceBetween(
-            new BigDecimal("100.00"), 
-            new BigDecimal("200.00")
+        // 3. 执行测试查询
+        List<CourseMarket> result = courseMarketRepository.findByPriceBetween(
+            BigDecimal.valueOf(50), 
+            BigDecimal.valueOf(150)
         );
-        
-        // 6. 验证
-        assertFalse(markets.isEmpty());
-        assertTrue(markets.stream().anyMatch(market -> 
-            market.getPrice().compareTo(new BigDecimal("150.00")) == 0));
-        
-        // 7. 验证关联关系
-        CourseMarket foundMarket = markets.get(0);
-        assertNotNull(foundMarket.getCourseBase());
-        assertEquals(courseBase.getName(), foundMarket.getCourseBase().getName());
+
+        // 4. 验证结果
+        assertFalse(result.isEmpty(), "查询结果不应为空");
+        assertEquals("测试课程", result.get(0).getCourseBase().getName(), "课程名称不匹配");
+        assertEquals(BigDecimal.valueOf(100), result.get(0).getPrice(), "课程价格不匹配");
     }
 } 

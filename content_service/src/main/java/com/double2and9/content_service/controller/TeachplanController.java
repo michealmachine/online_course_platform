@@ -52,12 +52,10 @@ public class TeachplanController {
      */
     @Operation(summary = "保存课程计划", description = "创建或更新课程计划")
     @PostMapping
-    public ContentResponse<Void> saveTeachplan(
-            @Parameter(description = "课程计划信息", required = true)
-            @RequestBody @Validated SaveTeachplanDTO teachplanDTO) {
+    public ContentResponse<Long> saveTeachplan(@RequestBody @Validated SaveTeachplanDTO teachplanDTO) {
         log.info("保存课程计划：{}", teachplanDTO);
-        teachplanService.saveTeachplan(teachplanDTO);
-        return ContentResponse.success(null);
+        Long teachplanId = teachplanService.saveTeachplan(teachplanDTO);
+        return ContentResponse.success(teachplanId);
     }
 
     /**

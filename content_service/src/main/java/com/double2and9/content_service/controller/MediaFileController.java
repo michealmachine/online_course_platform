@@ -13,8 +13,8 @@ import org.springframework.web.bind.annotation.*;
 
 @Slf4j
 @RestController
-@RequestMapping("/media")
-@Tag(name = "媒资文件管理", description = "提供媒资文件的管理接口")
+@RequestMapping("/media-files")
+@Tag(name = "媒资文件管理", description = "提供媒资文件的增删改查接口")
 public class MediaFileController {
     
     private final MediaFileService mediaFileService;
@@ -24,11 +24,10 @@ public class MediaFileController {
     }
     
     @Operation(summary = "保存媒资文件信息")
-    @PostMapping("/{organizationId}")
+    @PostMapping
     public ContentResponse<Void> saveMediaFile(
-            @Parameter(description = "机构ID") @PathVariable Long organizationId,
             @Parameter(description = "媒资文件信息") @RequestBody @Validated MediaFileDTO mediaFileDTO) {
-        mediaFileService.saveMediaFile(organizationId, mediaFileDTO);
+        mediaFileService.saveMediaFile(mediaFileDTO.getOrganizationId(), mediaFileDTO);
         return ContentResponse.success(null);
     }
     

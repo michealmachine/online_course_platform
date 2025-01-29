@@ -85,4 +85,48 @@ public class CourseController {
         courseBaseService.auditCourse(auditDTO);
         return ContentResponse.success(null);
     }
+
+    @Operation(summary = "获取课程详情")
+    @GetMapping("/{courseId}")
+    public ContentResponse<CourseBaseDTO> getCourseById(
+            @Parameter(description = "课程ID", required = true)
+            @PathVariable Long courseId) {
+        log.info("获取课程详情，courseId：{}", courseId);
+        CourseBaseDTO courseBaseDTO = courseBaseService.getCourseById(courseId);
+        log.info("获取课程详情成功，courseId：{}", courseId);
+        return ContentResponse.success(courseBaseDTO);
+    }
+
+    @Operation(summary = "删除课程")
+    @DeleteMapping("/{courseId}")
+    public ContentResponse<Void> deleteCourse(
+            @Parameter(description = "课程ID", required = true)
+            @PathVariable Long courseId) {
+        log.info("删除课程，courseId：{}", courseId);
+        courseBaseService.deleteCourse(courseId);
+        log.info("删除课程成功，courseId：{}", courseId);
+        return ContentResponse.success(null);
+    }
+
+    @Operation(summary = "发布课程")
+    @PostMapping("/{courseId}/publish")
+    public ContentResponse<Void> publishCourse(
+            @Parameter(description = "课程ID", required = true)
+            @PathVariable Long courseId) {
+        log.info("发布课程，courseId：{}", courseId);
+        courseBaseService.publishCourse(courseId);
+        log.info("发布课程成功，courseId：{}", courseId);
+        return ContentResponse.success(null);
+    }
+
+    @Operation(summary = "下架课程")
+    @PostMapping("/{courseId}/offline")
+    public ContentResponse<Void> offlineCourse(
+            @Parameter(description = "课程ID", required = true)
+            @PathVariable Long courseId) {
+        log.info("下架课程，courseId：{}", courseId);
+        courseBaseService.offlineCourse(courseId);
+        log.info("下架课程成功，courseId：{}", courseId);
+        return ContentResponse.success(null);
+    }
 } 

@@ -60,4 +60,23 @@ public interface CourseBaseService {
      * @return 审核状态
      */
     String getAuditStatus(Long courseId);
+
+    /**
+     * 根据ID获取课程
+     * @param courseId 课程ID
+     * @return 课程基本信息
+     */
+    CourseBaseDTO getCourseById(Long courseId);
+
+    /**
+     * 删除课程
+     * @param courseId 课程ID
+     */
+    void deleteCourse(Long courseId);
+
+    /**
+     * 下架课程
+     * @param courseId 课程ID
+     */
+    void offlineCourse(Long courseId);
 }

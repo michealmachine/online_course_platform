@@ -65,7 +65,7 @@ public class TeachplanServiceImpl implements TeachplanService {
 
     @Override
     @Transactional
-    public void saveTeachplan(SaveTeachplanDTO teachplanDTO) {
+    public Long saveTeachplan(SaveTeachplanDTO teachplanDTO) {
         // 获取课程信息
         CourseBase courseBase = courseBaseRepository.findById(teachplanDTO.getCourseId())
                 .orElseThrow(() -> new ContentException(ContentErrorCode.COURSE_NOT_EXISTS));
@@ -94,8 +94,11 @@ public class TeachplanServiceImpl implements TeachplanService {
         teachplan.setCourseBase(courseBase);
         teachplan.setUpdateTime(new Date());
         
-        teachplanRepository.save(teachplan);
-        log.info("保存课程计划成功，课程ID：{}，课程计划ID：{}", courseBase.getId(), teachplan.getId());
+        // 保存课程计划
+        Teachplan savedTeachplan = teachplanRepository.save(teachplan);
+        
+        log.info("保存课程计划成功，课程ID：{}，课程计划ID：{}", courseBase.getId(), savedTeachplan.getId());
+        return savedTeachplan.getId();  // 返回ID
     }
 
     @Override

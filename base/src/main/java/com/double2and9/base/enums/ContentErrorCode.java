@@ -9,7 +9,8 @@ public enum ContentErrorCode {
     COURSE_NAME_EMPTY(100102, "课程名称不能为空"),
     COURSE_CATEGORY_NOT_EXISTS(100103, "课程分类不存在"),
     COURSE_AUDIT_STATUS_ERROR(100104, "课程审核状态错误"),
-    COURSE_PUBLISH_ERROR(100105, "课程发布失败"),
+    COURSE_STATUS_ERROR(100105, "课程状态错误"),
+    COURSE_PUBLISH_ERROR(100106, "课程发布失败"),
     COURSE_ORG_NOT_MATCH(100106, "课程与机构不匹配"),
 
     // 课程计划相关错误 1002xx

@@ -31,9 +31,13 @@ public interface CourseBaseRepository extends JpaRepository<CourseBase, Long>, J
     Page<CourseBase> findByOrganizationId(Long organizationId, Pageable pageable);
     
     // 按机构ID和其他条件查询
-    @Query("SELECT c FROM CourseBase c WHERE " +
+    @Query(value = "SELECT c FROM CourseBase c WHERE " +
            "(:organizationId IS NULL OR c.organizationId = :organizationId) AND " +
-           "(:courseName IS NULL OR c.name LIKE CONCAT('%', :courseName, '%')) AND " +
+           "(:courseName IS NULL OR c.name LIKE %:courseName%) AND " +
+           "(:status IS NULL OR c.status = :status)",
+           countQuery = "SELECT COUNT(c) FROM CourseBase c WHERE " +
+           "(:organizationId IS NULL OR c.organizationId = :organizationId) AND " +
+           "(:courseName IS NULL OR c.name LIKE %:courseName%) AND " +
            "(:status IS NULL OR c.status = :status)")
     Page<CourseBase> findByConditions(
         @Param("organizationId") Long organizationId,

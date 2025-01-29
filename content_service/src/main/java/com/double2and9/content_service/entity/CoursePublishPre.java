@@ -33,6 +33,12 @@ public class CoursePublishPre {
     private String status;
 
     /**
+     * 审核意见
+     */
+    @Column(length = 500)
+    private String auditMessage;
+
+    /**
      * 预览时间
      */
     @Temporal(TemporalType.TIMESTAMP)

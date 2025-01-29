@@ -15,8 +15,9 @@ public interface TeachplanService {
     /**
      * 创建或修改课程计划
      * @param teachplanDTO 课程计划信息
+     * @return 课程计划ID
      */
-    void saveTeachplan(SaveTeachplanDTO teachplanDTO);
+    Long saveTeachplan(SaveTeachplanDTO teachplanDTO);
 
     /**
      * 删除课程计划
