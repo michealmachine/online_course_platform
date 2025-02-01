@@ -7,16 +7,18 @@
   - id: 课程ID
   - name: 课程名称
   - brief: 课程简介
+  - logo: 课程封面图片URL
   - mt/st: 课程分类(大类/小类)
   - status: 课程状态
   - organizationId: 机构ID
+  - qq: 咨询QQ
+  - valid: 课程有效性标识，true表示有效，false表示已删除
 
 - 关联关系:
-  - 一对一 CourseMarket (课程营销信息)
-  - 一对一 CoursePublish (课程发布信息)
-  - 一对一 CoursePublishPre (课程预发布信息) 
-  - 一对多 Teachplan (课程计划)
-  - 多对多 CourseTeacher (课程教师)
+  - 一对一 CourseMarket (共享主键)
+  - 一对多 Teachplan (通过course_id关联)
+  - 一对多 CourseTeacher (通过course_id关联)
+  - 与CoursePublish/CoursePublishPre的关联需要补充实体类
 
 ### 2. CourseMarket (课程营销信息)
 - 主要字段:
@@ -141,6 +143,17 @@ erDiagram
 6. 树形结构
 - Teachplan通过parentId实现树形结构
 - 支持两级结构:章节和小节
+
+7. 枚举使用规范
+- 所有状态字段必须使用枚举类型
+- 持久化时存储枚举的code值（字符串类型）
+- 示例：
+  ```java
+  @Enumerated(EnumType.STRING)
+  @Column(length = 20)
+  private CourseStatusEnum status;
+  ```
+- 前端交互使用code值，后端转换枚举处理
 
 ## Service层说明
 
@@ -321,6 +334,14 @@ erDiagram
   private List<CourseCategoryTreeDTO> childrenTreeNodes;  // 子节点
   ```
 
+### 5. 审核相关DTO
+- CourseAuditDTO：课程审核DTO
+  ```java
+  private Long courseId;     // 课程ID
+  private String auditStatus; // 审核状态
+  private String auditMessage;// 审核意见
+  ```
+
 ## 业务流程说明
 
 ### 1. 课程发布流程
@@ -354,10 +375,13 @@ erDiagram
    - 视频类型：需要通过media服务获取临时访问地址
 
 3. 审核流程
-   - 图片默认通过审核
-   - 视频需要经过审核
-   - 通过消息队列接收审核结果
-   - 更新本地审核状态
+   - 图片默认通过审核（状态直接设为3-审核通过）
+   - 视频需要经过审核（初始状态为1-未审核）
+   - 审核状态转换：
+     - 提交审核 → 2（审核中）
+     - 审核通过 → 3（审核通过）
+     - 审核不通过 → 4（审核不通过）
+   - 状态变更通过消息队列接收审核结果
 
 ## Controller层说明
 
@@ -551,40 +575,249 @@ erDiagram
 所有接口统一使用ContentResponse包装响应结果：
 ```json
 {
-  "code": 200,          // 响应码
-  "msg": "success",     // 响应消息
-  "data": {             // 响应数据
+  "code": 0,          // 响应码
+  "msg": "success",   // 响应消息
+  "data": {           // 响应数据
     // 具体业务数据
   }
 }
 ```
 
-### 错误码说明
-- 200: 成功
-- 400: 请求参数错误
-- 401: 未授权
-- 403: 无权限
-- 404: 资源不存在
-- 500: 系统内部错误
+## 错误码说明
 
-### 业务错误码
-- 100xxx: 课程相关错误
-  - 100101: 课程不存在
-  - 100102: 课程名称为空
-  - 100103: 课程分类不存在
-  
-- 100xxx: 教师相关错误
-  - 100301: 教师不存在
-  - 100302: 教师与课程不匹配
+### 通用错误码 (1xxxx)
+- 10000: 系统内部错误
+- 10001: 参数验证失败
+- 10002: 资源不存在
+- 10003: 无操作权限
 
-### 媒资相关错误码 (1004xx)
-- 100401: 媒资文件不存在
-- 100402: 媒资绑定失败
-- 100403: 媒资文件不属于该机构
-- 100404: 不支持的媒体类型
-- 100405: 媒资文件已存在
+### 课程相关错误码 (2xxxx)
+- 20001: 课程不存在
+- 20002: 课程已删除
+- 20003: 课程状态不允许当前操作
+- 20004: 课程计划不完整
+- 20005: 未设置课程教师
+- 20006: 课程价格信息不完整
+- 20007: 课程审核信息不存在
+
+### 教师相关错误码 (3xxxx)
+- 30001: 教师不存在
+- 30002: 教师已关联其他机构
+- 30003: 教师与课程关联关系不存在
+
+### 媒资相关错误码 (4xxxx)
+- 40001: 媒资文件不存在
+- 40002: 媒资文件未审核
+- 40003: 媒资文件审核未通过
+- 40004: 媒资绑定关系已存在
+
+## 错误响应格式
+```json
+{
+    "code": 0,          // 响应码
+    "msg": "success",   // 响应消息
+    "data": {           // 响应数据
+        // 具体业务数据
+    }
+}
+```
 
 ## 接口认证与授权
 - 所有接口需要在请求头中携带token
 - 使用Spring Security进行认证和授权
 - 机构ID从token中获取，无需在请求中传递
+
+## 状态码说明
+
+### 课程状态码
+- 202301: 已提交审核
+- 202302: 审核不通过
+- 202303: 审核通过
+- 202304: 已发布
+- 202305: 已下线
+
+## 业务流程约束
+
+### 课程审核提交条件
+1. 课程基本信息完整
+2. 必须添加至少一个课程计划（包含章节和小节）
+3. 必须关联至少一名教师
+4. 如果是收费课程，必须设置课程价格
+
+### 课程发布流程
+1. 创建课程：初始状态为未提交
+2. 完善课程信息：
+   - 添加课程计划
+   - 关联课程教师
+   - 设置营销信息
+3. 提交审核：
+   - 系统检查课程完整性
+   - 状态变更为"已提交审核"(202301)
+4. 审核处理：
+   - 审核通过：状态变更为"审核通过"(202303)，生成预发布信息
+   - 审核不通过：状态变更为"审核不通过"(202302)，可修改后重新提交
+5. 课程发布：
+   - 将预发布信息同步到发布信息
+   - 状态变更为"已发布"(202304)
+6. 课程下线：
+   - 状态变更为"已下线"(202305)
+   - 课程仍可被管理员查看，但用户端不可见
+
+## 接口说明
+
+### 课程管理接口
+
+#### 1. 创建课程
+- 请求方法：POST
+- 请求路径：/content/course
+- 请求体：
+```json
+{
+    "name": "课程名称",
+    "brief": "课程简介",
+    "mt": 1,
+    "st": 2,
+    "charge": "201001",
+    "price": 99.00,
+    "organizationId": 1234
+}
+```
+- 响应体：
+```json
+{
+    "code": 0,
+    "message": "success",
+    "data": {
+        "courseId": 1
+    }
+}
+```
+
+#### 2. 提交课程审核
+- 请求方法：POST
+- 请求路径：/content/course/{courseId}/audit
+- 响应体：
+```json
+{
+    "code": 0,
+    "message": "success"
+}
+```
+
+#### 3. 课程审核
+- 请求方法：POST
+- 请求路径：/content/course/{courseId}/audit/result
+- 请求体：
+```json
+{
+    "auditStatus": "202303",
+    "auditMessage": "审核通过"
+}
+```
+- 响应体：
+```json
+{
+    "code": 0,
+    "message": "success"
+}
+```
+
+### 课程计划接口
+
+#### 1. 获取课程计划树
+- 请求方法：GET
+- 请求路径：/content/teachplan/{courseId}/tree
+- 响应体：
+```json
+{
+    "code": 0,
+    "message": "success",
+    "data": [
+        {
+            "id": 1,
+            "name": "第一章",
+            "level": 1,
+            "orderBy": 1,
+            "teachPlanTreeNodes": [
+                {
+                    "id": 2,
+                    "name": "第一节",
+                    "level": 2,
+                    "orderBy": 1,
+                    "mediaInfo": null
+                }
+            ]
+        }
+    ]
+}
+```
+
+#### 2. 保存课程计划
+- 请求方法：POST
+- 请求路径：/content/teachplan
+- 请求体：
+```json
+{
+    "courseId": 1,
+    "parentId": 0,
+    "name": "第一章",
+    "level": 1,
+    "orderBy": 1
+}
+```
+- 响应体：
+```json
+{
+    "code": 0,
+    "message": "success",
+    "data": {
+        "teachplanId": 1
+    }
+}
+```
+
+### 课程教师接口
+
+#### 1. 关联教师
+- 请求方法：POST
+- 请求路径：/content/course-teacher
+- 请求体：
+```json
+{
+    "name": "教师名称",
+    "position": "讲师",
+    "description": "教师简介",
+    "courseIds": [1, 2]
+}
+```
+- 响应体：
+```json
+{
+    "code": 0,
+    "message": "success",
+    "data": {
+        "teacherId": 1
+    }
+}
+```
+
+### 媒资管理接口
+
+#### 1. 绑定媒资
+- 请求方法：POST
+- 请求路径：/content/teachplan-media
+- 请求体：
+```json
+{
+    "teachplanId": 1,
+    "mediaId": "mediaFileId",
+    "mediaType": "video"
+}
+```
+- 响应体：
+```json
+{
+    "code": 0,
+    "message": "success"
+}
+```
