@@ -14,50 +14,55 @@ import java.util.Optional;
  */
 @Repository
 public interface MediaFileRepository extends JpaRepository<MediaFile, Long> {
-    
+
     /**
-     * 根据文件ID查找文件信息
-     * @param fileId 文件ID（MD5值）
+     * 根据媒体文件ID查找文件信息
+     * 
+     * @param mediaFileId 媒体文件ID（MD5值）
      * @return 文件信息
      */
-    Optional<MediaFile> findByFileId(String fileId);
-    
+    Optional<MediaFile> findByMediaFileId(String mediaFileId);
+
     /**
-     * 根据文件类型查询文件列表
-     * @param fileType 文件类型
+     * 根据媒体类型查询文件列表
+     * 
+     * @param mediaType 媒体类型
      * @return 文件列表
      */
-    List<MediaFile> findByFileType(String fileType);
-    
+    List<MediaFile> findByMediaType(String mediaType);
+
     /**
      * 根据状态查询文件列表
+     * 
      * @param status 文件状态
      * @return 文件列表
      */
     List<MediaFile> findByStatus(String status);
-    
+
     /**
      * 根据文件名模糊查询
+     * 
      * @param filename 文件名
      * @return 文件列表
      */
     @Query("SELECT m FROM MediaFile m WHERE m.fileName LIKE %:filename%")
     List<MediaFile> findByFileNameLike(@Param("filename") String filename);
-    
+
     /**
      * 检查文件是否存在
-     * @param fileId 文件ID
+     * 
+     * @param mediaFileId 媒体文件ID
      * @return 是否存在
      */
-    boolean existsByFileId(String fileId);
-    
+    boolean existsByMediaFileId(String mediaFileId);
+
     /**
-     * 根据文件MD5查询
+     * 根据URL查询
      */
-    Optional<MediaFile> findByFileMd5(String fileMd5);
-    
+    Optional<MediaFile> findByUrl(String url);
+
     /**
      * 根据文件名模糊查询
      */
     List<MediaFile> findByFileNameContaining(String fileName);
-} 
+}

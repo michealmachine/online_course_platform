@@ -5,8 +5,8 @@ spring:
   # 文件上传配置
   servlet:
     multipart:
-      max-file-size: 10MB
-      max-request-size: 100MB
+      max-file-size: 5MB        # 单个文件大小限制
+      max-request-size: 10MB    # 总请求大小限制
       enabled: true
   application:
     name: media-service
@@ -42,6 +42,16 @@ minio:
   accessKey: root
   secretKey: rootroot
   bucketName: media
+
+# 自定义配置
+media:
+  image:
+    max-size: 2097152          # 图片最大2MB (2 * 1024 * 1024)
+    min-size: 1024             # 图片最小1KB
+    allowed-types:             # 允许的图片类型
+      - image/jpeg
+      - image/png
+      - image/gif
 
 
 

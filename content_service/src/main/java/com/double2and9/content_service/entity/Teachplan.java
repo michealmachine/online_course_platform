@@ -1,4 +1,5 @@
 package com.double2and9.content_service.entity;
+
 import jakarta.persistence.*;
 import lombok.Data;
 import lombok.EqualsAndHashCode;

@@ -1,5 +1,6 @@
 package com.double2and9.media.service;
 
+import com.double2and9.base.dto.MediaFileDTO;
 import com.double2and9.media.dto.UploadFileDTO;
 import com.double2and9.media.entity.MediaFile;
 import org.springframework.web.multipart.MultipartFile;
@@ -46,4 +47,20 @@ public interface ImageService {
     String updateTemp(String tempKey, MultipartFile file);
 
     String saveTemp(String tempKey);
+
+    /**
+     * 上传课程封面图片
+     * @param organizationId 机构ID
+     * @param courseId 课程ID
+     * @param file 图片文件
+     * @return 媒体文件信息
+     */
+    MediaFileDTO uploadCourseLogo(Long organizationId, Long courseId, MultipartFile file);
+
+    /**
+     * 删除媒体文件
+     * @param url 文件URL
+     */
+    void deleteMediaFile(String url);
+
 }
