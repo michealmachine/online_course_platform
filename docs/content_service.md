@@ -745,3 +745,77 @@ DELETE /teachplan-media/{teachplanId}/{mediaId}
 | 200102 | 文件上传失败 |
 | 200303 | MinIO上传失败 |
 | 299999 | 系统内部错误 |
+
+## 4. 容错机制设计
+
+### 4.1 Resilience4j 集成
+内容服务使用 Resilience4j 实现服务容错,主要用于处理与媒体服务的交互。
+
+#### 4.1.1 配置说明
+```yaml
+resilience4j:
+  circuitbreaker:
+    instances:
+      backendA:  # 断路器实例名称
+        slidingWindowType: COUNT_BASED  # 滑动窗口类型:基于计数
+        slidingWindowSize: 10  # 滑动窗口大小
+        minimumNumberOfCalls: 5  # 最小调用次数
+        failureRateThreshold: 50  # 失败率阈值
+        waitDurationInOpenState: 10s  # 断路器打开状态持续时间
+        permittedNumberOfCallsInHalfOpenState: 3  # 半开状态允许的调用次数
+```
+
+#### 4.1.2 使用示例
+```java
+@FeignClient(name = "media-service")
+public interface MediaFeignClient {
+
+    @PostMapping("/media/files/course/{courseId}/logo")
+    @CircuitBreaker(name = "backendA", fallbackMethod = "uploadCourseLogoFallback")
+    CommonResponse<MediaFileDTO> uploadCourseLogo(
+            @PathVariable("courseId") Long courseId,
+            @RequestParam("organizationId") Long organizationId,
+            @RequestPart("file") MultipartFile file);
+
+    /**
+     * 上传课程封面的降级方法
+     */
+    default CommonResponse<MediaFileDTO> uploadCourseLogoFallback(
+            Long courseId, Long organizationId, MultipartFile file, Throwable throwable) {
+        return CommonResponse.error(
+            String.valueOf(ContentErrorCode.UPLOAD_LOGO_FAILED.getCode()),
+            ContentErrorCode.UPLOAD_LOGO_FAILED.getMessage()
+        );
+    }
+}
+```
+
+### 4.2 容错策略
+
+1. 断路器模式
+- 使用滑动窗口统计失败率
+- 当失败率超过阈值时断路器打开
+- 等待一定时间后进入半开状态
+- 在半开状态下允许部分请求通过以探测服务是否恢复
+
+2. 降级处理
+- 为关键接口提供 fallback 方法
+- 降级时返回预定义的错误码和消息
+- 确保系统可以优雅降级
+
+3. 监控指标
+- 断路器状态变化
+- 请求成功/失败率
+- 响应时间统计
+- 降级方法调用次数
+
+### 4.3 错误处理
+1. 业务异常
+- 使用 ContentErrorCode 定义错误码
+- 统一异常处理和响应格式
+- 详细的错误信息记录
+
+2. 系统监控
+- 记录异常日志
+- 统计异常发生频率
+- 关键指标监控告警

@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.test.annotation.Rollback;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -16,19 +17,21 @@ import static org.junit.jupiter.api.Assertions.*;
 import com.double2and9.content_service.common.exception.ContentException;
 
 @SpringBootTest
+@Transactional
+@Rollback
 public class CourseAuditServiceTests {
 
     private static final Long TEST_ORG_ID = 1234L;
 
     @Autowired
     private CourseBaseService courseBaseService;
-    
+
     @Autowired
     private TeachplanService teachplanService;
-    
+
     @Autowired
     private CourseTeacherService courseTeacherService;
-    
+
     private Long courseId;
 
     @BeforeEach
@@ -87,9 +90,9 @@ public class CourseAuditServiceTests {
         // 2. 审核通过
         CourseAuditDTO auditDTO = new CourseAuditDTO();
         auditDTO.setCourseId(courseId);
-        auditDTO.setAuditStatus("202303");  // 通过
+        auditDTO.setAuditStatus("202303"); // 通过
         auditDTO.setAuditMessage("课程内容符合要求");
-        
+
         courseBaseService.auditCourse(auditDTO);
         status = courseBaseService.getAuditStatus(courseId);
         assertEquals("202303", status, "审核后状态应为'通过'");
@@ -106,13 +109,13 @@ public class CourseAuditServiceTests {
     public void testAuditReject() {
         // 1. 提交审核
         courseBaseService.submitForAudit(courseId);
-        
+
         // 2. 审核不通过
         CourseAuditDTO auditDTO = new CourseAuditDTO();
         auditDTO.setCourseId(courseId);
-        auditDTO.setAuditStatus("202302");  // 不通过
+        auditDTO.setAuditStatus("202302"); // 不通过
         auditDTO.setAuditMessage("课程内容需要完善");
-        
+
         courseBaseService.auditCourse(auditDTO);
         String status = courseBaseService.getAuditStatus(courseId);
         assertEquals("202302", status, "审核后状态应为'不通过'");
@@ -123,7 +126,7 @@ public class CourseAuditServiceTests {
     public void testSubmitAuditWithoutTeachplan() {
         // 删除课程计划
         List<TeachplanDTO> chapters = teachplanService.findTeachplanTree(courseId);
-        
+
         // 1. 先删除所有小节
         for (TeachplanDTO chapter : chapters) {
             if (chapter.getTeachPlanTreeNodes() != null) {
@@ -134,7 +137,7 @@ public class CourseAuditServiceTests {
                 }
             }
         }
-        
+
         // 2. 再删除所有章节
         for (TeachplanDTO chapter : chapters) {
             if (chapter != null && chapter.getId() != null) {
@@ -143,8 +146,8 @@ public class CourseAuditServiceTests {
         }
 
         // 提交审核应该失败
-        assertThrows(ContentException.class, 
-            () -> courseBaseService.submitForAudit(courseId));
+        assertThrows(ContentException.class,
+                () -> courseBaseService.submitForAudit(courseId));
     }
 
     @Test
@@ -157,7 +160,7 @@ public class CourseAuditServiceTests {
         }
 
         // 提交审核应该失败
-        assertThrows(ContentException.class, 
-            () -> courseBaseService.submitForAudit(courseId));
+        assertThrows(ContentException.class,
+                () -> courseBaseService.submitForAudit(courseId));
     }
-} 
+}

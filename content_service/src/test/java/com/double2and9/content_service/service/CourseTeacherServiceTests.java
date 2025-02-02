@@ -9,7 +9,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.annotation.Rollback;
 import org.springframework.transaction.annotation.Transactional;
+
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -18,16 +20,18 @@ import java.util.Set;
 import static org.junit.jupiter.api.Assertions.*;
 
 @SpringBootTest
+@Transactional
+@Rollback
 public class CourseTeacherServiceTests {
 
     private static final Long TEST_ORG_ID = 1234L;
 
     @Autowired
     private CourseTeacherService courseTeacherService;
-    
+
     @Autowired
     private CourseBaseService courseBaseService;
-    
+
     private Long courseId;
 
     @BeforeEach
@@ -57,7 +61,7 @@ public class CourseTeacherServiceTests {
         teacherDTO.setName("测试教师");
         teacherDTO.setPosition("讲师");
         teacherDTO.setDescription("测试教师简介");
-        teacherDTO.setCourseIds(Set.of(courseId));  // 使用Set设置课程ID
+        teacherDTO.setCourseIds(Set.of(courseId)); // 使用Set设置课程ID
 
         courseTeacherService.saveCourseTeacher(teacherDTO);
 
@@ -177,6 +181,6 @@ public class CourseTeacherServiceTests {
         // 3. 使用错误的机构ID查询，应该抛出异常
         Long wrongOrgId = 9999L;
         assertThrows(ContentException.class,
-            () -> courseTeacherService.getTeacherDetail(wrongOrgId, teacherId));
+                () -> courseTeacherService.getTeacherDetail(wrongOrgId, teacherId));
     }
-} 
+}
