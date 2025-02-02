@@ -27,7 +27,6 @@ public class TeachplanMediaServiceImpl implements TeachplanMediaService {
     private final TeachplanRepository teachplanRepository;
     private final MediaFileRepository mediaFileRepository;
     private final ModelMapper modelMapper;
-
     public TeachplanMediaServiceImpl(TeachplanMediaRepository teachplanMediaRepository,
                                    TeachplanRepository teachplanRepository,
                                    MediaFileRepository mediaFileRepository,
@@ -41,18 +40,18 @@ public class TeachplanMediaServiceImpl implements TeachplanMediaService {
     @Override
     @Transactional
     public void associateMedia(TeachplanMediaDTO teachplanMediaDTO) {
-        // 获取课程计划
+        // 验证课程计划是否存在
         Teachplan teachplan = teachplanRepository.findById(teachplanMediaDTO.getTeachplanId())
                 .orElseThrow(() -> new ContentException(ContentErrorCode.TEACHPLAN_NOT_EXISTS));
-
-        // 获取媒资文件
-        MediaFile mediaFile = mediaFileRepository.findById(teachplanMediaDTO.getMediaId())
+        
+        // 验证媒资是否存在 - 使用mediaFileId查询
+        MediaFile mediaFile = mediaFileRepository.findByMediaFileId(teachplanMediaDTO.getMediaId())
                 .orElseThrow(() -> new ContentException(ContentErrorCode.MEDIA_NOT_EXISTS));
 
         try {
             // 检查是否已经存在关联
             TeachplanMedia existingMedia = teachplanMediaRepository
-                    .findByTeachplanIdAndMediaFileId(teachplan.getId(), mediaFile.getId())
+                    .findByTeachplanIdAndMediaFile_MediaFileId(teachplan.getId(), mediaFile.getMediaFileId())
                     .orElse(null);
 
             if (existingMedia == null) {
@@ -65,7 +64,7 @@ public class TeachplanMediaServiceImpl implements TeachplanMediaService {
                 teachplanMediaRepository.save(teachplanMedia);
             }
 
-            log.info("课程计划与媒资关联成功，课程计划ID：{}，媒资ID：{}", teachplan.getId(), mediaFile.getId());
+            log.info("课程计划与媒资关联成功，课程计划ID：{}，媒资ID：{}", teachplan.getId(), mediaFile.getMediaFileId());
         } catch (Exception e) {
             throw new ContentException(ContentErrorCode.MEDIA_BIND_ERROR);
         }
@@ -73,13 +72,13 @@ public class TeachplanMediaServiceImpl implements TeachplanMediaService {
 
     @Override
     @Transactional
-    public void dissociateMedia(Long teachplanId, Long mediaId) {
+    public void dissociateMedia(Long teachplanId, String mediaFileId) {
         TeachplanMedia teachplanMedia = teachplanMediaRepository
-                .findByTeachplanIdAndMediaFileId(teachplanId, mediaId)
+                .findByTeachplanIdAndMediaFile_MediaFileId(teachplanId, mediaFileId)
                 .orElseThrow(() -> new ContentException(ContentErrorCode.MEDIA_NOT_EXISTS));
 
         teachplanMediaRepository.delete(teachplanMedia);
-        log.info("解除课程计划与媒资的关联成功，课程计划ID：{}，媒资ID：{}", teachplanId, mediaId);
+        log.info("解除课程计划与媒资的关联成功，课程计划ID：{}，媒资ID：{}", teachplanId, mediaFileId);
     }
 
     @Override
@@ -93,10 +92,10 @@ public class TeachplanMediaServiceImpl implements TeachplanMediaService {
     private TeachplanMediaDTO convertToDTO(TeachplanMedia teachplanMedia) {
         TeachplanMediaDTO dto = new TeachplanMediaDTO();
         dto.setTeachplanId(teachplanMedia.getTeachplan().getId());
-        dto.setMediaId(teachplanMedia.getMediaFile().getId());
+        dto.setMediaId(teachplanMedia.getMediaFile().getMediaFileId());
         dto.setMediaFileName(teachplanMedia.getMediaFile().getFileName());
-        dto.setMediaType(teachplanMedia.getMediaFile().getFileType());
-        dto.setUrl(teachplanMedia.getMediaFile().getFilePath());
+        dto.setMediaType(teachplanMedia.getMediaFile().getMediaType());
+        dto.setUrl(teachplanMedia.getMediaFile().getUrl());
         return dto;
     }
 } 

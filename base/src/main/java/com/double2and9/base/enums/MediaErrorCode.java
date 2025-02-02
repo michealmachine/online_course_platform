@@ -4,13 +4,17 @@ import lombok.Getter;
 
 @Getter
 public enum MediaErrorCode {
-    // 文件相关错误 2001xx
+    // 媒体文件相关错误 2001xx
     FILE_NOT_EXISTS(200101, "文件不存在"),
-    FILE_UPLOAD_FAILED(200102, "文件上传失败"),
-    FILE_TYPE_ERROR(200103, "文件类型错误"),
-    FILE_SIZE_ERROR(200104, "文件大小超出限制"),
-    FILE_MD5_ERROR(200105, "文件MD5校验失败"),
-    FILE_DELETE_FAILED(200106, "文件删除失败"),
+    MEDIA_TYPE_NOT_SUPPORT(200102, "不支持的媒体类型"),
+    UPLOAD_ERROR(200103, "上传失败"),
+    DELETE_ERROR(200104, "删除失败"),
+    FILE_TOO_LARGE(200105, "文件大小超过限制"),
+    FILE_TOO_SMALL(200106, "文件大小过小"),
+    FILE_EMPTY(200107, "文件为空"),
+    FILE_TYPE_ERROR(200108, "文件类型错误"),
+    FILE_UPLOAD_FAILED(200109, "文件上传失败"),
+
     // 处理相关错误 2002xx
     PROCESS_FAILED(200201, "文件处理失败"),
     PROCESS_STATUS_ERROR(200202, "处理状态错误"),

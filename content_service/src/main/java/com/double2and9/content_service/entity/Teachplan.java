@@ -1,6 +1,10 @@
 package com.double2and9.content_service.entity;
+
 import jakarta.persistence.*;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.ToString;
+
 import java.util.List;
 import java.util.Date;
 
@@ -59,11 +63,15 @@ public class Teachplan {
      */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "course_id", referencedColumnName = "id")
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
     private CourseBase courseBase;
 
     /**
      * 关联的媒资信息
      */
     @OneToMany(mappedBy = "teachplan", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
     private List<TeachplanMedia> teachplanMedias;
 }

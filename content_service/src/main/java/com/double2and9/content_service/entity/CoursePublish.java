@@ -1,6 +1,9 @@
 package com.double2and9.content_service.entity;
 import jakarta.persistence.*;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.ToString;
+
 import java.util.Date;
 
 /**
@@ -53,5 +56,7 @@ public class CoursePublish {
     @MapsId
     @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "id")
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
     private CourseBase courseBase;
 }

@@ -38,7 +38,7 @@ public class TeachplanMediaController {
     public ContentResponse<Void> dissociateMedia(
             @Parameter(description = "课程计划ID") @PathVariable Long teachplanId,
             @Parameter(description = "媒资ID") @PathVariable Long mediaId) {
-        teachplanMediaService.dissociateMedia(teachplanId, mediaId);
+        teachplanMediaService.dissociateMedia(teachplanId, String.valueOf(mediaId));
         return ContentResponse.success(null);
     }
 

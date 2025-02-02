@@ -18,6 +18,8 @@ import static org.junit.jupiter.api.Assertions.*;
 @Rollback
 public class TeachplanRepositoryTest {
 
+    private static final Long TEST_ORG_ID = 1234L;
+
     @Autowired
     private TeachplanRepository teachplanRepository;
     
@@ -26,9 +28,9 @@ public class TeachplanRepositoryTest {
 
     @Test
     void testSaveTeachplan() {
-        // 准备测试数据
         CourseBase courseBase = new CourseBase();
         courseBase.setName("测试课程");
+        courseBase.setOrganizationId(TEST_ORG_ID);
         courseBase = courseBaseRepository.save(courseBase);
 
         Teachplan teachplan = new Teachplan();
@@ -54,6 +56,7 @@ public class TeachplanRepositoryTest {
         // 准备测试数据
         CourseBase courseBase = new CourseBase();
         courseBase.setName("测试课程");
+        courseBase.setOrganizationId(TEST_ORG_ID);
         courseBase = courseBaseRepository.save(courseBase);
 
         Teachplan chapter = new Teachplan();

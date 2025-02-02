@@ -1,31 +1,81 @@
-### 查询课程计划树
-GET http://localhost:8080/teachplan/tree/1
-Content-Type: application/json
+### 环境变量
+@host = http://localhost:8080
+@contentType = application/json
 
-### 创建课程计划（章节）
-POST http://localhost:8080/teachplan
-Content-Type: application/json
+### 创建课程（准备数据）
+POST {{host}}/course
+Content-Type: {{contentType}}
 
 {
-  "courseId": 1,
+  "name": "课程计划测试课程",
+  "brief": "用于测试课程计划",
+  "mt": 1,
+  "st": 2,
+  "charge": "201001",
+  "price": 100,
+  "organizationId": 1234
+}
+
+> {%
+    client.global.set("courseId", response.body.data);
+%}
+
+### 创建章节
+POST {{host}}/teachplan
+Content-Type: {{contentType}}
+
+{
+  "courseId": {{courseId}},
   "parentId": 0,
-  "level": 1,
   "name": "第一章",
+  "level": 1,
   "orderBy": 1
 }
 
-### 创建课程计划（小节）
-POST http://localhost:8080/teachplan
-Content-Type: application/json
+> {%
+    client.global.set("chapterId", response.body.data);
+%}
+
+### 创建小节
+POST {{host}}/teachplan
+Content-Type: {{contentType}}
 
 {
-  "courseId": 1,
-  "parentId": 2,
-  "level": 2,
+  "courseId": {{courseId}},
+  "parentId": {{chapterId}},
   "name": "第一节",
+  "level": 2,
   "orderBy": 1
 }
 
-### 删除课程计划
-DELETE http://localhost:8080/teachplan/1
-Content-Type: application/json 
+> {%
+    client.global.set("sectionId", response.body.data);
+%}
+
+### 查询课程计划树
+GET {{host}}/teachplan/tree/{{courseId}}
+
+### 修改小节
+PUT {{host}}/teachplan
+Content-Type: {{contentType}}
+
+{
+  "id": {{sectionId}},
+  "name": "修改后的小节名称",
+  "orderBy": 2
+}
+
+### 上移小节
+POST {{host}}/teachplan/moveup/{{sectionId}}
+
+### 下移小节
+POST {{host}}/teachplan/movedown/{{sectionId}}
+
+### 删除小节
+DELETE {{host}}/teachplan/{{sectionId}}
+
+### 删除章节
+DELETE {{host}}/teachplan/{{chapterId}}
+
+### 删除课程（清理测试数据）
+DELETE {{host}}/course/{{courseId}} 

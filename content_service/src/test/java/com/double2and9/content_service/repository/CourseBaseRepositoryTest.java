@@ -4,107 +4,67 @@ import com.double2and9.content_service.entity.CourseBase;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.annotation.Rollback;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
 import java.util.Date;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 @SpringBootTest
-@Transactional
-@Rollback
-public class CourseBaseRepositoryTest {
+class CourseBaseRepositoryTest {
 
     @Autowired
     private CourseBaseRepository courseBaseRepository;
 
+    private static final Long TEST_ORG_ID = 1234L; // 测试用机构ID
+
     @Test
-    void testSaveCourseBase() {
-        // 创建测试数据
+    @Transactional
+    void testSaveCourse() {
         CourseBase courseBase = new CourseBase();
         courseBase.setName("测试课程");
-        courseBase.setBrief("这是一个测试课程");
-        courseBase.setLogo("test.jpg");
+        courseBase.setBrief("测试课程简介");
         courseBase.setMt(1L);
         courseBase.setSt(1L);
-        courseBase.setPrice(new BigDecimal("99.99"));
-        courseBase.setPriceOld(new BigDecimal("199.99"));
-        courseBase.setCharge("201001");  // 假设这是收费课程的代码
+        courseBase.setOrganizationId(TEST_ORG_ID);
         courseBase.setValid(true);
-        courseBase.setQq("12345678");
+        courseBase.setStatus("202001");
         courseBase.setCreateTime(new Date());
         courseBase.setUpdateTime(new Date());
 
-        // 保存
         CourseBase saved = courseBaseRepository.save(courseBase);
-        
-        // 验证
         assertNotNull(saved.getId());
         assertEquals("测试课程", saved.getName());
-        assertTrue(saved.getValid());
+        assertEquals(TEST_ORG_ID, saved.getOrganizationId());
     }
 
     @Test
-    void testFindByNameContaining() {
-        // 创建测试数据
-        CourseBase courseBase = new CourseBase();
-        courseBase.setName("Java高级课程");
-        courseBase.setValid(true);
-        courseBase.setCreateTime(new Date());
-        courseBase.setUpdateTime(new Date());
-        courseBaseRepository.save(courseBase);
-
-        // 测试查询
-        List<CourseBase> courses = courseBaseRepository.findByNameContaining("Java");
+    void testFindByConditions() {
+        // 测试按机构ID和其他条件查询
+        Page<CourseBase> result = courseBaseRepository.findByConditions(
+            TEST_ORG_ID,
+            "测试",
+            "202001",
+            PageRequest.of(0, 10)
+        );
         
-        // 验证
-        assertFalse(courses.isEmpty());
-        assertTrue(courses.stream().anyMatch(course -> 
-            course.getName().equals("Java高级课程")));
+        assertNotNull(result);
+        assertTrue(result.getContent().stream()
+            .allMatch(course -> course.getOrganizationId().equals(TEST_ORG_ID)));
     }
 
     @Test
-    void testFindByMtAndSt() {
-        // 创建测试数据
-        CourseBase courseBase = new CourseBase();
-        courseBase.setName("测试课程");
-        courseBase.setMt(1L);
-        courseBase.setSt(2L);
-        courseBase.setValid(true);
-        courseBase.setCreateTime(new Date());
-        courseBase.setUpdateTime(new Date());
-        courseBaseRepository.save(courseBase);
-
-        // 测试查询
-        List<CourseBase> courses = courseBaseRepository.findByMtAndSt(1L, 2L);
+    void testFindByOrganizationId() {
+        Page<CourseBase> result = courseBaseRepository.findByOrganizationId(
+            TEST_ORG_ID,
+            PageRequest.of(0, 10)
+        );
         
-        // 验证
-        assertFalse(courses.isEmpty());
-        CourseBase found = courses.get(0);
-        assertEquals(1L, found.getMt());
-        assertEquals(2L, found.getSt());
-    }
-
-    @Test
-    void testFindLatestCoursesByMt() {
-        // 创建测试数据
-        CourseBase courseBase = new CourseBase();
-        courseBase.setName("最新测试课程");
-        courseBase.setMt(1L);
-        courseBase.setValid(true);
-        courseBase.setCreateTime(new Date());
-        courseBase.setUpdateTime(new Date());
-        courseBaseRepository.save(courseBase);
-
-        // 测试查询
-        List<CourseBase> courses = courseBaseRepository.findLatestCoursesByMt(1L);
-        
-        // 验证
-        assertFalse(courses.isEmpty());
-        assertTrue(courses.stream().anyMatch(course -> 
-            course.getName().equals("最新测试课程")));
+        assertNotNull(result);
+        assertTrue(result.getContent().stream()
+            .allMatch(course -> course.getOrganizationId().equals(TEST_ORG_ID)));
     }
 } 

@@ -12,26 +12,50 @@ import java.util.List;
 @Table(name = "media_files")
 public class MediaFile {
     /**
-     * 文件ID
+     * 主键，使用media服务的fileId
      */
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    @Column(length = 32)
+    private String mediaFileId;
+
+    /**
+     * 机构ID
+     */
+    @Column(nullable = false)
+    private Long organizationId;
 
     /**
      * 文件名称
      */
-    @Column(nullable = false, length = 255)
+    @Column(length = 255)
     private String fileName;
 
     /**
-     * 文件在文件系统中的路径
+     * 本地审核状态
      */
-    @Column(length = 255)
-    private String filePath;
+    @Column(length = 20)
+    private String auditStatus;
 
     /**
-     * 文件大小，单位字节
+     * 审核信息
+     */
+    @Column(length = 255)
+    private String auditMessage;
+
+    /**
+     * 媒体类型：IMAGE/VIDEO
+     */
+    @Column(length = 20)
+    private String mediaType;
+
+    /**
+     * 访问地址
+     */
+    @Column(length = 512)
+    private String url;
+
+    /**
+     * 文件大小
      */
     @Column
     private Long fileSize;
@@ -39,20 +63,35 @@ public class MediaFile {
     /**
      * 文件类型
      */
-    @Column(length = 50)
-    private String fileType;
+    @Column(length = 128)
+    private String mimeType;
 
     /**
-     * 创建时间
+     * 文件用途：COVER(封面),VIDEO(视频)等
      */
-    @Temporal(TemporalType.TIMESTAMP)
+    @Column(length = 32)
+    private String purpose;
+
+    @Column(nullable = false)
     private Date createTime;
 
-    /**
-     * 更新时间
-     */
-    @Temporal(TemporalType.TIMESTAMP)
+    @Column(nullable = false)
     private Date updateTime;
+
+    @PrePersist
+    public void prePersist() {
+        if (createTime == null) {
+            createTime = new Date();
+        }
+        if (updateTime == null) {
+            updateTime = new Date();
+        }
+    }
+
+    @PreUpdate
+    public void preUpdate() {
+        updateTime = new Date();
+    }
 
     /**
      * 关联的教学计划媒资信息

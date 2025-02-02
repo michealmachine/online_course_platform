@@ -1,6 +1,9 @@
 package com.double2and9.content_service.entity;
 import jakarta.persistence.*;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.ToString;
+
 import java.util.Date;
 
 /**
@@ -30,6 +33,12 @@ public class CoursePublishPre {
     private String status;
 
     /**
+     * 审核意见
+     */
+    @Column(length = 500)
+    private String auditMessage;
+
+    /**
      * 预览时间
      */
     @Temporal(TemporalType.TIMESTAMP)
@@ -53,5 +62,7 @@ public class CoursePublishPre {
     @MapsId
     @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "id")
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
     private CourseBase courseBase;
 }

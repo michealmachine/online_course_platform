@@ -50,4 +50,8 @@ public class AddCourseDTO {
     
     @Schema(description = "是否有效", defaultValue = "true")
     private Boolean valid;
+    
+    @Schema(description = "机构ID", requiredMode = Schema.RequiredMode.REQUIRED)
+    @NotNull(message = "机构ID不能为空")
+    private Long organizationId;
 } 

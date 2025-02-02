@@ -28,6 +28,11 @@
   - 媒资绑定到课程计划
   - 支持解除绑定
   - 媒资信息查询
+- 课程封面管理
+  - 更新课程封面
+  - 删除课程封面
+  - 与媒资服务集成
+  - 跨服务文件管理
 - API文档
   - 集成Swagger
   - 详细的接口说明
@@ -86,6 +91,7 @@ content_service/
   - id: 课程ID（主键）
   - name: 课程名称
   - brief: 课程简介
+  - logo: 课程封面图片URL
   - mt/st: 课程分类（大类/小类）
   - status: 课程状态
   - valid: 是否有效
@@ -150,14 +156,33 @@ content_service/
     - 202001：未发布
     - 202002：已发布
     - 202003：已下线
+对应枚举类：CourseStatusEnum
+
 - 审核状态：
-    - 202301：已提交
-    - 202302：审核中
-    - 202303：通过
-    - 202304：不通过
+    - 202301：已提交审核
+    - 202302：审核不通过
+    - 202303：审核通过
+对应枚举类：CourseAuditStatusEnum
+
 - 收费规则：
     - 201001：免费
     - 201002：收费
+对应枚举类：CourseChargeEnum
+
+媒资相关状态：
+审核状态（MediaAuditStatusEnum）：
+  - 1：未审核
+  - 2：审核中
+  - 3：审核通过
+  - 4：审核不通过
+
+文件状态（MediaStatusEnum）：
+  - 1：上传中
+  - 2：上传完成
+  - 3：上传失败
+  - 4：处理中
+  - 5：处理成功
+  - 6：处理失败
 
 ## 4. API接口设计
 
@@ -186,6 +211,34 @@ POST /course
 "price": 0,
 "valid": true
 }
+
+#### 4.1.4 更新课程封面
+```http
+POST /course/{courseId}/logo
+Content-Type: multipart/form-data
+
+请求参数：
+- file: 封面图片文件
+- organizationId: 机构ID
+
+响应：
+{
+  "code": 0,
+  "message": "success",
+  "data": "http://minio/bucket/course/logo/xxx.jpg"
+}
+```
+
+#### 4.1.5 删除课程封面
+```http
+DELETE /course/{courseId}/logo
+
+响应：
+{
+  "code": 0,
+  "message": "success"
+}
+```
 
 ### 4.2 课程计划接口
 #### 4.2.1 查询课程计划树
@@ -230,6 +283,44 @@ POST /teachplan
     - 记录审核意见
     - 触发后续流程
 
+### 5.4 课程封面管理流程
+
+```mermaid
+sequenceDiagram
+    participant Client as 前端
+    participant Content as Content Service
+    participant Media as Media Service
+    participant MinIO
+    participant DB as Database
+
+    Client->>Content: 上传课程封面请求
+    Content->>Media: Feign调用上传接口
+    Media->>Media: 校验文件类型和大小
+    Media->>MinIO: 上传文件
+    MinIO-->>Media: 返回存储结果
+    Media->>DB: 保存媒资记录
+    Media-->>Content: 返回媒资信息(URL等)
+    Content->>DB: 更新课程封面URL
+    Content-->>Client: 返回处理结果
+```
+
+### 服务调用关系
+
+```mermaid
+graph LR
+    Content[Content Service]
+    Media[Media Service]
+    MinIO[MinIO Storage]
+    Redis[Redis]
+    DB[(Database)]
+
+    Content -->|Feign| Media
+    Media -->|Store| MinIO
+    Media -->|Temp Storage| Redis
+    Media -->|Save Metadata| DB
+    Content -->|Update Course| DB
+```
+
 ## 6. 测试覆盖
 
 ### 6.1 单元测试
@@ -266,25 +357,150 @@ POST /teachplan
 - 关键业务操作添加INFO级别日志
 - 异常情况记录ERROR级别日志
 
-## 8. 后续优化建议
-1. 添加缓存层
-    - 课程分类缓存
-    - 热门课程缓存
-2. 引入统一异常处理
-    - 全局异常处理器
-    - 统一错误码
-3. 添加接口文档（Swagger）
-4. 完善日志体系
-    - ELK日志收集
-    - 操作日志记录
-5. 添加数据验证
-    - 参数验证增强
-    - 业务规则验证
-6. 引入领域驱动设计思想
-7. 性能优化
-    - 数据库索引优化
-    - N+1问题处理
-    - 大数据量分页优化
+### 7.4 异常处理规范
+- 使用全局异常处理器`GlobalExceptionHandler`
+- 业务异常使用`ContentException`统一抛出
+- 异常类型包括：
+  - 参数校验异常（400）
+  - 数据完整性异常（400） 
+  - 业务逻辑异常（20001系列）
+  - 系统内部异常（500）
+
+## 8. 业务流程说明
+
+### 8.1 课程生命周期管理
+```mermaid
+graph TD
+    A[创建课程] --> B[完善基本信息]
+    B --> C[添加课程计划]
+    B --> D[关联教师]
+    C --> E[关联媒资]
+    B --> F[设置营销信息]
+    F --> G[提交审核]
+    G --> H{审核结果}
+    H -->|通过| I[发布课程]
+    H -->|不通过| B
+    I --> J[课程上线]
+    J --> K[课程下线]
+```
+
+1. 课程创建阶段
+   - 基本信息录入（名称、简介、分类等）
+   - 营销信息设置（收费规则、价格等）
+   - 封面图片上传（与媒体服务交互）
+   - 数据合法性校验（@Valid注解校验）
+
+2. 课程内容管理
+   - 课程计划编排（两级章节结构）
+   - 教师关联（支持多个教师）
+   - 媒资绑定（图片、视频等）
+   - 内容预览（课程预览功能）
+
+3. 课程审核流程
+   ```mermaid
+   stateDiagram-v2
+       [*] --> 未提交: 创建课程
+       未提交 --> 已提交: 提交审核
+       已提交 --> 审核通过: 审核通过
+       已提交 --> 审核不通过: 审核拒绝
+       审核不通过 --> 已提交: 修改重提
+       审核通过 --> 已发布: 发布课程
+       已发布 --> 已下线: 下架课程
+   ```
+
+4. 课程发布管理
+   - 审核通过后可发布
+   - 支持课程上下线
+   - 发布信息同步机制
+   - 基于版本的内容控制
+
+### 8.2 数据一致性保证
+
+1. 跨服务调用处理
+```mermaid
+sequenceDiagram
+    participant Content as Content Service
+    participant Media as Media Service
+    participant MinIO as MinIO Storage
+    participant DB as Database
+
+    Content->>Media: 1. 上传文件请求
+    Media->>Media: 2. 校验文件
+    Media->>MinIO: 3. 存储文件
+    Media->>DB: 4. 保存媒资记录
+    Media-->>Content: 5. 返回媒资信息
+    Content->>DB: 6. 更新关联关系
+```
+
+2. 事务管理策略
+   - 本地事务：@Transactional
+   - 跨服务一致性：最终一致性
+   - 补偿机制：失败重试
+   - 回滚策略：部分回滚支持
+
+3. 并发控制机制
+   - 乐观锁：版本号控制
+   - 状态机制：状态流转控制
+   - 并发冲突：冲突检测和处理
+   - 分布式锁：关键操作保护
+
+### 8.3 业务校验规则
+
+1. 课程创建校验
+   - 必填字段：名称、简介、分类等
+   - 业务规则：价格范围、图片格式等
+   - 数据格式：时间、金额等
+   - 权限校验：机构和用户权限
+
+2. 课程发布条件
+   - 基本信息完整性
+   - 至少一个课程计划
+   - 至少一名教师关联
+   - 收费课程必须设置价格
+
+### 8.4 异常处理机制
+
+1. 业务异常处理
+```java
+@RestControllerAdvice
+public class GlobalExceptionHandler {
+    @ExceptionHandler(ContentException.class)
+    public CommonResponse<?> handleContentException(ContentException e) {
+        return CommonResponse.error(e.getCode(), e.getMessage());
+    }
+}
+```
+
+2. 服务降级策略
+```java
+@Component
+public class MediaFeignClientFallback implements MediaFeignClient {
+    @Override
+    public CommonResponse<?> uploadCourseLogo(...) {
+        return CommonResponse.error("500", "媒体服务不可用");
+    }
+}
+```
+
+### 8.5 关键监控指标
+
+1. 业务指标监控
+   - 课程创建成功率
+   - 审核通过率
+   - 发布成功率
+   - 媒资处理成功率
+
+2. 性能指标监控
+   - 接口响应时间
+   - 服务调用成功率
+   - 资源使用情况
+   - 并发处理能力
+
+3. 告警阈值设置
+   - 错误率超过5%
+   - 响应时间超过1s
+   - 服务不可用
+   - 存储空间不足
 
 ## 9. 微服务架构规划
 
@@ -309,6 +525,10 @@ POST /teachplan
   - 重复提交保护
   - 操作日志记录
   - 分布式事务支持
+- 媒资服务集成
+  - 课程封面上传
+  - 封面文件管理
+  - 跨服务文件删除
 
 ### 9.3 微服务集成
 - 媒资服务集成
@@ -516,7 +736,86 @@ DELETE /teachplan-media/{teachplanId}/{mediaId}
 |--------|------|
 | 100101 | 课程不存在 |
 | 100102 | 课程名称不能为空 |
+| 100103 | 课程分类不存在 |
+| 100104 | 课程审核状态错误 |
 | 100201 | 课程计划不存在 |
 | 100202 | 课程计划层级错误 |
 | 100301 | 教师不存在 |
-| 100401 | 媒资不存在 |
+| 200101 | 文件不存在 |
+| 200102 | 文件上传失败 |
+| 200303 | MinIO上传失败 |
+| 299999 | 系统内部错误 |
+
+## 4. 容错机制设计
+
+### 4.1 Resilience4j 集成
+内容服务使用 Resilience4j 实现服务容错,主要用于处理与媒体服务的交互。
+
+#### 4.1.1 配置说明
+```yaml
+resilience4j:
+  circuitbreaker:
+    instances:
+      backendA:  # 断路器实例名称
+        slidingWindowType: COUNT_BASED  # 滑动窗口类型:基于计数
+        slidingWindowSize: 10  # 滑动窗口大小
+        minimumNumberOfCalls: 5  # 最小调用次数
+        failureRateThreshold: 50  # 失败率阈值
+        waitDurationInOpenState: 10s  # 断路器打开状态持续时间
+        permittedNumberOfCallsInHalfOpenState: 3  # 半开状态允许的调用次数
+```
+
+#### 4.1.2 使用示例
+```java
+@FeignClient(name = "media-service")
+public interface MediaFeignClient {
+
+    @PostMapping("/media/files/course/{courseId}/logo")
+    @CircuitBreaker(name = "backendA", fallbackMethod = "uploadCourseLogoFallback")
+    CommonResponse<MediaFileDTO> uploadCourseLogo(
+            @PathVariable("courseId") Long courseId,
+            @RequestParam("organizationId") Long organizationId,
+            @RequestPart("file") MultipartFile file);
+
+    /**
+     * 上传课程封面的降级方法
+     */
+    default CommonResponse<MediaFileDTO> uploadCourseLogoFallback(
+            Long courseId, Long organizationId, MultipartFile file, Throwable throwable) {
+        return CommonResponse.error(
+            String.valueOf(ContentErrorCode.UPLOAD_LOGO_FAILED.getCode()),
+            ContentErrorCode.UPLOAD_LOGO_FAILED.getMessage()
+        );
+    }
+}
+```
+
+### 4.2 容错策略
+
+1. 断路器模式
+- 使用滑动窗口统计失败率
+- 当失败率超过阈值时断路器打开
+- 等待一定时间后进入半开状态
+- 在半开状态下允许部分请求通过以探测服务是否恢复
+
+2. 降级处理
+- 为关键接口提供 fallback 方法
+- 降级时返回预定义的错误码和消息
+- 确保系统可以优雅降级
+
+3. 监控指标
+- 断路器状态变化
+- 请求成功/失败率
+- 响应时间统计
+- 降级方法调用次数
+
+### 4.3 错误处理
+1. 业务异常
+- 使用 ContentErrorCode 定义错误码
+- 统一异常处理和响应格式
+- 详细的错误信息记录
+
+2. 系统监控
+- 记录异常日志
+- 统计异常发生频率
+- 关键指标监控告警

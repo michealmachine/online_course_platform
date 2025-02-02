@@ -1,43 +1,175 @@
-### 课程分页查询
-GET http://localhost:8080/course/list?pageNo=1&pageSize=10
-Content-Type: application/json
+### 环境变量
+@host = http://localhost:8080
+@contentType = application/json
 
-### 按课程名称查询
-GET http://localhost:8080/course/list?pageNo=1&pageSize=10&courseName=测试
-Content-Type: application/json
-
-### 创建课程
-POST http://localhost:8080/course
-Content-Type: application/json
+### 1. 创建课程（基本信息和营销信息）
+# @name createCourse
+POST {{host}}/course
+Content-Type: {{contentType}}
 
 {
-  "name": "测试课程",
-  "brief": "这是一个测试课程",
+  "name": "Java从入门到精通",
+  "brief": "完整的Java学习课程，从零基础到高级开发",
   "mt": 1,
   "st": 2,
   "charge": "201001",
-  "price": 0,
-  "valid": true
+  "price": 199.99,
+  "organizationId": 1234
 }
 
-### 修改课程
-PUT http://localhost:8080/course
-Content-Type: application/json
+> {%
+    client.global.set("courseId", response.body.data);
+%}
+
+### 2. 创建媒资文件
+POST {{host}}/media-files
+Content-Type: {{contentType}}
 
 {
-  "id": 78,
-  "name": "修改后的课程名称",
-  "brief": "修改后的课程简介",
-  "mt": 1,
-  "st": 2,
-  "charge": "201001",
-  "price": 0
+  "mediaFileId": "video001",
+  "fileName": "第一章课程视频.mp4",
+  "mediaType": "VIDEO",
+  "purpose": "VIDEO",
+  "url": "https://example.com/videos/java-chapter1.mp4",
+  "fileSize": 102400,
+  "mimeType": "video/mp4",
+  "organizationId": 1234
 }
 
-### 查询课程分类树
-GET http://localhost:8080/course/category/tree
-Content-Type: application/json
+> {%
+    client.test("Request executed successfully", function() {
+        client.assert(response.status === 200, "Response status is not 200");
+        client.global.set("mediaFileId", "video001");
+    });
+%}
 
-### 课程预览
-GET http://localhost:8080/course/preview/78
-Content-Type: application/json 
+### 3. 添加课程计划-第一章
+# @name createChapter1
+POST {{host}}/teachplan
+Content-Type: {{contentType}}
+
+{
+  "courseId": {{courseId}},
+  "parentId": 0,
+  "name": "第一章：Java基础语法",
+  "level": 1,
+  "orderBy": 1
+}
+
+> {%
+    client.test("Request executed successfully", function() {
+        client.assert(response.status === 200, "Response status is not 200");
+        client.global.set("chapter1Id", response.body.data);
+    });
+%}
+
+### 4. 添加课程计划-第一章第一节
+# @name createSection1
+POST {{host}}/teachplan
+Content-Type: {{contentType}}
+
+{
+  "courseId": {{courseId}},
+  "parentId": {{chapter1Id}},
+  "name": "1.1 Java开发环境搭建",
+  "level": 2,
+  "orderBy": 1
+}
+
+> {%
+    client.test("Request executed successfully", function() {
+        client.assert(response.status === 200, "Response status is not 200");
+        client.global.set("section1Id", response.body.data);
+    });
+%}
+
+### 5. 绑定媒资文件到小节
+POST {{host}}/teachplan/media
+Content-Type: {{contentType}}
+
+{
+  "teachplanId": {{section1Id}},
+  "mediaId": "video001",
+  "mediaFileName": "第一章课程视频.mp4"
+}
+
+### 6. 添加课程计划-第一章第二节
+POST {{host}}/teachplan
+Content-Type: {{contentType}}
+
+{
+  "courseId": {{courseId}},
+  "parentId": {{chapter1Id}},
+  "name": "1.2 第一个Java程序",
+  "level": 2,
+  "orderBy": 2
+}
+
+### 7. 添加课程计划-第二章
+# @name createChapter2
+POST {{host}}/teachplan
+Content-Type: {{contentType}}
+
+{
+  "courseId": {{courseId}},
+  "parentId": 0,
+  "name": "第二章：面向对象编程",
+  "level": 1,
+  "orderBy": 2
+}
+
+> {%
+    client.global.set("chapter2Id", response.body.data);
+%}
+
+### 8. 添加课程计划-第二章第一节
+POST {{host}}/teachplan
+Content-Type: {{contentType}}
+
+{
+  "courseId": {{courseId}},
+  "parentId": {{chapter2Id}},
+  "name": "2.1 类与对象",
+  "level": 2,
+  "orderBy": 1
+}
+
+### 9. 查看课程计划树（验证媒资绑定）
+GET {{host}}/teachplan/tree/{{courseId}}
+
+### 10. 添加课程教师
+POST {{host}}/course-teacher
+Content-Type: {{contentType}}
+
+{
+  "organizationId": 1234,
+  "name": "张三",
+  "position": "高级Java工程师",
+  "description": "10年Java开发经验，曾就职于阿里、腾讯",
+  "courseIds": [{{courseId}}]
+}
+
+### 11. 提交课程审核
+POST {{host}}/course/{{courseId}}/audit/submit
+
+### 12. 审核课程（通过）
+POST {{host}}/course/audit
+Content-Type: {{contentType}}
+
+{
+  "courseId": {{courseId}},
+  "auditStatus": "202303",
+  "auditMessage": "课程内容完整，审核通过"
+}
+
+### 13. 发布课程
+POST {{host}}/course/{{courseId}}/publish
+
+### 14. 分页查询课程（验证发布后的课程可以被查询到）
+GET {{host}}/course/list?pageNo=1&pageSize=10&courseName=Java&organizationId=1234&status=202002
+
+### 15. 查询课程详情
+GET {{host}}/course/{{courseId}}
+
+### 16. 下架课程
+POST {{host}}/course/{{courseId}}/offline

@@ -1,4 +1,4 @@
-# 媒资管理服务(Media Service)文档
+# 媒体服务(Media Service)文档
 
 ## 1. 功能概述
 
@@ -9,14 +9,17 @@
   - 图片永久存储(MinIO)
   - 图片格式校验
   - 图片去重(基于MD5)
+  - 图片大小控制(1KB~2MB)
 - 文件存储
   - MinIO对象存储集成
   - Redis临时存储
   - 文件元信息管理
-- API文档
-  - 集成Swagger
-  - 详细的接口说明
-  - 完整的参数描述
+- 课程封面管理
+  - 封面图片上传
+  - 封面图片更新
+  - 封面图片删除
+  - 图片格式校验
+  - 文件去重
 
 ### 1.2 待实现功能
 - 视频处理
@@ -31,6 +34,45 @@
   - CDN推送
   - 缓存刷新
   - 访问控制
+
+### 1.3 文件校验规则
+```yaml
+media:
+  image:
+    max-size: 2097152          # 图片最大2MB
+    min-size: 1024             # 图片最小1KB
+    allowed-types:             # 允许的图片类型
+      - image/jpeg
+      - image/jpg
+      - image/png
+      - image/gif
+```
+
+### 1.4 业务流程
+
+1. 图片上传流程
+```mermaid
+sequenceDiagram
+    Client->>Service: 上传图片
+    Service->>Service: 校验文件(大小/类型)
+    Service->>Redis: 临时存储(30分钟)
+    Service-->>Client: 返回临时key
+    Client->>Service: 确认保存
+    Service->>MinIO: 永久存储
+    Service->>MySQL: 保存元数据
+    Service-->>Client: 返回访问URL
+```
+
+2. 图片更新流程
+```mermaid
+sequenceDiagram
+    Client->>Service: 上传新图片
+    Service->>Service: 校验文件
+    Service->>MinIO: 删除旧文件
+    Service->>MinIO: 上传新文件
+    Service->>MySQL: 更新元数据
+    Service-->>Client: 返回新URL
+```
 
 ## 2. 技术架构
 
@@ -119,24 +161,223 @@ POST /images/temp/save
 Content-Type: application/json
 ```
 
+#### 4.1.4 上传课程封面
+```http
+POST /media/files/course/{courseId}/logo
+Content-Type: multipart/form-data
+
+请求参数：
+- file: 封面图片文件
+- organizationId: 机构ID
+
+响应：
+{
+  "code": 0,
+  "message": "success", 
+  "data": {
+    "mediaFileId": "xxx",
+    "fileName": "logo.jpg",
+    "url": "http://minio/bucket/course/logo/xxx.jpg"
+  }
+}
+```
+
+#### 4.1.5 删除媒体文件
+```http
+DELETE /media/files/{url}
+
+响应：
+{
+  "code": 0,
+  "message": "success"
+}
+```
+
 ## 5. 业务实现细节
 
-### 5.1 图片上传流程
-1. 校验图片格式
-2. 生成临时存储key
-3. 保存到Redis
-4. 设置过期时间(30分钟)
+### 5.1 图片处理流程
 
-### 5.2 图片永久存储流程
-1. 从Redis获取临时文件
-2. 上传到MinIO
-3. 保存元数据到MySQL
-4. 删除临时文件
+```mermaid
+graph TD
+    A[接收图片] --> B{校验图片}
+    B -->|不合法| C[抛出异常]
+    B -->|合法| D[生成文件ID]
+    D --> E{是否存在}
+    E -->|是| F[删除旧文件]
+    E -->|否| G[上传新文件]
+    F --> G
+    G --> H[保存元数据]
+    H --> I[返回访问URL]
+```
 
-### 5.3 图片更新流程
-1. 校验临时文件是否存在
-2. 更新Redis中的文件内容
-3. 重置过期时间
+1. 文件校验
+   ```java
+   public class FileTypeUtils {
+       private static final List<String> ALLOWED_IMAGE_TYPES = Arrays.asList(
+           "image/jpeg", "image/jpg", "image/png", "image/gif"
+       );
+       
+       public static boolean isAllowedImage(MultipartFile file) {
+           return ALLOWED_IMAGE_TYPES.contains(file.getContentType());
+       }
+   }
+   ```
+
+2. 文件标识生成
+   ```java
+   private String generateMediaFileId(Long organizationId, Long courseId, String fileName) {
+       String simpleFileName = new File(fileName).getName();
+       return String.format("course_%d_%d_%s", 
+           organizationId, courseId,
+           DigestUtils.md5DigestAsHex(simpleFileName.getBytes())
+       );
+   }
+   ```
+
+### 5.2 存储架构设计
+
+```mermaid
+graph LR
+    Client[客户端]
+    Redis[(Redis临时存储)]
+    MinIO[(MinIO对象存储)]
+    MySQL[(MySQL元数据)]
+    
+    Client -->|上传| Redis
+    Client -->|确认| MinIO
+    MinIO -->|存储| MySQL
+    Redis -->|30分钟过期| Clean[自动清理]
+```
+
+1. 临时存储(Redis)
+   - Key格式: media:temp:image:{uuid}
+   - 有效期: 30分钟
+   - 数据结构: TempFileDTO序列化
+
+2. 永久存储(MinIO)
+   - 存储路径: course/logo/{mediaFileId}
+   - 文件去重: 基于mediaFileId
+   - 访问URL: /{bucketName}/{filePath}
+
+3. 元数据管理(MySQL)
+   - 实体类: MediaFile
+   - 索引: mediaFileId(唯一索引)
+   - 关联关系: 与课程计划多对多
+
+### 5.3 异常处理机制
+
+```mermaid
+graph TD
+    A[异常发生] --> B{异常类型}
+    B -->|业务异常| C[MediaException]
+    B -->|系统异常| D[全局处理]
+    C --> E[返回错误码]
+    D --> F[记录日志]
+    F --> E
+```
+
+1. 业务异常
+   ```java
+   public class MediaException extends RuntimeException {
+       private final MediaErrorCode errorCode;
+       private final String message;
+   }
+   ```
+
+2. 全局处理
+   ```java
+   @RestControllerAdvice
+   public class GlobalExceptionHandler {
+       @ExceptionHandler(MediaException.class)
+       public MediaResponse<Void> handleMediaException(MediaException e) {
+           return MediaResponse.error(e.getCode(), e.getMessage());
+       }
+   }
+   ```
+
+### 5.4 文件处理流程
+
+1. 上传流程
+   ```mermaid
+   sequenceDiagram
+       participant Client
+       participant Service
+       participant MinIO
+       participant DB
+       
+       Client->>Service: 上传文件
+       Service->>Service: 校验文件
+       Service->>MinIO: 存储文件
+       MinIO-->>Service: 返回结果
+       Service->>DB: 保存元数据
+       Service-->>Client: 返回URL
+   ```
+
+2. 删除流程
+   ```mermaid
+   sequenceDiagram
+       participant Client
+       participant Service
+       participant MinIO
+       participant DB
+       
+       Client->>Service: 删除请求
+       Service->>DB: 查询文件
+       Service->>MinIO: 删除文件
+       Service->>DB: 删除记录
+       Service-->>Client: 返回结果
+   ```
+
+### 5.5 性能优化
+
+1. 文件缓存策略
+   - Redis缓存临时文件
+   - MinIO对象缓存
+   - 文件URL缓存
+
+2. 数据库优化
+   - mediaFileId索引
+   - url索引
+   - 组合索引优化
+
+3. 并发处理
+   - 文件操作原子性
+   - 数据一致性保证
+   - 重复上传处理
+
+### 5.6 监控指标
+
+1. 业务指标
+   - 上传成功率
+   - 文件处理时长
+   - 存储空间使用率
+   - 文件访问频率
+
+2. 系统指标
+   - MinIO连接状态
+   - Redis连接状态
+   - 服务响应时间
+   - 错误率统计
+
+### 5.7 安全措施
+
+1. 文件安全
+   - 类型校验
+   - 大小限制
+   - 内容检测
+   - 访问控制
+
+2. 存储安全
+   - MinIO访问控制
+   - Redis访问控制
+   - 数据加密存储
+   - 备份机制
+
+3. 接口安全
+   - 参数校验
+   - 权限控制
+   - 防盗链措施
+   - 访问频率限制
 
 ## 6. 测试覆盖
 
@@ -164,6 +405,9 @@ Content-Type: application/json
 ### 7.2 文件命名规范
 - 临时文件key: media:temp:image:{uuid}
 - MinIO对象名: images/{uuid}.{extension}
+- 课程封面文件:
+  - mediaFileId格式: course_{organizationId}_{courseId}_{fileMd5}
+  - MinIO存储路径: course/logo/{mediaFileId}
 
 ## 8. 后续优化建议
 1. 添加文件预处理机制
@@ -176,7 +420,7 @@ Content-Type: application/json
 
 ## 9. 监控告警
 1. 文件上传成功率监控
-2. 存储空间使��监控
+2. 存储空间使用监控
 3. Redis键过期监控
 4. 接口响应时间监控
 5. 异常情况告警
@@ -186,4 +430,40 @@ Content-Type: application/json
 2. 文件大小限制
 3. 临时文件过期清理
 4. 访问权限控制
-5. 防盗链措施 
+5. 防盗链措施
+
+## 11. 异常处理
+
+### 11.1 业务异常
+- FILE_EMPTY: 文件为空
+- FILE_TOO_LARGE: 超过大小限制(2MB)
+- FILE_TOO_SMALL: 小于最小限制(1KB)
+- MEDIA_TYPE_NOT_SUPPORT: 不支持的文件类型
+- FILE_NOT_EXISTS: 文件不存在
+- UPLOAD_ERROR: 上传失败
+
+### 11.2 异常处理示例
+```java
+@RestControllerAdvice
+public class GlobalExceptionHandler {
+    @ExceptionHandler(MediaException.class)
+    public MediaResponse<?> handleMediaException(MediaException e) {
+        return MediaResponse.error(e.getCode(), e.getMessage());
+    }
+}
+```
+
+## 12. 测试用例示例
+```java
+@Test
+void testUploadCourseLogo_FileTooLarge() {
+    // 准备超大文件
+    byte[] largeContent = new byte[3 * 1024 * 1024]; // 3MB
+    MockMultipartFile file = new MockMultipartFile(
+            "file", "test.jpg", "image/jpeg", largeContent);
+
+    // 验证异常
+    MediaException exception = assertThrows(MediaException.class,
+            () -> imageService.uploadCourseLogo(1L, 1L, file));
+    assertEquals(MediaErrorCode.FILE_TOO_LARGE, exception.getErrorCode());
+} 
