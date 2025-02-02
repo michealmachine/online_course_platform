@@ -821,3 +821,58 @@ erDiagram
     "message": "success"
 }
 ```
+
+### 机构课程管理
+1. 查询机构课程列表
+```http
+GET /course/organization/{organizationId}
+```
+请求参数：
+- organizationId: 机构ID（路径参数）
+- status: 课程状态（可选）
+- auditStatus: 审核状态（可选）
+- pageNo: 页码
+- pageSize: 每页大小
+
+响应示例：
+```json
+{
+    "code": "0",
+    "message": "success",
+    "data": {
+        "items": [
+            {
+                "id": 1,
+                "name": "测试课程",
+                "brief": "课程简介",
+                "status": "202001",
+                "auditStatus": "202302",
+                "organizationId": 1234
+            }
+        ],
+        "total": 100,
+        "pageNo": 1,
+        "pageSize": 10
+    }
+}
+```
+
+2. 重新提交审核
+```http
+POST /course/{courseId}/resubmit
+```
+请求参数：
+- courseId: 课程ID（路径参数）
+
+响应示例：
+```json
+{
+    "code": "0",
+    "message": "success"
+}
+```
+
+注意：
+1. 所有机构相关的接口后续会加入认证和鉴权机制
+2. 机构只能操作自己的课程
+3. 重新提交审核仅支持审核不通过的课程

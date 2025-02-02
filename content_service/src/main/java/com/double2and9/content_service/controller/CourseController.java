@@ -21,7 +21,7 @@ import org.springframework.validation.annotation.Validated;
 
 import java.util.List;
 
-@Tag(name = "课程管理", description = "提供课程的增删改查接口")
+@Tag(name = "课程管理", description = "提供课程的增删改查、审核、发布等接口")
 @Slf4j
 @RestController
 @RequestMapping("/course")
@@ -122,6 +122,44 @@ public class CourseController {
         log.info("下架课程，courseId：{}", courseId);
         courseBaseService.offlineCourse(courseId);
         log.info("下架课程成功，courseId：{}", courseId);
+        return ContentResponse.success(null);
+    }
+
+    /**
+     * 查询机构的课程列表
+     * 注意：后续会加入认证和鉴权，确保只能查询自己机构的课程
+     */
+    @Operation(summary = "查询机构课程列表", description = "查询指定机构的课程列表，支持状态筛选")
+    @GetMapping("/organization/{organizationId}")
+    public ContentResponse<PageResult<CourseBaseDTO>> queryCourseList(
+            @Parameter(description = "机构ID", required = true) @PathVariable Long organizationId,
+            @Parameter(description = "课程状态") @RequestParam(required = false) String status,
+            @Parameter(description = "审核状态") @RequestParam(required = false) String auditStatus,
+            @Parameter(description = "分页参数") PageParams pageParams) {
+
+        log.info("查询机构课程列表，机构ID：{}，状态：{}，审核状态：{}",
+                organizationId, status, auditStatus);
+
+        // 构建查询参数
+        QueryCourseParamsDTO queryParams = new QueryCourseParamsDTO();
+        queryParams.setOrganizationId(organizationId);
+        queryParams.setStatus(status);
+        queryParams.setAuditStatus(auditStatus);
+
+        return ContentResponse.success(
+                courseBaseService.queryCourseList(pageParams, queryParams));
+    }
+
+    /**
+     * 重新提交审核
+     * 注意：后续会加入认证和鉴权，确保只能重新提交自己机构的课程
+     */
+    @Operation(summary = "重新提交审核", description = "将审核不通过的课程重新提交审核")
+    @PostMapping("/{courseId}/resubmit")
+    public ContentResponse<Void> resubmitForAudit(
+            @Parameter(description = "课程ID", required = true) @PathVariable Long courseId) {
+        log.info("重新提交课程审核，课程ID：{}", courseId);
+        courseBaseService.submitForAudit(courseId);
         return ContentResponse.success(null);
     }
 }

@@ -45,26 +45,24 @@ class CourseBaseRepositoryTest {
     void testFindByConditions() {
         // 测试按机构ID和其他条件查询
         Page<CourseBase> result = courseBaseRepository.findByConditions(
-            TEST_ORG_ID,
-            "测试",
-            "202001",
-            PageRequest.of(0, 10)
-        );
-        
+                TEST_ORG_ID,
+                "测试",
+                "202001",
+                PageRequest.of(0, 10));
+
         assertNotNull(result);
         assertTrue(result.getContent().stream()
-            .allMatch(course -> course.getOrganizationId().equals(TEST_ORG_ID)));
+                .allMatch(course -> course.getOrganizationId().equals(TEST_ORG_ID)));
     }
 
     @Test
     void testFindByOrganizationId() {
         Page<CourseBase> result = courseBaseRepository.findByOrganizationId(
-            TEST_ORG_ID,
-            PageRequest.of(0, 10)
-        );
-        
+                TEST_ORG_ID,
+                PageRequest.of(0, 10));
+
         assertNotNull(result);
         assertTrue(result.getContent().stream()
-            .allMatch(course -> course.getOrganizationId().equals(TEST_ORG_ID)));
+                .allMatch(course -> course.getOrganizationId().equals(TEST_ORG_ID)));
     }
-} 
+}
