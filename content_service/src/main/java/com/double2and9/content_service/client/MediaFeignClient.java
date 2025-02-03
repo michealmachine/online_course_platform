@@ -5,6 +5,7 @@ import com.double2and9.base.dto.MediaFileDTO;
 import com.double2and9.base.enums.ContentErrorCode;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import org.springframework.cloud.openfeign.FeignClient;
+import org.springframework.stereotype.Component;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -12,6 +13,7 @@ import org.springframework.web.multipart.MultipartFile;
  * 媒体服务Feign客户端
  * 用于content服务调用media服务的接口
  */
+
 @FeignClient(name = "media-service")
 public interface MediaFeignClient {
 
