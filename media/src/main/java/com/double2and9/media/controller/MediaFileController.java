@@ -33,6 +33,7 @@ public class MediaFileController {
         }
         return MediaResponse.success(imageService.uploadImageTemp(file));
     }
+
     @Operation(summary = "更新临时存储的图片")
     @PutMapping("/temp/{tempKey}")
     public MediaResponse<String> updateTemp(
@@ -43,13 +44,24 @@ public class MediaFileController {
         }
         return MediaResponse.success(imageService.updateTemp(tempKey, file));
     }
+
     @Operation(summary = "保存临时文件到永久存储")
     @PostMapping("/temp/save")
     public MediaResponse<String> saveTempFile(@RequestBody Map<String, String> params) {
         String tempKey = params.get("tempKey");
-        if (StringUtils.isEmpty(tempKey)) {
+        if (tempKey == null || tempKey.isBlank()) {
             throw new MediaException(MediaErrorCode.PARAM_ERROR, "临时文件key不能为空");
         }
         return MediaResponse.success(imageService.saveTempFile(tempKey));
     }
-} 
+
+    @Operation(summary = "删除媒体文件")
+    @DeleteMapping("/files/{url}")
+    public MediaResponse<?> deleteMediaFile(@PathVariable String url) {
+        if (url == null || url.isBlank()) {
+            throw new MediaException(MediaErrorCode.PARAM_ERROR, "文件URL不能为空");
+        }
+        imageService.deleteMediaFile(url);
+        return MediaResponse.success(null);
+    }
+}

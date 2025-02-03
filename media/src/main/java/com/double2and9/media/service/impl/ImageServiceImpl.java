@@ -289,13 +289,6 @@ public class ImageServiceImpl implements ImageService {
     }
 
     @Override
-    /**
-     * 保存临时文件到永久存储（saveTempFile的别名方法）
-     * 
-     * @param tempKey 临时文件key
-     * @return 文件访问URL
-     * @throws MediaException 临时文件不存在或上传失败时抛出异常
-     */
     public String saveTemp(String tempKey) {
         // 原有的saveTempFile方法逻辑
         TempFileDTO tempFile = (TempFileDTO) redisTemplate.opsForValue().get(tempKey);

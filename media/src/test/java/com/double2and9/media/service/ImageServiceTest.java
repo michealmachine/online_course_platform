@@ -229,12 +229,12 @@ public class ImageServiceTest {
         String url = imageService.saveTempFile(tempKey);
 
         // 3. 验证
-        Assertions.assertNotNull(url);
-        Assertions.assertTrue(url.startsWith("/"));
+        assertNotNull(url);
+        assertTrue(url.startsWith("/"));
 
         // 4. 验证临时文件已删除
         Object tempFile = redisTemplate.opsForValue().get(tempKey);
-        Assertions.assertNull(tempFile);
+        assertNull(tempFile);
     }
 
     @Test
@@ -260,14 +260,9 @@ public class ImageServiceTest {
         String updatedKey = imageService.updateTemp(tempKey, newFile);
 
         // 4. 验证
-        // 4.1 验证返回的key没变
         assertEquals(tempKey, updatedKey);
-
-        // 4.2 验证Redis中的文件已更新
-        Object tempFile = redisTemplate.opsForValue().get(tempKey);
-        assertNotNull(tempFile);
-        assertTrue(tempFile instanceof TempFileDTO);
-        TempFileDTO tempFileDTO = (TempFileDTO) tempFile;
+        TempFileDTO tempFileDTO = (TempFileDTO) redisTemplate.opsForValue().get(tempKey);
+        assertNotNull(tempFileDTO);
         assertEquals("new_test.jpg", tempFileDTO.getFileName());
         assertArrayEquals(newContent, tempFileDTO.getFileData());
     }
