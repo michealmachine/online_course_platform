@@ -3,59 +3,49 @@ package com.double2and9.content_service.client;
 import com.double2and9.base.dto.CommonResponse;
 import com.double2and9.base.dto.MediaFileDTO;
 import com.double2and9.base.enums.ContentErrorCode;
-import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import org.springframework.cloud.openfeign.FeignClient;
-import org.springframework.stereotype.Component;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.Map;
+
 /**
  * 媒体服务Feign客户端
- * 用于content服务调用media服务的接口
+ * 用于与媒体服务进行跨服务调用,主要处理:
+ * - 文件上传(两步式)
+ * - 文件删除
+ * - 文件访问
  */
 
 @FeignClient(name = "media-service")
 public interface MediaFeignClient {
 
-    /**
-     * 删除媒体文件
-     * 
-     * @param url 文件URL路径
-     * @return 通用响应对象
-     */
-    @DeleteMapping("/media/files/{url}")
-    @CircuitBreaker(name = "backendA", fallbackMethod = "deleteMediaFileFallback")
-    CommonResponse<?> deleteMediaFile(@PathVariable("url") String url);
+        /**
+         * 上传图片到临时存储
+         * 实现两步式上传的第一步
+         *
+         * @param file 要上传的文件
+         * @return 包含临时存储key的响应对象
+         */
+        @PostMapping("/media/images/temp")
+        CommonResponse<String> uploadImageTemp(@RequestPart("file") MultipartFile file);
 
-    /**
-     * 上传课程封面图片
-     * 
-     * @param courseId       课程ID
-     * @param organizationId 机构ID,用于权限验证
-     * @param file           封面图片文件
-     * @return 包含媒体文件信息的响应对象
-     */
-    @PostMapping("/media/files/course/{courseId}/logo")
-    @CircuitBreaker(name = "backendA", fallbackMethod = "uploadCourseLogoFallback")
-    CommonResponse<MediaFileDTO> uploadCourseLogo(
-            @PathVariable("courseId") Long courseId,
-            @RequestParam("organizationId") Long organizationId,
-            @RequestPart("file") MultipartFile file);
+        /**
+         * 保存临时文件到永久存储
+         * 实现两步式上传的第二步
+         *
+         * @param params 包含tempKey的参数Map
+         * @return 包含媒体文件信息的响应对象
+         */
+        @PostMapping("/media/temp/save")
+        CommonResponse<MediaFileDTO> saveTempFile(@RequestBody Map<String, String> params);
 
-    /**
-     * 上传课程封面的降级方法
-     */
-    default CommonResponse<MediaFileDTO> uploadCourseLogoFallback(
-            Long courseId, Long organizationId, MultipartFile file, Throwable throwable) {
-        return CommonResponse.error(String.valueOf(ContentErrorCode.UPLOAD_LOGO_FAILED.getCode()),
-                ContentErrorCode.UPLOAD_LOGO_FAILED.getMessage());
-    }
-
-    /**
-     * 删除媒体文件的降级方法
-     */
-    default CommonResponse<?> deleteMediaFileFallback(String url, Throwable throwable) {
-        return CommonResponse.error(String.valueOf(ContentErrorCode.DELETE_LOGO_FAILED.getCode()),
-                ContentErrorCode.DELETE_LOGO_FAILED.getMessage());
-    }
+        /**
+         * 删除媒体文件
+         *
+         * @param url 文件访问URL
+         * @return 删除操作的响应对象
+         */
+        @DeleteMapping("/media/files/{url}")
+        CommonResponse<?> deleteMediaFile(@PathVariable("url") String url);
 }

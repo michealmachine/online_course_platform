@@ -10,7 +10,9 @@ import com.double2and9.content_service.client.MediaFeignClient;
 import com.double2and9.content_service.common.exception.ContentException;
 import com.double2and9.content_service.dto.*;
 import com.double2and9.content_service.entity.CourseBase;
+import com.double2and9.content_service.entity.CourseCategory;
 import com.double2and9.content_service.repository.CourseBaseRepository;
+import com.double2and9.content_service.repository.CourseCategoryRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -22,12 +24,16 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.util.Date;
+import java.util.List;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verify;
+import static org.mockito.ArgumentMatchers.argThat;
 
 @SpringBootTest
 @Transactional
@@ -45,6 +51,9 @@ class CourseBaseServiceTest {
 
     @Autowired
     private CourseBaseRepository courseBaseRepository;
+
+    @Autowired
+    private CourseCategoryRepository courseCategoryRepository;
 
     @MockBean
     private MediaFeignClient mediaFeignClient;
@@ -341,31 +350,80 @@ class CourseBaseServiceTest {
 
     @Test
     @Transactional
-    void testUpdateCourseLogo() throws IOException {
-        // 1. 先创建一个课程
+    void testUploadCourseLogo_TwoPhase() throws IOException {
+        // 1. 创建测试课程
         Long courseId = courseBaseService.createCourse(createTestCourseDTO());
 
-        // 2. 准备测试数据
+        // 2. 准备测试文件
         MockMultipartFile file = new MockMultipartFile(
                 "file",
                 "test.jpg",
                 "image/jpeg",
                 "test".getBytes());
 
-        // 3. Mock媒体服务响应
+        // 3. Mock临时上传响应
+        when(mediaFeignClient.uploadImageTemp(any()))
+                .thenReturn(CommonResponse.success("temp-key-123"));
+
+        // 4. Mock永久保存响应
         MediaFileDTO mediaFileDTO = new MediaFileDTO();
-        mediaFileDTO.setMediaFileId("test_media_id");
+        mediaFileDTO.setMediaFileId("test-file-id");
         mediaFileDTO.setUrl("/test/url");
-        when(mediaFeignClient.uploadCourseLogo(eq(courseId), any(), eq(file)))
+        when(mediaFeignClient.saveTempFile(any()))
                 .thenReturn(CommonResponse.success(mediaFileDTO));
 
-        // 4. 执行测试
-        courseBaseService.updateCourseLogo(courseId, file);
+        // 5. 执行临时上传
+        String tempKey = courseBaseService.uploadCourseLogoTemp(courseId, file);
+        assertEquals("temp-key-123", tempKey);
 
-        // 5. 直接通过Repository验证数据库中的实际数据
-        CourseBase courseBase = courseBaseRepository.findById(courseId)
-                .orElseThrow(() -> new ContentException(ContentErrorCode.COURSE_NOT_EXISTS));
-        assertEquals("/test/url", courseBase.getLogo());
+        // 6. 执行确认保存
+        courseBaseService.confirmCourseLogo(courseId, tempKey);
+
+        // 7. 验证调用和结果
+        verify(mediaFeignClient).uploadImageTemp(any());
+        verify(mediaFeignClient).saveTempFile(argThat(params -> "temp-key-123".equals(params.get("tempKey"))));
+
+        CourseBase updatedCourse = courseBaseRepository.findById(courseId).orElseThrow();
+        assertEquals("/test/url", updatedCourse.getLogo());
+    }
+
+    @Test
+    @Transactional
+    void testUploadCourseLogo_TempUploadFailed() {
+        // 1. 创建测试课程
+        Long courseId = courseBaseService.createCourse(createTestCourseDTO());
+
+        // 2. 准备测试文件
+        MockMultipartFile file = new MockMultipartFile(
+                "file",
+                "test.jpg",
+                "image/jpeg",
+                "test".getBytes());
+
+        // 3. Mock临时上传失败
+        when(mediaFeignClient.uploadImageTemp(any()))
+                .thenReturn(CommonResponse.error("500", "上传失败"));
+
+        // 4. 验证异常
+        ContentException exception = assertThrows(ContentException.class,
+                () -> courseBaseService.uploadCourseLogoTemp(courseId, file));
+        assertEquals(ContentErrorCode.UPLOAD_LOGO_FAILED, exception.getErrorCode());
+    }
+
+    @Test
+    @Transactional
+    void testUploadCourseLogo_ConfirmFailed() {
+        // 1. 创建测试课程
+        Long courseId = courseBaseService.createCourse(createTestCourseDTO());
+
+        // 2. Mock永久保存失败
+        when(mediaFeignClient.saveTempFile(any()))
+                .thenReturn(CommonResponse.error("500", "保存失败"));
+
+        // 3. 验证异常
+        ContentException exception = assertThrows(ContentException.class,
+                () -> courseBaseService.confirmCourseLogo(courseId, "temp-key-123"));
+        assertEquals(ContentErrorCode.UPLOAD_LOGO_FAILED, exception.getErrorCode());
     }
 
     @Test
@@ -392,29 +450,6 @@ class CourseBaseServiceTest {
         courseBase = courseBaseRepository.findById(courseId)
                 .orElseThrow(() -> new ContentException(ContentErrorCode.COURSE_NOT_EXISTS));
         assertNull(courseBase.getLogo());
-    }
-
-    @Test
-    @Transactional
-    void testUpdateCourseLogo_MediaServiceError() {
-        // 1. 先创建一个课程
-        Long courseId = courseBaseService.createCourse(createTestCourseDTO());
-
-        // 2. 准备测试数据
-        MockMultipartFile file = new MockMultipartFile(
-                "file",
-                "test.jpg",
-                "image/jpeg",
-                "test".getBytes());
-
-        // 3. Mock媒体服务错误响应
-        when(mediaFeignClient.uploadCourseLogo(eq(courseId), any(), eq(file)))
-                .thenReturn(CommonResponse.error("500", "服务错误"));
-
-        // 4. 验证异常
-        ContentException exception = assertThrows(ContentException.class,
-                () -> courseBaseService.updateCourseLogo(courseId, file));
-        assertEquals(ContentErrorCode.UPLOAD_LOGO_FAILED, exception.getErrorCode());
     }
 
     @Test
@@ -461,6 +496,38 @@ class CourseBaseServiceTest {
 
         // 4. 验证课程已删除
         assertFalse(courseBaseRepository.findById(courseId).isPresent(), "课程应该已被删除");
+    }
+
+    @Test
+    void testQueryCourseCategoryTree() {
+        // 创建测试用的分类数据
+        CourseCategory parent = new CourseCategory();
+        parent.setName("后端开发");
+        parent.setParentId(0L);
+        parent.setLevel(1);
+        parent.setCreateTime(new Date());
+        parent.setUpdateTime(new Date());
+        courseCategoryRepository.save(parent);
+
+        CourseCategory child = new CourseCategory();
+        child.setName("Java开发");
+        child.setParentId(parent.getId());
+        child.setLevel(2);
+        child.setCreateTime(new Date());
+        child.setUpdateTime(new Date());
+        courseCategoryRepository.save(child);
+
+        // 执行测试
+        List<CourseCategoryTreeDTO> categoryTree = courseBaseService.queryCourseCategoryTree();
+
+        // 验证结果
+        assertNotNull(categoryTree);
+        assertFalse(categoryTree.isEmpty());
+        CourseCategoryTreeDTO parentNode = categoryTree.get(0);
+        assertEquals("后端开发", parentNode.getName());
+        assertNotNull(parentNode.getChildrenTreeNodes());
+        assertFalse(parentNode.getChildrenTreeNodes().isEmpty());
+        assertEquals("Java开发", parentNode.getChildrenTreeNodes().get(0).getName());
     }
 
     // 辅助方法：准备审核所需的课程计划和教师

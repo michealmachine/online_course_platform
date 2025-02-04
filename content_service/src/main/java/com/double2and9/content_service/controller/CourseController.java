@@ -18,9 +18,18 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.validation.annotation.Validated;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
+/**
+ * 课程管理控制器
+ * 提供课程相关的REST API接口,包括:
+ * - 课程基本信息的CRUD操作
+ * - 课程封面管理(两步式上传)
+ * - 课程审核和发布流程
+ * - 课程分类管理
+ */
 @Tag(name = "课程管理", description = "提供课程的增删改查、审核、发布等接口")
 @Slf4j
 @RestController
@@ -160,6 +169,62 @@ public class CourseController {
             @Parameter(description = "课程ID", required = true) @PathVariable Long courseId) {
         log.info("重新提交课程审核，课程ID：{}", courseId);
         courseBaseService.submitForAudit(courseId);
+        return ContentResponse.success(null);
+    }
+
+    /**
+     * 上传课程封面到临时存储
+     * 实现两步式上传的第一步,将文件先保存到临时存储
+     *
+     * @param courseId 课程ID
+     * @param file     封面图片文件
+     * @return 临时存储的key
+     * @throws ContentException 当课程不存在或上传失败时
+     */
+    @Operation(summary = "上传课程封面到临时存储")
+    @PostMapping("/{courseId}/logo/temp")
+    public ContentResponse<String> uploadCourseLogoTemp(
+            @Parameter(description = "课程ID", required = true) @PathVariable Long courseId,
+            @Parameter(description = "封面图片文件", required = true) @RequestPart("file") MultipartFile file) {
+        log.info("上传课程封面到临时存储，courseId：{}", courseId);
+        String tempKey = courseBaseService.uploadCourseLogoTemp(courseId, file);
+        log.info("上传课程封面到临时存储成功，courseId：{}，tempKey：{}", courseId, tempKey);
+        return ContentResponse.success(tempKey);
+    }
+
+    /**
+     * 确认并保存临时课程封面
+     * 实现两步式上传的第二步,将临时文件转存为永久文件
+     *
+     * @param courseId 课程ID
+     * @param tempKey  临时存储key
+     * @throws ContentException 当课程不存在、临时文件不存在或保存失败时
+     */
+    @Operation(summary = "确认并保存临时课程封面")
+    @PostMapping("/{courseId}/logo/confirm")
+    public ContentResponse<Void> confirmCourseLogo(
+            @Parameter(description = "课程ID", required = true) @PathVariable Long courseId,
+            @Parameter(description = "临时存储key", required = true) @RequestParam String tempKey) {
+        log.info("确认保存课程封面，courseId：{}，tempKey：{}", courseId, tempKey);
+        courseBaseService.confirmCourseLogo(courseId, tempKey);
+        log.info("确认保存课程封面成功，courseId：{}", courseId);
+        return ContentResponse.success(null);
+    }
+
+    /**
+     * 删除课程封面
+     * 同时删除媒体服务中的文件和课程中的封面引用
+     *
+     * @param courseId 课程ID
+     * @throws ContentException 当课程不存在或删除失败时
+     */
+    @Operation(summary = "删除课程封面")
+    @DeleteMapping("/{courseId}/logo")
+    public ContentResponse<Void> deleteCourseLogo(
+            @Parameter(description = "课程ID", required = true) @PathVariable Long courseId) {
+        log.info("删除课程封面，courseId：{}", courseId);
+        courseBaseService.deleteCourseLogo(courseId);
+        log.info("删除课程封面成功，courseId：{}", courseId);
         return ContentResponse.success(null);
     }
 }

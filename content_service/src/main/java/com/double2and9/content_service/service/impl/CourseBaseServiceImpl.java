@@ -33,8 +33,11 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * 课程基本信息服务实现类
- * 处理课程的CRUD、审核、发布等核心业务逻辑
+ * 课程基础服务实现类
+ * 处理课程相关的核心业务逻辑,包括:
+ * - 课程基本信息管理
+ * - 课程封面管理(两步式上传)
+ * - 课程审核和发布流程
  */
 @Slf4j
 @Service
@@ -496,50 +499,82 @@ public class CourseBaseServiceImpl implements CourseBaseService {
     }
 
     /**
-     * 更新课程封面
-     * 
+     * 上传课程封面到临时存储
+     * 实现两步式上传的第一步
+     *
      * @param courseId 课程ID
      * @param file     封面图片文件
-     * @throws ContentException 如果课程不存在或上传失败
+     * @return 临时存储的key
+     * @throws ContentException 当课程不存在或上传失败时
      */
     @Transactional
-    public void updateCourseLogo(Long courseId, MultipartFile file) {
+    public String uploadCourseLogoTemp(Long courseId, MultipartFile file) {
+        // 1. 验证课程存在
+        courseBaseRepository.findById(courseId)
+                .orElseThrow(() -> new ContentException(ContentErrorCode.COURSE_NOT_EXISTS));
+
+        try {
+            // 2. 上传到临时存储
+            CommonResponse<String> tempResponse = mediaFeignClient.uploadImageTemp(file);
+            if (!tempResponse.isSuccess()) {
+                throw new ContentException(ContentErrorCode.UPLOAD_LOGO_FAILED, tempResponse.getMessage());
+            }
+
+            log.info("课程封面上传到临时存储成功，课程ID：{}，临时key：{}", courseId, tempResponse.getData());
+            return tempResponse.getData();
+        } catch (ContentException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("上传课程封面到临时存储失败：", e);
+            throw new ContentException(ContentErrorCode.UPLOAD_LOGO_FAILED);
+        }
+    }
+
+    /**
+     * 确认并保存临时课程封面
+     * 实现两步式上传的第二步
+     *
+     * @param courseId 课程ID
+     * @param tempKey  临时存储key
+     * @throws ContentException 当课程不存在、临时文件不存在或保存失败时
+     */
+    @Transactional
+    public void confirmCourseLogo(Long courseId, String tempKey) {
         // 1. 获取课程信息
         CourseBase courseBase = courseBaseRepository.findById(courseId)
                 .orElseThrow(() -> new ContentException(ContentErrorCode.COURSE_NOT_EXISTS));
 
         try {
-            // 2. 调用媒体服务上传图片
-            CommonResponse<MediaFileDTO> response = mediaFeignClient.uploadCourseLogo(
-                    courseId,
-                    courseBase.getOrganizationId(),
-                    file);
+            // 2. 保存到永久存储
+            Map<String, String> params = new HashMap<>();
+            params.put("tempKey", tempKey);
+            CommonResponse<MediaFileDTO> saveResponse = mediaFeignClient.saveTempFile(params);
 
-            if (!response.isSuccess()) {
-                throw new ContentException(ContentErrorCode.UPLOAD_LOGO_FAILED, response.getMessage());
+            if (!saveResponse.isSuccess()) {
+                throw new ContentException(ContentErrorCode.UPLOAD_LOGO_FAILED, saveResponse.getMessage());
             }
 
-            MediaFileDTO mediaFileDTO = response.getData();
-
-            // 3. 保存或更新媒体文件记录
-            MediaFile mediaFile = mediaFileRepository.findByMediaFileId(mediaFileDTO.getMediaFileId())
-                    .orElse(new MediaFile());
-            modelMapper.map(mediaFileDTO, mediaFile);
-            mediaFileRepository.save(mediaFile);
-
-            // 4. 更新课程封面URL
+            // 3. 更新课程封面URL
+            MediaFileDTO mediaFileDTO = saveResponse.getData();
             courseBase.setLogo(mediaFileDTO.getUrl());
             courseBaseRepository.save(courseBase);
 
-            log.info("课程封面更新成功，课程ID：{}，文件ID：{}", courseId, mediaFileDTO.getMediaFileId());
+            log.info("课程封面确认保存成功，课程ID：{}，文件ID：{}", courseId, mediaFileDTO.getMediaFileId());
         } catch (ContentException e) {
             throw e;
         } catch (Exception e) {
-            log.error("更新课程封面失败：", e);
+            log.error("确认保存课程封面失败：", e);
             throw new ContentException(ContentErrorCode.UPLOAD_LOGO_FAILED);
         }
     }
 
+    /**
+     * 删除课程封面
+     * 同时删除媒体服务中的文件和课程中的封面引用
+     *
+     * @param courseId 课程ID
+     * @throws ContentException 当课程不存在或删除失败时
+     */
     @Transactional
     public void deleteCourseLogo(Long courseId) {
         // 1. 获取课程信息

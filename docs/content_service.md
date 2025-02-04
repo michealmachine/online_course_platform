@@ -226,25 +226,36 @@ POST /course
 "valid": true
 }
 
-#### 4.1.4 更新课程封面
+#### 4.1.4 课程封面管理接口
 ```http
-POST /course/{courseId}/logo
+# 上传课程封面到临时存储
+POST /course/{courseId}/logo/temp
 Content-Type: multipart/form-data
 
 请求参数：
 - file: 封面图片文件
-- organizationId: 机构ID
 
 响应：
 {
   "code": 0,
   "message": "success",
-  "data": "http://minio/bucket/course/logo/xxx.jpg"
+  "data": "temp-key-123" // 临时存储key
 }
-```
 
-#### 4.1.5 删除课程封面
-```http
+# 确认并保存临时课程封面
+POST /course/{courseId}/logo/confirm
+Content-Type: application/json
+
+请求参数：
+- tempKey: 临时存储key
+
+响应：
+{
+  "code": 0,
+  "message": "success"
+}
+
+# 删除课程封面
 DELETE /course/{courseId}/logo
 
 响应：
@@ -304,16 +315,23 @@ sequenceDiagram
     participant Client as 前端
     participant Content as Content Service
     participant Media as Media Service
-    participant MinIO
+    participant Redis as Redis临时存储
+    participant MinIO as MinIO永久存储
     participant DB as Database
 
     Client->>Content: 上传课程封面请求
-    Content->>Media: Feign调用上传接口
-    Media->>Media: 校验文件类型和大小
-    Media->>MinIO: 上传文件
-    MinIO-->>Media: 返回存储结果
+    Content->>Media: Feign调用临时上传接口
+    Media->>Media: 校验文件
+    Media->>Redis: 存储临时文件
+    Media-->>Content: 返回临时key
+    Content-->>Client: 返回临时key
+    
+    Client->>Content: 确认保存请求
+    Content->>Media: Feign调用永久保存接口
+    Media->>Redis: 获取临时文件
+    Media->>MinIO: 保存到永久存储
     Media->>DB: 保存媒资记录
-    Media-->>Content: 返回媒资信息(URL等)
+    Media-->>Content: 返回访问URL
     Content->>DB: 更新课程封面URL
     Content-->>Client: 返回处理结果
 ```
@@ -752,13 +770,25 @@ DELETE /teachplan-media/{teachplanId}/{mediaId}
 | 100102 | 课程名称不能为空 |
 | 100103 | 课程分类不存在 |
 | 100104 | 课程审核状态错误 |
+| 100105 | 课程状态错误 |
+| 100106 | 课程发布失败 |
 | 100201 | 课程计划不存在 |
 | 100202 | 课程计划层级错误 |
+| 100203 | 课程计划包含子节点，无法删除 |
+| 100204 | 课程计划移动失败 |
 | 100301 | 教师不存在 |
-| 200101 | 文件不存在 |
-| 200102 | 文件上传失败 |
-| 200303 | MinIO上传失败 |
-| 299999 | 系统内部错误 |
+| 100302 | 教师与课程不匹配 |
+| 100401 | 媒资文件不存在 |
+| 100402 | 媒资绑定失败 |
+| 100403 | 媒资文件不属于该机构 |
+| 100404 | 不支持的媒体类型 |
+| 100405 | 媒资文件已存在 |
+| 100406 | 删除媒资文件失败 |
+| 100407 | 媒体服务不可用 |
+| 100501 | 上传课程封面失败 |
+| 100502 | 删除课程封面失败 |
+| 100503 | 课程封面不存在 |
+| 199999 | 系统内部错误 |
 
 ## 4. 容错机制设计
 

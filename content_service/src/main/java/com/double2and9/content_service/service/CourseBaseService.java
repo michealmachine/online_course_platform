@@ -88,21 +88,26 @@ public interface CourseBaseService {
     void offlineCourse(Long courseId);
 
     /**
-     * 更新课程封面
+     * 上传课程封面到临时存储
      * 
      * @param courseId 课程ID
      * @param file     封面图片文件
-     * @throws ContentException 如果课程不存在或上传失败
+     * @return 临时存储的key
      */
-    @Transactional
-    void updateCourseLogo(Long courseId, MultipartFile file);
+    String uploadCourseLogoTemp(Long courseId, MultipartFile file);
+
+    /**
+     * 确认并保存临时课程封面
+     * 
+     * @param courseId 课程ID
+     * @param tempKey  临时存储key
+     */
+    void confirmCourseLogo(Long courseId, String tempKey);
 
     /**
      * 删除课程封面
      * 
      * @param courseId 课程ID
-     * @throws ContentException 如果课程不存在或删除失败
      */
-    @Transactional
     void deleteCourseLogo(Long courseId);
 }

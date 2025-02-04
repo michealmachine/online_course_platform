@@ -145,44 +145,43 @@ media/
 ### 4.1 图片管理接口
 #### 4.1.1 上传图片到临时存储
 ```http
-POST /images/temp
-Content-Type: multipart/form-data
-```
-
-#### 4.1.2 更新临时存储的图片
-```http
-PUT /images/temp/{tempKey}
-Content-Type: multipart/form-data
-```
-
-#### 4.1.3 保存临时图片到永久存储
-```http
-POST /images/temp/save
-Content-Type: application/json
-```
-
-#### 4.1.4 上传课程封面
-```http
-POST /media/files/course/{courseId}/logo
+POST /media/images/temp
 Content-Type: multipart/form-data
 
 请求参数：
-- file: 封面图片文件
-- organizationId: 机构ID
+- file: 图片文件
 
 响应：
 {
   "code": 0,
-  "message": "success", 
+  "message": "success",
+  "data": "temp-key-123" // 临时存储key
+}
+```
+
+#### 4.1.2 保存临时图片到永久存储
+```http
+POST /media/temp/save
+Content-Type: application/json
+
+请求体：
+{
+  "tempKey": "temp-key-123"
+}
+
+响应：
+{
+  "code": 0,
+  "message": "success",
   "data": {
     "mediaFileId": "xxx",
-    "fileName": "logo.jpg",
-    "url": "http://minio/bucket/course/logo/xxx.jpg"
+    "fileName": "image.jpg",
+    "url": "http://minio/bucket/xxx.jpg"
   }
 }
 ```
 
-#### 4.1.5 删除媒体文件
+#### 4.1.3 删除媒体文件
 ```http
 DELETE /media/files/{url}
 
@@ -198,16 +197,23 @@ DELETE /media/files/{url}
 ### 5.1 图片处理流程
 
 ```mermaid
-graph TD
-    A[接收图片] --> B{校验图片}
-    B -->|不合法| C[抛出异常]
-    B -->|合法| D[生成文件ID]
-    D --> E{是否存在}
-    E -->|是| F[删除旧文件]
-    E -->|否| G[上传新文件]
-    F --> G
-    G --> H[保存元数据]
-    H --> I[返回访问URL]
+sequenceDiagram
+    participant Client
+    participant Service
+    participant Redis
+    participant MinIO
+    participant DB
+
+    Client->>Service: 上传图片
+    Service->>Service: 校验文件
+    Service->>Redis: 临时存储(30分钟)
+    Service-->>Client: 返回临时key
+    
+    Client->>Service: 确认保存
+    Service->>Redis: 获取临时文件
+    Service->>MinIO: 永久存储
+    Service->>DB: 保存元数据
+    Service-->>Client: 返回访问URL
 ```
 
 1. 文件校验
@@ -467,3 +473,38 @@ void testUploadCourseLogo_FileTooLarge() {
             () -> imageService.uploadCourseLogo(1L, 1L, file));
     assertEquals(MediaErrorCode.FILE_TOO_LARGE, exception.getErrorCode());
 } 
+```
+
+## 6. 错误码说明
+
+#### 6.1 媒体文件相关错误 (2001xx)
+| 错误码 | 说明 |
+|--------|------|
+| 200101 | 文件不存在 |
+| 200102 | 不支持的媒体类型 |
+| 200103 | 上传失败 |
+| 200104 | 删除失败 |
+| 200105 | 文件大小超过限制 |
+| 200106 | 文件大小过小 |
+| 200107 | 文件为空 |
+| 200108 | 文件类型错误 |
+| 200109 | 文件上传失败 |
+
+#### 6.2 处理相关错误 (2002xx)
+| 错误码 | 说明 |
+|--------|------|
+| 200201 | 文件处理失败 |
+| 200202 | 处理状态错误 |
+
+#### 6.3 MinIO相关错误 (2003xx)
+| 错误码 | 说明 |
+|--------|------|
+| 200301 | MinIO连接失败 |
+| 200302 | 存储桶操作失败 |
+| 200303 | MinIO上传失败 |
+
+#### 6.4 系统错误 (2999xx)
+| 错误码 | 说明 |
+|--------|------|
+| 299901 | 参数错误 |
+| 299999 | 系统内部错误 |
