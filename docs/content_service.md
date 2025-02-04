@@ -201,16 +201,33 @@ content_service/
 ## 4. API接口设计
 
 ### 4.1 课程管理接口
-#### 4.1.1 课程列表查询
-http
-GET /course/list
-参数：
-pageNo: 页码
-pageSize: 每页大小
-courseName: 课程名称(可选)
-status: 课程状态(可选)
-mt: 大分类(可选)
-st: 小分类(可选)
+#### 4.1.1 查询课程列表
+```http
+GET /content/course/list
+```
+
+**请求参数:**
+- organizationId: 机构ID (必填)
+- courseName: 课程名称 (可选)
+- status: 课程状态 (可选)
+- pageNo: 页码，从1开始 (必填)
+- pageSize: 每页记录数 (必填)
+
+**响应格式:**
+```json
+{
+    "items": [
+        {
+            "id": 1,
+            "name": "课程名称",
+            // ... 其他课程属性
+        }
+    ],
+    "counts": 100,
+    "page": 1,
+    "pageSize": 10
+}
+```
 
 #### 4.1.2 创建课程
 ttp
@@ -304,6 +321,79 @@ DELETE /course-teacher/{teacherId}/avatar
 }
 ```
 
+#### 4.1.8 课程封面管理
+```http
+# 上传课程封面到临时存储
+POST /course/{courseId}/logo/temp
+Content-Type: multipart/form-data
+
+# 确认并保存临时课程封面
+POST /course/{courseId}/logo/confirm
+
+# 删除课程封面
+DELETE /course/{courseId}/logo
+```
+
+#### 4.1.9 课程状态管理
+```http
+# 获取所有课程状态
+GET /course/status/all
+
+响应：
+{
+    "code": "0",
+    "message": "success",
+    "data": {
+        "courseStatus": {
+            "202001": "未发布",
+            "202002": "已发布",
+            "202003": "已下架"
+        },
+        "auditStatus": {
+            "202301": "未提交",
+            "202302": "已提交",
+            "202303": "审核通过",
+            "202304": "审核不通过"
+        }
+    }
+}
+```
+
+#### 4.1.10 管理员接口
+```http
+# 管理员查询所有课程列表（需要管理员权限）
+GET /course/admin/list
+
+请求参数：
+- organizationId: 机构ID（可选）
+- status: 课程状态（可选）
+- auditStatus: 审核状态（可选）
+- courseName: 课程名称（可选）
+- pageNo: 页码
+- pageSize: 每页大小
+
+响应：
+{
+    "code": "0",
+    "message": "success",
+    "data": {
+        "items": [
+            {
+                "id": 1,
+                "name": "课程名称",
+                "organizationId": 1234,
+                "organizationName": "测试机构",
+                "status": "202001",
+                "auditStatus": "202301"
+            }
+        ],
+        "total": 100,
+        "pageNo": 1,
+        "pageSize": 10
+    }
+}
+```
+
 ### 4.2 课程计划接口
 #### 4.2.1 查询课程计划树
 http
@@ -320,6 +410,67 @@ POST /teachplan
 "level": 1,
 "orderBy": 1
 }
+
+### 4.3 教师管理接口
+
+#### 4.3.1 教师基本信息管理
+```http
+# 创建/更新教师
+POST /course-teacher/organization/{organizationId}/teachers
+请求体：
+{
+    "name": "张老师",
+    "position": "高级讲师",
+    "description": "教师简介"
+}
+响应：
+{
+    "code": "0",
+    "message": "success",
+    "data": 123  // 教师ID
+}
+
+# 删除教师
+DELETE /course-teacher/organization/{organizationId}/teachers/{teacherId}
+
+# 查询教师详情
+GET /course-teacher/organization/{organizationId}/teachers/{teacherId}
+
+# 查询机构教师列表
+GET /course-teacher/organization/{organizationId}/teachers
+```
+
+#### 4.3.2 教师课程关联管理
+```http
+# 关联教师到课程
+POST /course-teacher/organization/{organizationId}/courses/{courseId}/teachers/{teacherId}
+
+# 解除教师与课程的关联
+DELETE /course-teacher/organization/{organizationId}/courses/{courseId}/teachers/{teacherId}
+
+# 查询课程的教师列表
+GET /course-teacher/courses/{courseId}/teachers
+
+# 查询教师关联的课程列表
+GET /course-teacher/teachers/{teacherId}/courses
+```
+
+#### 4.3.3 教师头像管理
+```http
+# 上传教师头像（两步式上传）
+POST /course-teacher/teachers/{teacherId}/avatar/temp
+Content-Type: multipart/form-data
+
+# 确认保存头像
+POST /course-teacher/teachers/{teacherId}/avatar/confirm
+请求体：
+{
+    "tempKey": "xxx"
+}
+
+# 删除教师头像
+DELETE /course-teacher/teachers/{teacherId}/avatar
+```
 
 ## 5. 业务实现细节
 
@@ -931,3 +1082,380 @@ public interface MediaFeignClient {
 - 记录异常日志
 - 统计异常发生频率
 - 关键指标监控告警
+
+### 8.3 权限控制说明
+
+#### 8.3.1 接口权限分类
+
+1. **管理员权限接口**
+- `/course/admin/*` - 管理员专用接口
+- 可以查看和操作所有机构的课程信息
+- 示例：查询所有课程列表
+
+2. **审核人员权限接口**
+- `/course/audit` - 课程审核
+- `/course/{courseId}/audit/result` - 审核结果处理
+- 可以查看待审核的课程并进行审核操作
+
+3. **机构权限接口**
+- `/course/organization/*` - 机构相关操作
+- `/content/teacher/*` - 教师管理操作
+- 只能操作自己机构的课程和教师
+- 示例：查询机构课程列表、管理教师信息
+
+#### 8.3.2 审核流程权限控制
+```mermaid
+graph TD
+    A[机构用户] -->|提交审核| B[待审核]
+    B -->|审核人员审核| C{审核结果}
+    C -->|通过| D[待发布]
+    C -->|不通过| E[审核失败]
+    D -->|机构用户发布| F[已发布]
+```
+
+1. 提交审核：机构权限
+2. 审核操作：审核人员权限
+3. 发布操作：机构权限
+4. 查看审核进度：机构权限（仅自己机构）
+5. 查看所有审核：管理员权限
+```
+
+# 内容服务 API 文档
+
+## 1. 课程管理接口
+(保持原有课程管理接口文档不变)
+
+## 2. 课程教师管理接口
+
+### 2.1 分页查询机构教师列表
+
+```http
+GET /content/teacher/list
+```
+
+**请求参数:**
+- `organizationId`: 机构ID (必填)
+- `pageNo`: 页码，从1开始 (必填)
+- `pageSize`: 每页记录数 (必填)
+
+**响应示例:**
+```json
+{
+    "items": [
+        {
+            "id": 1,
+            "name": "张老师",
+            "position": "高级讲师",
+            "description": "资深Java讲师",
+            "avatar": "http://example.com/avatar.jpg",
+            "organizationId": 1234,
+            "courseIds": [1, 2, 3]
+        }
+    ],
+    "counts": 10,
+    "page": 1,
+    "pageSize": 10
+}
+```
+
+### 2.2 查询课程教师列表
+
+```http
+GET /content/teacher/course/{courseId}
+```
+
+**路径参数:**
+- `courseId`: 课程ID
+
+**响应示例:**
+```json
+[
+    {
+        "id": 1,
+        "name": "张老师",
+        "position": "高级讲师",
+        "description": "资深Java讲师",
+        "avatar": "http://example.com/avatar.jpg",
+        "organizationId": 1234,
+        "courseIds": [1, 2, 3]
+    }
+]
+```
+
+### 2.3 保存教师信息
+
+```http
+POST /content/teacher/save
+```
+
+**请求体:**
+```json
+{
+    "id": null,  // 新增时为null，修改时传ID
+    "name": "张老师",
+    "position": "高级讲师",
+    "description": "资深Java讲师",
+    "organizationId": 1234
+}
+```
+
+**响应示例:**
+```json
+{
+    "id": 1  // 返回教师ID
+}
+```
+
+### 2.4 关联教师到课程
+
+```http
+POST /content/teacher/course/{courseId}/associate/{teacherId}
+```
+
+**路径参数:**
+- `courseId`: 课程ID
+- `teacherId`: 教师ID
+- `organizationId`: 机构ID (请求参数)
+
+### 2.5 解除教师与课程的关联
+
+```http
+POST /content/teacher/course/{courseId}/dissociate/{teacherId}
+```
+
+**路径参数:**
+- `courseId`: 课程ID
+- `teacherId`: 教师ID
+- `organizationId`: 机构ID (请求参数)
+
+### 2.6 删除教师
+
+```http
+DELETE /content/teacher/{teacherId}
+```
+
+**路径参数:**
+- `teacherId`: 教师ID
+- `organizationId`: 机构ID (请求参数)
+
+### 2.7 上传教师头像
+
+```http
+POST /content/teacher/{teacherId}/avatar/upload
+```
+
+**路径参数:**
+- `teacherId`: 教师ID
+
+**请求体:**
+- `file`: 图片文件 (multipart/form-data)
+
+**响应示例:**
+```json
+{
+    "tempKey": "temp_123456"  // 临时存储key
+}
+```
+
+### 2.8 确认教师头像
+
+```http
+POST /content/teacher/{teacherId}/avatar/confirm
+```
+
+**路径参数:**
+- `teacherId`: 教师ID
+
+**请求体:**
+```json
+{
+    "tempKey": "temp_123456"
+}
+```
+
+## 3. 系统设计
+
+### 3.1 数据模型
+
+#### CourseBase
+(原有的 CourseBase 模型)
+
+#### CourseTeacher
+```java
+public class CourseTeacher {
+    private Long id;
+    private String name;
+    private String position;
+    private String description;
+    private String avatar;
+    private Long organizationId;
+    private Date createTime;
+    private Date updateTime;
+    private Set<CourseBase> courses;
+}
+```
+
+### 3.2 错误码说明
+
+课程管理错误码:
+(原有的错误码)
+
+教师管理错误码:
+- `404001`: 教师不存在
+- `403001`: 无权操作其他机构的教师
+- `400001`: 教师信息不完整
+- `400002`: 头像文件格式不正确
+- `500001`: 头像上传失败
+- `500002`: 头像确认保存失败
+
+### 3.3 权限控制说明
+
+#### 3.3.1 接口权限分类
+
+1. **管理员权限接口**
+(原有的管理员权限说明)
+
+2. **机构权限接口**
+- `/course/organization/*` - 机构相关操作
+- `/content/teacher/*` - 教师管理操作
+- 只能操作自己机构的课程和教师
+- 示例：查询机构课程列表、管理教师信息
+
+### 3.4 注意事项
+
+课程管理注意事项:
+(原有的注意事项)
+
+教师管理注意事项:
+1. 所有涉及教师操作的接口都需要验证操作者所属机构ID与教师所属机构ID是否一致
+2. 教师头像上传采用两阶段提交：先上传到临时存储获取tempKey，确认后再保存到永久存储
+3. 删除教师时会自动解除与所有课程的关联关系
+4. 教师与课程是多对多关系，通过中间表course_teacher_relation维护
+
+### 4. 容错设计
+
+### 4.1 断路器配置
+(保持原有容错设计部分不变)
+
+## 3.5 分页查询说明
+
+### 3.5.1 分页参数
+
+所有分页查询接口统一使用以下参数：
+
+```java
+public class PageParams {
+    private Long pageNo = 1L;     // 页码，从1开始
+    private Long pageSize = 10L;  // 每页记录数
+}
+```
+
+### 3.5.2 分页结果
+
+分页查询统一返回以下格式：
+
+```java
+public class PageResult<T> {
+    private List<T> items;        // 当前页数据列表
+    private long counts;          // 总记录数
+    private long page;            // 当前页码
+    private long pageSize;        // 每页记录数
+}
+```
+
+### 3.5.3 分页接口示例
+
+1. 查询机构教师列表
+```http
+GET /content/teacher/list?pageNo=1&pageSize=10&organizationId=1234
+```
+
+2. 查询课程列表
+```http
+GET /content/course/list?pageNo=1&pageSize=10&organizationId=1234
+```
+
+### 3.5.4 分页查询注意事项
+
+1. 参数校验
+- pageNo 必须大于等于1
+- pageSize 必须大于0且小于等于100
+- 超出范围将返回400错误
+
+2. 性能优化
+- 添加适当的索引支持分页查询
+- 避免使用 count(*) 导致的全表扫描
+- 大数据量场景建议使用游标分页
+
+3. 数据一致性
+- 分页期间的数据变化可能导致重复或遗漏
+- 建议在UI上提示数据可能不是实时的
+- 关键业务场景考虑添加时间戳或版本号
+
+4. 空结果处理
+- 当没有数据时返回空列表而不是null
+- counts为0，items为空数组
+- 前端需要正确处理空结果的显示
+
+### 3.6 统一响应格式
+
+所有接口统一使用以下响应格式：
+
+```java
+public class ContentResponse<T> {
+    private String code;      // 响应码，"0"表示成功
+    private String message;   // 响应消息
+    private T data;          // 响应数据
+}
+```
+
+#### 3.6.1 分页查询响应示例
+
+```http
+GET /content/course/list?pageNo=1&pageSize=10&organizationId=1234
+```
+
+```json
+{
+    "code": "0",
+    "message": "success",
+    "data": {
+        "items": [
+            {
+                "id": 1,
+                "name": "课程名称",
+                "brief": "课程简介"
+                // ... 其他课程属性
+            }
+        ],
+        "counts": 100,
+        "page": 1,
+        "pageSize": 10
+    }
+}
+```
+
+#### 3.6.2 常见响应码说明
+
+基础响应码：
+- `0`: 成功
+- `4001`: 参数错误
+- `4003`: 权限不足
+- `4004`: 资源不存在
+- `5000`: 系统错误
+
+业务响应码：
+- `404001`: 教师不存在
+- `403001`: 无权操作其他机构的教师
+- `400001`: 教师信息不完整
+- `400002`: 头像文件格式不正确
+- `500001`: 头像上传失败
+- `500002`: 头像确认保存失败
+
+#### 3.6.3 注意事项
+
+1. 所有接口必须使用 ContentResponse 包装返回结果
+2. 分页查询接口的数据部分使用 PageResult 封装
+3. 错误码应当具有明确的业务含义
+4. 响应消息应当清晰描述操作结果或错误原因
+5. 敏感信息不应在响应中返回

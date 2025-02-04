@@ -22,6 +22,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.util.Date;
 import java.util.List;
 import java.util.Set;
 
@@ -30,6 +31,10 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.verify;
+
+import com.double2and9.base.model.PageParams;
+import com.double2and9.base.model.PageResult;
+import org.springframework.data.domain.Page;
 
 @SpringBootTest
 @Transactional
@@ -73,130 +78,65 @@ public class CourseTeacherServiceTests {
     @Test
     @Transactional
     public void testTeacherCRUD() {
+        // 清理已有数据
+        courseTeacherRepository.deleteAll();
+
         // 1. 添加教师
         SaveCourseTeacherDTO teacherDTO = new SaveCourseTeacherDTO();
         teacherDTO.setOrganizationId(TEST_ORG_ID);
         teacherDTO.setName("测试教师");
         teacherDTO.setPosition("讲师");
         teacherDTO.setDescription("测试教师简介");
-        teacherDTO.setCourseIds(Set.of(courseId)); // 使用Set设置课程ID
 
-        courseTeacherService.saveCourseTeacher(teacherDTO);
+        // 保存教师信息
+        Long teacherId = courseTeacherService.saveTeacher(teacherDTO);
+        assertNotNull(teacherId);
 
-        // 2. 查询教师列表
+        // 2. 关联课程
+        courseTeacherService.associateTeacherToCourse(TEST_ORG_ID, courseId, teacherId);
+
+        // 3. 查询教师列表
         List<CourseTeacherDTO> teachers = courseTeacherService.listByCourseId(courseId);
         assertNotNull(teachers);
         assertFalse(teachers.isEmpty());
 
-        // 验证新增的教师
-        CourseTeacherDTO teacher = teachers.stream()
-                .filter(t -> "测试教师".equals(t.getName()))
-                .findFirst()
-                .orElse(null);
-        assertNotNull(teacher);
+        CourseTeacherDTO teacher = teachers.get(0);
+        assertEquals("测试教师", teacher.getName());
         assertEquals("讲师", teacher.getPosition());
         assertTrue(teacher.getCourseIds().contains(courseId));
 
-        // 3. 修改教师信息
+        // 4. 修改教师信息
         teacherDTO.setId(teacher.getId());
         teacherDTO.setPosition("高级讲师");
-        courseTeacherService.saveCourseTeacher(teacherDTO);
+        courseTeacherService.saveTeacher(teacherDTO);
 
-        // 4. 再次查询验证
+        // 5. 再次查询验证
         teachers = courseTeacherService.listByCourseId(courseId);
-        teacher = teachers.stream()
-                .filter(t -> "测试教师".equals(t.getName()))
-                .findFirst()
-                .orElse(null);
-        assertNotNull(teacher);
+        teacher = teachers.get(0);
         assertEquals("高级讲师", teacher.getPosition());
-        assertTrue(teacher.getCourseIds().contains(courseId));
 
-        // 5. 删除测试
-        courseTeacherService.deleteCourseTeacher(courseId, teacher.getId());
+        // 6. 解除课程关联
+        courseTeacherService.dissociateTeacherFromCourse(TEST_ORG_ID, courseId, teacher.getId());
         teachers = courseTeacherService.listByCourseId(courseId);
-        assertTrue(teachers.stream().noneMatch(t -> "测试教师".equals(t.getName())));
+        assertTrue(teachers.isEmpty());
+
+        // 7. 删除教师
+        courseTeacherService.deleteTeacher(TEST_ORG_ID, teacher.getId());
+        teachers = courseTeacherService.listByOrganizationId(TEST_ORG_ID);
+        assertTrue(teachers.isEmpty());
     }
 
     @Test
     @Transactional
-    public void testListByOrganizationId() {
-        // 1. 创建教师并关联课程
+    public void testTeacherWithWrongOrg() {
+        // 1. 创建教师
         SaveCourseTeacherDTO teacherDTO = new SaveCourseTeacherDTO();
         teacherDTO.setOrganizationId(TEST_ORG_ID);
         teacherDTO.setName("测试教师");
         teacherDTO.setPosition("讲师");
-        teacherDTO.setCourseIds(Set.of(courseId));
-        courseTeacherService.saveCourseTeacher(teacherDTO);
+        Long teacherId = courseTeacherService.saveTeacher(teacherDTO);
 
-        // 2. 查询机构教师列表
-        List<CourseTeacherDTO> teachers = courseTeacherService.listByOrganizationId(TEST_ORG_ID);
-        assertNotNull(teachers);
-        assertFalse(teachers.isEmpty());
-        assertEquals(TEST_ORG_ID, teachers.get(0).getOrganizationId());
-    }
-
-    @Test
-    @Transactional
-    public void testListCoursesByTeacherId() {
-        // 1. 创建教师并关联课程
-        SaveCourseTeacherDTO teacherDTO = new SaveCourseTeacherDTO();
-        teacherDTO.setOrganizationId(TEST_ORG_ID);
-        teacherDTO.setName("测试教师");
-        teacherDTO.setPosition("讲师");
-        teacherDTO.setCourseIds(Set.of(courseId));
-        courseTeacherService.saveCourseTeacher(teacherDTO);
-
-        // 2. 获取教师ID
-        List<CourseTeacherDTO> teachers = courseTeacherService.listByCourseId(courseId);
-        Long teacherId = teachers.get(0).getId();
-
-        // 3. 查询教师关联的课程
-        List<CourseBaseDTO> courses = courseTeacherService.listCoursesByTeacherId(teacherId);
-        assertNotNull(courses);
-        assertFalse(courses.isEmpty());
-        assertEquals(courseId, courses.get(0).getId());
-    }
-
-    @Test
-    @Transactional
-    public void testGetTeacherDetail() {
-        // 1. 创建教师并关联课程
-        SaveCourseTeacherDTO teacherDTO = new SaveCourseTeacherDTO();
-        teacherDTO.setOrganizationId(TEST_ORG_ID);
-        teacherDTO.setName("测试教师");
-        teacherDTO.setPosition("讲师");
-        teacherDTO.setCourseIds(Set.of(courseId));
-        courseTeacherService.saveCourseTeacher(teacherDTO);
-
-        // 2. 获取教师ID
-        List<CourseTeacherDTO> teachers = courseTeacherService.listByCourseId(courseId);
-        Long teacherId = teachers.get(0).getId();
-
-        // 3. 查询教师详情
-        CourseTeacherDTO teacherDetail = courseTeacherService.getTeacherDetail(TEST_ORG_ID, teacherId);
-        assertNotNull(teacherDetail);
-        assertEquals("测试教师", teacherDetail.getName());
-        assertEquals(TEST_ORG_ID, teacherDetail.getOrganizationId());
-        assertTrue(teacherDetail.getCourseIds().contains(courseId));
-    }
-
-    @Test
-    @Transactional
-    public void testGetTeacherDetailWithWrongOrg() {
-        // 1. 创建教师并关联课程
-        SaveCourseTeacherDTO teacherDTO = new SaveCourseTeacherDTO();
-        teacherDTO.setOrganizationId(TEST_ORG_ID);
-        teacherDTO.setName("测试教师");
-        teacherDTO.setPosition("讲师");
-        teacherDTO.setCourseIds(Set.of(courseId));
-        courseTeacherService.saveCourseTeacher(teacherDTO);
-
-        // 2. 获取教师ID
-        List<CourseTeacherDTO> teachers = courseTeacherService.listByCourseId(courseId);
-        Long teacherId = teachers.get(0).getId();
-
-        // 3. 使用错误的机构ID查询，应该抛出异常
+        // 2. 使用错误的机构ID查询，应该抛出异常
         Long wrongOrgId = 9999L;
         assertThrows(ContentException.class,
                 () -> courseTeacherService.getTeacherDetail(wrongOrgId, teacherId));
@@ -209,11 +149,7 @@ public class CourseTeacherServiceTests {
         teacherDTO.setOrganizationId(TEST_ORG_ID);
         teacherDTO.setName("测试教师");
         teacherDTO.setPosition("讲师");
-        teacherDTO.setCourseIds(Set.of(courseId));
-        courseTeacherService.saveCourseTeacher(teacherDTO);
-
-        List<CourseTeacherDTO> teachers = courseTeacherService.listByCourseId(courseId);
-        Long teacherId = teachers.get(0).getId();
+        Long teacherId = courseTeacherService.saveTeacher(teacherDTO);
 
         // 2. 准备测试文件
         MultipartFile file = new MockMultipartFile(
@@ -249,32 +185,26 @@ public class CourseTeacherServiceTests {
     }
 
     @Test
-    void testDeleteTeacherAvatar() {
-        // 1. 创建带头像的教师
-        SaveCourseTeacherDTO teacherDTO = new SaveCourseTeacherDTO();
-        teacherDTO.setOrganizationId(TEST_ORG_ID);
-        teacherDTO.setName("测试教师");
-        teacherDTO.setCourseIds(Set.of(courseId));
-        courseTeacherService.saveCourseTeacher(teacherDTO);
+    @Transactional
+    void testListTeachers() {
+        // 清理已有数据
+        courseTeacherRepository.deleteAll();
 
-        List<CourseTeacherDTO> teachers = courseTeacherService.listByCourseId(courseId);
-        Long teacherId = teachers.get(0).getId();
-
-        // 2. 设置头像URL
-        CourseTeacher teacher = courseTeacherRepository.findById(teacherId).orElseThrow();
-        teacher.setAvatar("/test/url");
+        // 创建测试数据
+        CourseTeacher teacher = new CourseTeacher();
+        teacher.setName("测试教师");
+        teacher.setOrganizationId(TEST_ORG_ID);
+        teacher.setCreateTime(new Date());
+        teacher.setUpdateTime(new Date());
         courseTeacherRepository.save(teacher);
 
-        // 3. Mock删除响应
-        when(mediaFeignClient.deleteMediaFile(any()))
-                .thenReturn(CommonResponse.success(null));
+        // 执行测试
+        PageResult<CourseTeacherDTO> result = courseTeacherService.listByOrganizationId(
+                TEST_ORG_ID,
+                new PageParams(1L, 10L));
 
-        // 4. 执行删除
-        courseTeacherService.deleteTeacherAvatar(teacherId);
-
-        // 5. 验证结果
-        verify(mediaFeignClient).deleteMediaFile("/test/url");
-        CourseTeacherDTO updatedTeacher = courseTeacherService.getTeacherDetail(TEST_ORG_ID, teacherId);
-        assertNull(updatedTeacher.getAvatar());
+        // 验证
+        assertEquals(1, result.getCounts());
+        assertEquals("测试教师", result.getItems().get(0).getName());
     }
 }

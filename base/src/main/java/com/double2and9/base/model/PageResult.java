@@ -14,10 +14,10 @@ import java.util.List;
 public class PageResult<T> {
     // 数据列表
     private List<T> items;
-    //总记录数
+    // 总记录数
     private long counts;
-    //当前⻚码
+    // 当前⻚码
     private long page;
-    //每⻚记录数
+    // 每⻚记录数
     private long pageSize;
 }

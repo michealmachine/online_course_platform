@@ -100,18 +100,18 @@ class MediaFileServiceTests {
 
         // 查询所有媒体文件
         PageResult<MediaFileDTO> result = mediaFileService.queryMediaFiles(
-            TEST_ORG_ID, null, null, pageParams);
+                TEST_ORG_ID, null, null, pageParams);
         assertEquals(2, result.getItems().size());
 
         // 按媒体类型查询
         result = mediaFileService.queryMediaFiles(
-            TEST_ORG_ID, "IMAGE", null, pageParams);
+                TEST_ORG_ID, "IMAGE", null, pageParams);
         assertEquals(1, result.getItems().size());
         assertEquals("IMAGE", result.getItems().get(0).getMediaType());
 
         // 按用途查询
         result = mediaFileService.queryMediaFiles(
-            TEST_ORG_ID, null, "VIDEO", pageParams);
+                TEST_ORG_ID, null, "VIDEO", pageParams);
         assertEquals(1, result.getItems().size());
         assertEquals("VIDEO", result.getItems().get(0).getPurpose());
     }
@@ -138,8 +138,7 @@ class MediaFileServiceTests {
         mediaFileService.saveMediaFile(TEST_ORG_ID, videoDto);
 
         // 测试获取视频URL（应该抛出异常）
-        assertThrows(ContentException.class, () ->
-            mediaFileService.getMediaFileUrl(TEST_ORG_ID, "test456"));
+        assertThrows(ContentException.class, () -> mediaFileService.getMediaFileUrl(TEST_ORG_ID, "test456"));
     }
 
     @Test
@@ -154,7 +153,7 @@ class MediaFileServiceTests {
 
         // 更新审核状态
         mediaFileService.updateAuditStatus(
-            "test123", "202003", "审核通过");
+                "test123", "202003", "审核通过");
 
         // 验证更新结果
         Optional<MediaFile> updated = mediaFileRepository.findByMediaFileId("test123");
@@ -174,7 +173,6 @@ class MediaFileServiceTests {
 
         // 使用错误的机构ID访问
         Long wrongOrgId = 9999L;
-        assertThrows(ContentException.class, () -> 
-            mediaFileService.getMediaFileUrl(wrongOrgId, "test123"));
+        assertThrows(ContentException.class, () -> mediaFileService.getMediaFileUrl(wrongOrgId, "test123"));
     }
-} 
+}

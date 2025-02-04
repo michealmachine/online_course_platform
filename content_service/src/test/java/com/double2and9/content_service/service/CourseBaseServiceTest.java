@@ -175,8 +175,10 @@ class CourseBaseServiceTest {
         teacherDTO.setName("测试教师");
         teacherDTO.setPosition("讲师");
         teacherDTO.setDescription("测试教师简介");
-        teacherDTO.setCourseIds(Set.of(courseId));
-        courseTeacherService.saveCourseTeacher(teacherDTO);
+        Long teacherId = courseTeacherService.saveTeacher(teacherDTO);
+
+        // 4. 关联教师到课程
+        courseTeacherService.associateTeacherToCourse(TEST_ORG_ID, courseId, teacherId);
 
         // 4. 提交审核
         courseBaseService.submitForAudit(courseId);
@@ -555,7 +557,9 @@ class CourseBaseServiceTest {
         teacherDTO.setName("测试教师");
         teacherDTO.setPosition("讲师");
         teacherDTO.setDescription("测试教师简介");
-        teacherDTO.setCourseIds(Set.of(courseId));
-        courseTeacherService.saveCourseTeacher(teacherDTO);
+        Long teacherId = courseTeacherService.saveTeacher(teacherDTO);
+
+        // 关联教师到课程
+        courseTeacherService.associateTeacherToCourse(TEST_ORG_ID, courseId, teacherId);
     }
 }

@@ -15,12 +15,18 @@ import com.double2and9.content_service.repository.CourseTeacherRepository;
 import com.double2and9.content_service.service.CourseTeacherService;
 import lombok.extern.slf4j.Slf4j;
 import org.modelmapper.ModelMapper;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.*;
 import java.util.stream.Collectors;
+
+import com.double2and9.base.model.PageParams;
+import com.double2and9.base.model.PageResult;
 
 @Slf4j
 @Service
@@ -43,8 +49,13 @@ public class CourseTeacherServiceImpl implements CourseTeacherService {
 
     @Override
     public List<CourseTeacherDTO> listByCourseId(Long courseId) {
-        List<CourseTeacher> teachers = courseTeacherRepository.findByCourseId(courseId);
-        return teachers.stream()
+        // 修改为使用分页查询，但获取所有记录
+        Page<CourseTeacher> teacherPage = courseTeacherRepository.findByCourseId(
+                courseId,
+                PageRequest.of(0, Integer.MAX_VALUE) // 获取所有记录
+        );
+
+        return teacherPage.getContent().stream()
                 .map(teacher -> {
                     CourseTeacherDTO dto = modelMapper.map(teacher, CourseTeacherDTO.class);
                     dto.setCourseIds(teacher.getCourses().stream()
@@ -66,30 +77,21 @@ public class CourseTeacherServiceImpl implements CourseTeacherService {
         } else {
             teacher = new CourseTeacher();
             teacher.setCreateTime(new Date());
+            teacher.setCourses(new HashSet<>()); // 初始化空的课程集合
         }
 
         // 设置基本信息
         modelMapper.map(teacherDTO, teacher);
         teacher.setUpdateTime(new Date());
+        teacher.setOrganizationId(teacherDTO.getOrganizationId());
 
-        // 处理课程关联
-        Set<CourseBase> courses = courseBaseRepository.findAllById(teacherDTO.getCourseIds())
-                .stream()
-                .collect(Collectors.toSet());
-
-        // 验证所有课程都属于同一机构
-        if (!courses.stream().allMatch(course -> course.getOrganizationId().equals(teacherDTO.getOrganizationId()))) {
-            throw new ContentException(ContentErrorCode.COURSE_ORG_NOT_MATCH);
-        }
-
-        teacher.setCourses(courses);
+        // 保存教师信息
         courseTeacherRepository.save(teacher);
-
-        log.info("保存教师信息成功，教师ID：{}，关联课程数：{}", teacher.getId(), courses.size());
+        log.info("保存教师信息成功，教师ID：{}", teacher.getId());
     }
 
-    @Override
     @Transactional
+    @Override
     public void deleteCourseTeacher(Long courseId, Long teacherId) {
         CourseTeacher teacher = courseTeacherRepository.findById(teacherId)
                 .orElseThrow(() -> new ContentException(ContentErrorCode.TEACHER_NOT_EXISTS));
@@ -118,25 +120,27 @@ public class CourseTeacherServiceImpl implements CourseTeacherService {
 
     @Override
     public List<CourseTeacherDTO> listByOrganizationId(Long organizationId) {
-        List<CourseTeacher> teachers = courseTeacherRepository.findByOrganizationId(organizationId);
-        return teachers.stream()
-                .map(teacher -> {
-                    CourseTeacherDTO dto = modelMapper.map(teacher, CourseTeacherDTO.class);
-                    dto.setCourseIds(teacher.getCourses().stream()
-                            .map(CourseBase::getId)
-                            .collect(Collectors.toSet()));
-                    return dto;
-                })
+        // 修改为使用分页查询，但获取所有记录
+        Page<CourseTeacher> teacherPage = courseTeacherRepository.findByOrganizationId(
+                organizationId,
+                PageRequest.of(0, Integer.MAX_VALUE) // 获取所有记录
+        );
+
+        return teacherPage.getContent().stream()
+                .map(teacher -> modelMapper.map(teacher, CourseTeacherDTO.class))
                 .collect(Collectors.toList());
     }
 
     @Override
     @Transactional(readOnly = true)
     public List<CourseBaseDTO> listCoursesByTeacherId(Long teacherId) {
-        CourseTeacher teacher = courseTeacherRepository.findById(teacherId)
-                .orElseThrow(() -> new ContentException(ContentErrorCode.TEACHER_NOT_EXISTS));
+        // 使用分页查询，但获取所有记录
+        Page<CourseBase> page = courseBaseRepository.findCoursesByTeacherId(
+                teacherId,
+                PageRequest.of(0, Integer.MAX_VALUE) // 获取所有记录
+        );
 
-        return teacher.getCourses().stream()
+        return page.getContent().stream()
                 .map(course -> modelMapper.map(course, CourseBaseDTO.class))
                 .collect(Collectors.toList());
     }
@@ -242,6 +246,159 @@ public class CourseTeacherServiceImpl implements CourseTeacherService {
         } catch (Exception e) {
             log.error("删除教师头像失败：", e);
             throw new ContentException(ContentErrorCode.DELETE_LOGO_FAILED);
+        }
+    }
+
+    @Override
+    @Transactional
+    public void associateTeacherToCourse(Long organizationId, Long courseId, Long teacherId) {
+        // 获取教师信息
+        CourseTeacher teacher = courseTeacherRepository.findByOrganizationIdAndId(organizationId, teacherId)
+                .orElseThrow(() -> new ContentException(ContentErrorCode.TEACHER_NOT_EXISTS));
+
+        // 获取课程信息
+        CourseBase course = courseBaseRepository.findById(courseId)
+                .orElseThrow(() -> new ContentException(ContentErrorCode.COURSE_NOT_EXISTS));
+
+        // 验证机构ID匹配
+        if (!teacher.getOrganizationId().equals(organizationId) ||
+                !course.getOrganizationId().equals(organizationId)) {
+            throw new ContentException(ContentErrorCode.COURSE_ORG_NOT_MATCH);
+        }
+
+        // 添加课程关联
+        if (teacher.getCourses() == null) {
+            teacher.setCourses(new HashSet<>());
+        }
+        teacher.getCourses().add(course);
+        teacher.setUpdateTime(new Date());
+
+        courseTeacherRepository.save(teacher);
+        log.info("教师关联课程成功，教师ID：{}，课程ID：{}", teacherId, courseId);
+    }
+
+    @Override
+    @Transactional
+    public void dissociateTeacherFromCourse(Long organizationId, Long courseId, Long teacherId) {
+        // 获取教师信息
+        CourseTeacher teacher = courseTeacherRepository.findByOrganizationIdAndId(organizationId, teacherId)
+                .orElseThrow(() -> new ContentException(ContentErrorCode.TEACHER_NOT_EXISTS));
+
+        // 获取课程信息
+        CourseBase course = courseBaseRepository.findById(courseId)
+                .orElseThrow(() -> new ContentException(ContentErrorCode.COURSE_NOT_EXISTS));
+
+        // 验证机构ID匹配
+        if (!teacher.getOrganizationId().equals(organizationId) ||
+                !course.getOrganizationId().equals(organizationId)) {
+            throw new ContentException(ContentErrorCode.COURSE_ORG_NOT_MATCH);
+        }
+
+        // 移除课程关联
+        if (teacher.getCourses() != null) {
+            teacher.getCourses().remove(course);
+            teacher.setUpdateTime(new Date());
+            courseTeacherRepository.save(teacher);
+        }
+
+        log.info("解除教师与课程的关联成功，教师ID：{}，课程ID：{}", teacherId, courseId);
+    }
+
+    @Override
+    @Transactional
+    public Long saveTeacher(SaveCourseTeacherDTO teacherDTO) {
+        // 获取或创建教师
+        CourseTeacher teacher;
+        if (teacherDTO.getId() != null) {
+            teacher = courseTeacherRepository.findByOrganizationIdAndId(
+                    teacherDTO.getOrganizationId(), teacherDTO.getId())
+                    .orElseThrow(() -> new ContentException(ContentErrorCode.TEACHER_NOT_EXISTS));
+        } else {
+            teacher = new CourseTeacher();
+            teacher.setCreateTime(new Date());
+            teacher.setCourses(new HashSet<>()); // 初始化空的课程集合
+        }
+
+        // 设置基本信息
+        modelMapper.map(teacherDTO, teacher);
+        teacher.setUpdateTime(new Date());
+        teacher.setOrganizationId(teacherDTO.getOrganizationId());
+
+        // 保存教师信息
+        CourseTeacher savedTeacher = courseTeacherRepository.save(teacher);
+        log.info("保存教师信息成功，教师ID：{}", savedTeacher.getId());
+
+        return savedTeacher.getId();
+    }
+
+    @Override
+    @Transactional
+    public void deleteTeacher(Long organizationId, Long teacherId) {
+        CourseTeacher teacher = courseTeacherRepository.findByOrganizationIdAndId(organizationId, teacherId)
+                .orElseThrow(() -> new ContentException(ContentErrorCode.TEACHER_NOT_EXISTS));
+
+        // 删除教师头像
+        if (StringUtils.hasText(teacher.getAvatar())) {
+            try {
+                deleteTeacherAvatar(teacherId);
+            } catch (Exception e) {
+                log.error("删除教师头像失败：", e);
+                // 继续删除教师，不影响主流程
+            }
+        }
+
+        // 删除教师
+        courseTeacherRepository.delete(teacher);
+        log.info("删除教师成功，教师ID：{}", teacherId);
+    }
+
+    @Override
+    public PageResult<CourseTeacherDTO> listByOrganizationId(Long organizationId, PageParams pageParams) {
+        Page<CourseTeacher> page = courseTeacherRepository.findByOrganizationId(
+                organizationId,
+                PageRequest.of(pageParams.getPageNo().intValue() - 1, pageParams.getPageSize().intValue()));
+
+        List<CourseTeacherDTO> items = page.getContent().stream()
+                .map(teacher -> modelMapper.map(teacher, CourseTeacherDTO.class))
+                .collect(Collectors.toList());
+
+        return new PageResult<>(items, page.getTotalElements(), pageParams.getPageNo(), pageParams.getPageSize());
+    }
+
+    @Override
+    public PageResult<CourseTeacherDTO> listByCourseId(Long courseId, PageParams pageParams) {
+        Page<CourseTeacher> page = courseTeacherRepository.findByCourseId(
+                courseId,
+                PageRequest.of(pageParams.getPageNo().intValue() - 1, pageParams.getPageSize().intValue()));
+
+        List<CourseTeacherDTO> items = page.getContent().stream()
+                .map(teacher -> modelMapper.map(teacher, CourseTeacherDTO.class))
+                .collect(Collectors.toList());
+
+        return new PageResult<>(items, page.getTotalElements(), pageParams.getPageNo(), pageParams.getPageSize());
+    }
+
+    @Override
+    public PageResult<CourseBaseDTO> listCoursesByTeacherId(Long teacherId, PageParams pageParams) {
+        Page<CourseBase> page = courseBaseRepository.findCoursesByTeacherId(
+                teacherId,
+                PageRequest.of(pageParams.getPageNo().intValue() - 1, pageParams.getPageSize().intValue()));
+
+        List<CourseBaseDTO> items = page.getContent().stream()
+                .map(course -> modelMapper.map(course, CourseBaseDTO.class))
+                .collect(Collectors.toList());
+
+        return new PageResult<>(
+                items,
+                page.getTotalElements(),
+                pageParams.getPageNo(),
+                pageParams.getPageSize());
+    }
+
+    private void validateOrganizationAccess(Long organizationId) {
+        // TODO: 后续通过认证信息验证，当前仅做参数验证
+        if (organizationId == null) {
+            throw new ContentException(ContentErrorCode.PARAMS_EMPTY, "机构ID不能为空");
         }
     }
 }

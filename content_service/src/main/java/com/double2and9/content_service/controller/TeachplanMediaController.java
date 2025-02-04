@@ -1,5 +1,7 @@
 package com.double2and9.content_service.controller;
 
+import com.double2and9.base.model.PageParams;
+import com.double2and9.base.model.PageResult;
 import com.double2and9.content_service.common.model.ContentResponse;
 import com.double2and9.content_service.dto.TeachplanMediaDTO;
 import com.double2and9.content_service.service.TeachplanMediaService;
@@ -48,4 +50,4 @@ public class TeachplanMediaController {
             @Parameter(description = "课程计划ID") @PathVariable Long teachplanId) {
         return ContentResponse.success(teachplanMediaService.getMediaByTeachplanId(teachplanId));
     }
-} 
+}

@@ -25,8 +25,8 @@ public class TeachplanServiceImpl implements TeachplanService {
     private final ModelMapper modelMapper;
 
     public TeachplanServiceImpl(TeachplanRepository teachplanRepository,
-                              CourseBaseRepository courseBaseRepository,
-                              ModelMapper modelMapper) {
+            CourseBaseRepository courseBaseRepository,
+            ModelMapper modelMapper) {
         this.teachplanRepository = teachplanRepository;
         this.courseBaseRepository = courseBaseRepository;
         this.modelMapper = modelMapper;
@@ -36,15 +36,15 @@ public class TeachplanServiceImpl implements TeachplanService {
     public List<TeachplanDTO> findTeachplanTree(Long courseId) {
         // 查询所有课程计划
         List<Teachplan> teachplans = teachplanRepository.findByCourseBaseIdOrderByOrderBy(courseId);
-        
+
         // 将课程计划转换为树形结构
         List<TeachplanDTO> chapters = new ArrayList<>();
         Map<Long, TeachplanDTO> teachplanMap = new HashMap<>();
-        
+
         teachplans.forEach(teachplan -> {
             TeachplanDTO dto = modelMapper.map(teachplan, TeachplanDTO.class);
             teachplanMap.put(dto.getId(), dto);
-            
+
             // 处理parentId为null的情况
             Long parentId = teachplan.getParentId();
             if (parentId == null || parentId == 0L) {
@@ -59,7 +59,7 @@ public class TeachplanServiceImpl implements TeachplanService {
                 }
             }
         });
-        
+
         return chapters;
     }
 
@@ -72,7 +72,7 @@ public class TeachplanServiceImpl implements TeachplanService {
 
         Long teachplanId = teachplanDTO.getId();
         Teachplan teachplan;
-        
+
         if (teachplanId == null) {
             teachplan = new Teachplan();
             // 设置新增课程计划的排序号
@@ -81,24 +81,24 @@ public class TeachplanServiceImpl implements TeachplanService {
             teachplan.setCreateTime(new Date());
         } else {
             teachplan = teachplanRepository.findById(teachplanId)
-                .orElseThrow(() -> new ContentException(ContentErrorCode.TEACHPLAN_NOT_EXISTS));
+                    .orElseThrow(() -> new ContentException(ContentErrorCode.TEACHPLAN_NOT_EXISTS));
         }
-        
+
         // 验证层级
         if (teachplanDTO.getLevel() != 1 && teachplanDTO.getLevel() != 2) {
             throw new ContentException(ContentErrorCode.TEACHPLAN_LEVEL_ERROR);
         }
-        
+
         // 更新课程计划信息
         modelMapper.map(teachplanDTO, teachplan);
         teachplan.setCourseBase(courseBase);
         teachplan.setUpdateTime(new Date());
-        
+
         // 保存课程计划
         Teachplan savedTeachplan = teachplanRepository.save(teachplan);
-        
+
         log.info("保存课程计划成功，课程ID：{}，课程计划ID：{}", courseBase.getId(), savedTeachplan.getId());
-        return savedTeachplan.getId();  // 返回ID
+        return savedTeachplan.getId(); // 返回ID
     }
 
     @Override
@@ -106,21 +106,21 @@ public class TeachplanServiceImpl implements TeachplanService {
     public void deleteTeachplan(Long teachplanId) {
         // 查询课程计划
         Teachplan teachplan = teachplanRepository.findById(teachplanId)
-            .orElseThrow(() -> new ContentException(ContentErrorCode.TEACHPLAN_NOT_EXISTS));
-        
+                .orElseThrow(() -> new ContentException(ContentErrorCode.TEACHPLAN_NOT_EXISTS));
+
         // 检查是否有子节点
         if (teachplanRepository.countByParentId(teachplanId) > 0) {
             throw new ContentException(ContentErrorCode.TEACHPLAN_DELETE_ERROR);
         }
-        
+
         // 如果是章节，先删除其下的所有小节
         if (teachplan.getLevel() == 1) {
             teachplanRepository.deleteByParentId(teachplanId);
         }
-        
+
         // 删除当前课程计划
         teachplanRepository.delete(teachplan);
-        
+
         log.info("课程计划删除成功，课程计划ID：{}", teachplanId);
     }
 
@@ -132,7 +132,8 @@ public class TeachplanServiceImpl implements TeachplanService {
                 .orElseThrow(() -> new ContentException(ContentErrorCode.TEACHPLAN_NOT_EXISTS));
 
         // 获取上一个课程计划
-        Optional<Teachplan> previous = teachplanRepository.findPreviousNode(current.getParentId(), current.getOrderBy());
+        Optional<Teachplan> previous = teachplanRepository.findPreviousNode(current.getParentId(),
+                current.getOrderBy());
         if (previous.isEmpty()) {
             // 已经是第一个，抛出异常
             throw new ContentException(ContentErrorCode.TEACHPLAN_MOVE_ERROR, "已经是第一个，无法上移");
@@ -171,4 +172,4 @@ public class TeachplanServiceImpl implements TeachplanService {
         teachplanRepository.save(current);
         teachplanRepository.save(next.get());
     }
-} 
+}

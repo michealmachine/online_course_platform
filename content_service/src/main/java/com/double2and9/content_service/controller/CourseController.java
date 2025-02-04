@@ -29,6 +29,11 @@ import java.util.List;
  * - 课程封面管理(两步式上传)
  * - 课程审核和发布流程
  * - 课程分类管理
+ *
+ * 审核权限接口说明：
+ * 1. /admin/* 路径下的接口需要管理员权限
+ * 2. /audit/* 路径下的接口需要审核人员权限
+ * 3. /organization/* 路径下的接口需要机构权限且只能操作自己机构的数据
  */
 @Tag(name = "课程管理", description = "提供课程的增删改查、审核、发布等接口")
 @Slf4j
@@ -136,7 +141,7 @@ public class CourseController {
 
     /**
      * 查询机构的课程列表
-     * 注意：后续会加入认证和鉴权，确保只能查询自己机构的课程
+     * 权限要求：机构权限，只能查询自己机构的课程
      */
     @Operation(summary = "查询机构课程列表", description = "查询指定机构的课程列表，支持状态筛选")
     @GetMapping("/organization/{organizationId}")
@@ -226,5 +231,31 @@ public class CourseController {
         courseBaseService.deleteCourseLogo(courseId);
         log.info("删除课程封面成功，courseId：{}", courseId);
         return ContentResponse.success(null);
+    }
+
+    /**
+     * 管理员查询所有课程列表
+     * 权限要求：管理员权限
+     */
+    @Operation(summary = "管理员查询课程列表", description = "管理员查询所有机构的课程列表，支持多条件筛选")
+    @GetMapping("/admin/list")
+    public ContentResponse<PageResult<CourseBaseDTO>> queryAllCourses(
+            @Parameter(description = "机构ID") @RequestParam(required = false) Long organizationId,
+            @Parameter(description = "课程状态") @RequestParam(required = false) String status,
+            @Parameter(description = "审核状态") @RequestParam(required = false) String auditStatus,
+            @Parameter(description = "课程名称") @RequestParam(required = false) String courseName,
+            @Parameter(description = "分页参数") PageParams pageParams) {
+
+        log.info("管理员查询课程列表，机构ID：{}，状态：{}，审核状态：{}，课程名称：{}",
+                organizationId, status, auditStatus, courseName);
+
+        QueryCourseParamsDTO queryParams = new QueryCourseParamsDTO();
+        queryParams.setOrganizationId(organizationId);
+        queryParams.setStatus(status);
+        queryParams.setAuditStatus(auditStatus);
+        queryParams.setCourseName(courseName);
+
+        return ContentResponse.success(
+                courseBaseService.queryCourseList(pageParams, queryParams));
     }
 }

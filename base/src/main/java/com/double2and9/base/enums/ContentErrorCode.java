@@ -38,7 +38,14 @@ public enum ContentErrorCode {
     // 课程封面相关错误 1005xx
     UPLOAD_LOGO_FAILED(100501, "上传课程封面失败"),
     DELETE_LOGO_FAILED(100502, "删除课程封面失败"),
-    LOGO_NOT_EXISTS(100503, "课程封面不存在");
+    LOGO_NOT_EXISTS(100503, "课程封面不存在"),
+
+    /**
+     * 参数错误 (1001xx)
+     */
+    PARAMS_ERROR(100100, "参数错误"),
+    PARAMS_EMPTY(100101, "必填参数为空"),
+    PARAMS_INVALID(100102, "参数格式不正确");
 
     private final int code;
     private final String message;

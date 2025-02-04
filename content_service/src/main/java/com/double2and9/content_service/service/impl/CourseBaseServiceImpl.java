@@ -122,6 +122,12 @@ public class CourseBaseServiceImpl implements CourseBaseService {
         CourseBase courseBase = modelMapper.map(addCourseDTO, CourseBase.class);
         courseBase.setOrganizationId(organizationId);
 
+        // 添加默认值设置
+        courseBase.setStatus("202001"); // 设置初始状态为"未发布"
+        courseBase.setCreateTime(new Date()); // 设置创建时间
+        courseBase.setUpdateTime(new Date()); // 设置更新时间
+        courseBase.setValid(true); // 设置有效标志
+
         // 先保存CourseBase以获取ID
         CourseBase savedCourse = courseBaseRepository.save(courseBase);
 
@@ -155,7 +161,7 @@ public class CourseBaseServiceImpl implements CourseBaseService {
 
         // 更新基本信息
         modelMapper.map(editCourseDTO, courseBase);
-        courseBase.setUpdateTime(new Date());
+        courseBase.setUpdateTime(new Date()); // 设置更新时间
 
         // 更新营销信息
         CourseMarket courseMarket = courseBase.getCourseMarket();
@@ -163,9 +169,10 @@ public class CourseBaseServiceImpl implements CourseBaseService {
             courseMarket = new CourseMarket();
             courseMarket.setCourseBase(courseBase);
             courseBase.setCourseMarket(courseMarket);
+            courseMarket.setCreateTime(new Date()); // 如果是新建的营销信息，设置创建时间
         }
         modelMapper.map(editCourseDTO, courseMarket);
-        courseMarket.setUpdateTime(new Date());
+        courseMarket.setUpdateTime(new Date()); // 设置营销信息的更新时间
 
         // 保存更新
         courseBaseRepository.save(courseBase);
@@ -235,7 +242,11 @@ public class CourseBaseServiceImpl implements CourseBaseService {
         previewDTO.setTeachplans(teachplanDTOs);
 
         // 获取课程教师信息
-        List<CourseTeacher> teachers = courseTeacherRepository.findByCourseId(courseId);
+        Page<CourseTeacher> teacherPage = courseTeacherRepository.findByCourseId(
+                courseId,
+                PageRequest.of(0, Integer.MAX_VALUE) // 获取所有记录
+        );
+        List<CourseTeacher> teachers = teacherPage.getContent();
         List<CourseTeacherDTO> teacherDTOs = teachers.stream()
                 .map(teacher -> modelMapper.map(teacher, CourseTeacherDTO.class))
                 .collect(Collectors.toList());
@@ -316,7 +327,11 @@ public class CourseBaseServiceImpl implements CourseBaseService {
         }
 
         // 验证课程教师
-        List<CourseTeacher> teachers = courseTeacherRepository.findByCourseId(courseBase.getId());
+        Page<CourseTeacher> teacherPage = courseTeacherRepository.findByCourseId(
+                courseBase.getId(),
+                PageRequest.of(0, Integer.MAX_VALUE) // 获取所有记录
+        );
+        List<CourseTeacher> teachers = teacherPage.getContent();
         if (teachers.isEmpty()) {
             throw new ContentException(ContentErrorCode.TEACHER_NOT_EXISTS, "请添加课程教师");
         }

@@ -5,6 +5,8 @@ import com.double2and9.content_service.entity.Teachplan;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.test.annotation.Rollback;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,7 +24,7 @@ public class TeachplanRepositoryTest {
 
     @Autowired
     private TeachplanRepository teachplanRepository;
-    
+
     @Autowired
     private CourseBaseRepository courseBaseRepository;
 
@@ -76,4 +78,81 @@ public class TeachplanRepositoryTest {
         assertFalse(teachplans.isEmpty());
         assertEquals("第一章", teachplans.get(0).getName());
     }
-} 
+
+    @Test
+    void testFindPageByCourseId() {
+        // 准备测试数据
+        CourseBase courseBase = new CourseBase();
+        courseBase.setName("测试课程");
+        courseBase.setOrganizationId(TEST_ORG_ID);
+        courseBase = courseBaseRepository.save(courseBase);
+
+        // 创建两个课程计划
+        Teachplan plan1 = new Teachplan();
+        plan1.setName("第一章");
+        plan1.setCourseBase(courseBase);
+        plan1.setLevel(1);
+        plan1.setOrderBy(1);
+        plan1.setCreateTime(new Date());
+        plan1.setUpdateTime(new Date());
+        teachplanRepository.save(plan1);
+
+        Teachplan plan2 = new Teachplan();
+        plan2.setName("第二章");
+        plan2.setCourseBase(courseBase);
+        plan2.setLevel(1);
+        plan2.setOrderBy(2);
+        plan2.setCreateTime(new Date());
+        plan2.setUpdateTime(new Date());
+        teachplanRepository.save(plan2);
+
+        // 测试分页查询
+        Page<Teachplan> result = teachplanRepository.findPageByCourseId(
+                courseBase.getId(),
+                PageRequest.of(0, 10));
+
+        // 验证结果
+        assertEquals(2, result.getTotalElements());
+        assertEquals("第一章", result.getContent().get(0).getName());
+        assertEquals("第二章", result.getContent().get(1).getName());
+    }
+
+    @Test
+    void testFindByCourseBaseIdAndLevel() {
+        // 准备测试数据
+        CourseBase courseBase = new CourseBase();
+        courseBase.setName("测试课程");
+        courseBase.setOrganizationId(TEST_ORG_ID);
+        courseBase = courseBaseRepository.save(courseBase);
+
+        // 创建一级和二级课程计划
+        Teachplan chapter = new Teachplan();
+        chapter.setName("第一章");
+        chapter.setCourseBase(courseBase);
+        chapter.setLevel(1);
+        chapter.setOrderBy(1);
+        chapter.setCreateTime(new Date());
+        chapter.setUpdateTime(new Date());
+        teachplanRepository.save(chapter);
+
+        Teachplan section = new Teachplan();
+        section.setName("第一节");
+        section.setCourseBase(courseBase);
+        section.setParentId(chapter.getId());
+        section.setLevel(2);
+        section.setOrderBy(1);
+        section.setCreateTime(new Date());
+        section.setUpdateTime(new Date());
+        teachplanRepository.save(section);
+
+        // 测试分页查询一级课程计划
+        Page<Teachplan> result = teachplanRepository.findByCourseBaseIdAndLevel(
+                courseBase.getId(),
+                1,
+                PageRequest.of(0, 10));
+
+        // 验证结果
+        assertEquals(1, result.getTotalElements());
+        assertEquals("第一章", result.getContent().get(0).getName());
+    }
+}

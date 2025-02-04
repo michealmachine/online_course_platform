@@ -1,5 +1,7 @@
 package com.double2and9.content_service.controller;
 
+import com.double2and9.base.model.PageParams;
+import com.double2and9.base.model.PageResult;
 import com.double2and9.content_service.common.model.ContentResponse;
 import com.double2and9.content_service.dto.SaveTeachplanDTO;
 import com.double2and9.content_service.dto.TeachplanDTO;
@@ -35,13 +37,14 @@ public class TeachplanController {
 
     /**
      * 查询课程计划树形结构
+     * 
      * @param courseId 课程id
      * @return 课程计划树形结构
      */
     @Operation(summary = "查询课程计划树", description = "根据课程ID查询课程计划的树形结构")
     @GetMapping("/tree/{courseId}")
     public ContentResponse<List<TeachplanDTO>> getTeachplanTree(
-            @Parameter(description = "课程ID", required = true) 
+            @Parameter(description = "课程ID", required = true)
             @PathVariable Long courseId) {
         log.info("查询课程计划树，课程ID：{}", courseId);
         return ContentResponse.success(teachplanService.findTeachplanTree(courseId));
@@ -64,7 +67,7 @@ public class TeachplanController {
     @Operation(summary = "删除课程计划")
     @DeleteMapping("/{teachplanId}")
     public ContentResponse<Void> deleteTeachplan(
-            @Parameter(description = "课程计划ID", required = true) 
+            @Parameter(description = "课程计划ID", required = true)
             @PathVariable Long teachplanId) {
         log.info("删除课程计划，ID：{}", teachplanId);
         teachplanService.deleteTeachplan(teachplanId);
@@ -73,13 +76,14 @@ public class TeachplanController {
 
     /**
      * 课程计划向上移动
+     * 
      * @param teachplanId 课程计划ID
      * @return 操作结果
      */
     @Operation(summary = "上移课程计划")
     @PostMapping("/moveup/{teachplanId}")
     public ContentResponse<Void> moveUp(
-            @Parameter(description = "课程计划ID", required = true) 
+            @Parameter(description = "课程计划ID", required = true)
             @PathVariable Long teachplanId) {
         log.info("上移课程计划，ID：{}", teachplanId);
         teachplanService.moveUp(teachplanId);
@@ -88,13 +92,14 @@ public class TeachplanController {
 
     /**
      * 课程计划向下移动
+     * 
      * @param teachplanId 课程计划ID
      * @return 操作结果
      */
     @Operation(summary = "下移课程计划")
     @PostMapping("/movedown/{teachplanId}")
     public ContentResponse<Void> moveDown(
-            @Parameter(description = "课程计划ID", required = true) 
+            @Parameter(description = "课程计划ID", required = true)
             @PathVariable Long teachplanId) {
         log.info("下移课程计划，ID：{}", teachplanId);
         teachplanService.moveDown(teachplanId);
@@ -114,12 +119,12 @@ public class TeachplanController {
     @Operation(summary = "解除媒资绑定")
     @DeleteMapping("/media/{teachplanId}/{mediaId}")
     public ContentResponse<Void> dissociateMedia(
-            @Parameter(description = "课程计划ID", required = true) 
+            @Parameter(description = "课程计划ID", required = true)
             @PathVariable Long teachplanId,
-            @Parameter(description = "媒资ID", required = true) 
+            @Parameter(description = "媒资ID", required = true)
             @PathVariable Long mediaId) {
         log.info("解除媒资绑定，课程计划ID：{}，媒资ID：{}", teachplanId, mediaId);
         teachplanMediaService.dissociateMedia(teachplanId, String.valueOf(mediaId));
         return ContentResponse.success(null);
     }
-} 
+}

@@ -27,10 +27,11 @@ public class TeachplanMediaServiceImpl implements TeachplanMediaService {
     private final TeachplanRepository teachplanRepository;
     private final MediaFileRepository mediaFileRepository;
     private final ModelMapper modelMapper;
+
     public TeachplanMediaServiceImpl(TeachplanMediaRepository teachplanMediaRepository,
-                                   TeachplanRepository teachplanRepository,
-                                   MediaFileRepository mediaFileRepository,
-                                   ModelMapper modelMapper) {
+            TeachplanRepository teachplanRepository,
+            MediaFileRepository mediaFileRepository,
+            ModelMapper modelMapper) {
         this.teachplanMediaRepository = teachplanMediaRepository;
         this.teachplanRepository = teachplanRepository;
         this.mediaFileRepository = mediaFileRepository;
@@ -43,7 +44,7 @@ public class TeachplanMediaServiceImpl implements TeachplanMediaService {
         // 验证课程计划是否存在
         Teachplan teachplan = teachplanRepository.findById(teachplanMediaDTO.getTeachplanId())
                 .orElseThrow(() -> new ContentException(ContentErrorCode.TEACHPLAN_NOT_EXISTS));
-        
+
         // 验证媒资是否存在 - 使用mediaFileId查询
         MediaFile mediaFile = mediaFileRepository.findByMediaFileId(teachplanMediaDTO.getMediaId())
                 .orElseThrow(() -> new ContentException(ContentErrorCode.MEDIA_NOT_EXISTS));
@@ -98,4 +99,4 @@ public class TeachplanMediaServiceImpl implements TeachplanMediaService {
         dto.setUrl(teachplanMedia.getMediaFile().getUrl());
         return dto;
     }
-} 
+}

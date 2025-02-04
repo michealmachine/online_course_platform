@@ -1,6 +1,7 @@
 package com.double2and9.content_service.repository;
 
 import com.double2and9.content_service.entity.CourseBase;
+import com.double2and9.content_service.entity.CourseTeacher;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -14,15 +15,18 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 
 @SpringBootTest
-class CourseBaseRepositoryTest {
+@Transactional
+public class CourseBaseRepositoryTest {
 
     @Autowired
     private CourseBaseRepository courseBaseRepository;
 
+    @Autowired
+    private CourseTeacherRepository courseTeacherRepository;
+
     private static final Long TEST_ORG_ID = 1234L; // 测试用机构ID
 
     @Test
-    @Transactional
     void testSaveCourse() {
         CourseBase courseBase = new CourseBase();
         courseBase.setName("测试课程");
@@ -64,5 +68,86 @@ class CourseBaseRepositoryTest {
         assertNotNull(result);
         assertTrue(result.getContent().stream()
                 .allMatch(course -> course.getOrganizationId().equals(TEST_ORG_ID)));
+    }
+
+    @Test
+    void testFindByTeacherId() {
+        // 创建测试数据
+        CourseBase course = new CourseBase();
+        course.setName("测试课程");
+        course.setOrganizationId(TEST_ORG_ID);
+        course = courseBaseRepository.save(course);
+
+        CourseTeacher teacher = new CourseTeacher();
+        teacher.setName("测试教师");
+        teacher.setOrganizationId(TEST_ORG_ID);
+        teacher.getCourses().add(course);
+        // 添加必需的时间字段
+        teacher.setCreateTime(new Date());
+        teacher.setUpdateTime(new Date());
+        teacher = courseTeacherRepository.save(teacher);
+
+        // 测试分页查询 - 使用新的方法名
+        Page<CourseBase> page = courseBaseRepository.findCoursesByTeacherId(
+                teacher.getId(),
+                PageRequest.of(0, 10));
+
+        // 验证
+        assertEquals(1, page.getTotalElements());
+        assertEquals("测试课程", page.getContent().get(0).getName());
+    }
+
+    @Test
+    void testFindByTeacherIdAndOrganizationId() {
+        // 创建测试数据
+        CourseBase course = new CourseBase();
+        course.setName("测试课程");
+        course.setOrganizationId(TEST_ORG_ID);
+        course = courseBaseRepository.save(course);
+
+        CourseTeacher teacher = new CourseTeacher();
+        teacher.setName("测试教师");
+        teacher.setOrganizationId(TEST_ORG_ID);
+        teacher.getCourses().add(course);
+        teacher.setCreateTime(new Date());
+        teacher.setUpdateTime(new Date());
+        teacher = courseTeacherRepository.save(teacher);
+
+        // 测试分页查询 - 使用新的方法名
+        Page<CourseBase> page = courseBaseRepository.findCoursesByTeacherIdAndOrganizationId(
+                teacher.getId(),
+                TEST_ORG_ID,
+                PageRequest.of(0, 10));
+
+        // 验证
+        assertEquals(1, page.getTotalElements());
+        assertEquals("测试课程", page.getContent().get(0).getName());
+    }
+
+    @Test
+    void testFindByOrganizationIdAndNameContainingAndStatus() {
+        // 准备测试数据
+        CourseBase course1 = new CourseBase();
+        course1.setName("Java课程");
+        course1.setOrganizationId(TEST_ORG_ID);
+        course1.setStatus("202001");
+        courseBaseRepository.save(course1);
+
+        CourseBase course2 = new CourseBase();
+        course2.setName("Python课程");
+        course2.setOrganizationId(TEST_ORG_ID);
+        course2.setStatus("202001");
+        courseBaseRepository.save(course2);
+
+        // 测试分页查询
+        Page<CourseBase> result = courseBaseRepository.findByOrganizationIdAndNameContainingAndStatus(
+                TEST_ORG_ID,
+                "Java",
+                "202001",
+                PageRequest.of(0, 10));
+
+        // 验证结果
+        assertEquals(1, result.getTotalElements());
+        assertEquals("Java课程", result.getContent().get(0).getName());
     }
 }
