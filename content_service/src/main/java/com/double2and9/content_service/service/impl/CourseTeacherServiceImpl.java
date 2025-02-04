@@ -1,6 +1,9 @@
 package com.double2and9.content_service.service.impl;
 
+import com.double2and9.base.dto.CommonResponse;
+import com.double2and9.base.dto.MediaFileDTO;
 import com.double2and9.base.enums.ContentErrorCode;
+import com.double2and9.content_service.client.MediaFeignClient;
 import com.double2and9.content_service.common.exception.ContentException;
 import com.double2and9.content_service.dto.CourseBaseDTO;
 import com.double2and9.content_service.dto.CourseTeacherDTO;
@@ -14,10 +17,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.modelmapper.ModelMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
-import java.util.Date;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -27,13 +29,16 @@ public class CourseTeacherServiceImpl implements CourseTeacherService {
     private final CourseTeacherRepository courseTeacherRepository;
     private final CourseBaseRepository courseBaseRepository;
     private final ModelMapper modelMapper;
+    private final MediaFeignClient mediaFeignClient;
 
     public CourseTeacherServiceImpl(CourseTeacherRepository courseTeacherRepository,
-                                  CourseBaseRepository courseBaseRepository,
-                                  ModelMapper modelMapper) {
+            CourseBaseRepository courseBaseRepository,
+            ModelMapper modelMapper,
+            MediaFeignClient mediaFeignClient) {
         this.courseTeacherRepository = courseTeacherRepository;
         this.courseBaseRepository = courseBaseRepository;
         this.modelMapper = modelMapper;
+        this.mediaFeignClient = mediaFeignClient;
     }
 
     @Override
@@ -43,8 +48,8 @@ public class CourseTeacherServiceImpl implements CourseTeacherService {
                 .map(teacher -> {
                     CourseTeacherDTO dto = modelMapper.map(teacher, CourseTeacherDTO.class);
                     dto.setCourseIds(teacher.getCourses().stream()
-                        .map(CourseBase::getId)
-                        .collect(Collectors.toSet()));
+                            .map(CourseBase::getId)
+                            .collect(Collectors.toSet()));
                     return dto;
                 })
                 .collect(Collectors.toList());
@@ -71,16 +76,15 @@ public class CourseTeacherServiceImpl implements CourseTeacherService {
         Set<CourseBase> courses = courseBaseRepository.findAllById(teacherDTO.getCourseIds())
                 .stream()
                 .collect(Collectors.toSet());
-        
+
         // 验证所有课程都属于同一机构
-        if (!courses.stream().allMatch(course -> 
-                course.getOrganizationId().equals(teacherDTO.getOrganizationId()))) {
+        if (!courses.stream().allMatch(course -> course.getOrganizationId().equals(teacherDTO.getOrganizationId()))) {
             throw new ContentException(ContentErrorCode.COURSE_ORG_NOT_MATCH);
         }
 
         teacher.setCourses(courses);
         courseTeacherRepository.save(teacher);
-        
+
         log.info("保存教师信息成功，教师ID：{}，关联课程数：{}", teacher.getId(), courses.size());
     }
 
@@ -119,8 +123,8 @@ public class CourseTeacherServiceImpl implements CourseTeacherService {
                 .map(teacher -> {
                     CourseTeacherDTO dto = modelMapper.map(teacher, CourseTeacherDTO.class);
                     dto.setCourseIds(teacher.getCourses().stream()
-                        .map(CourseBase::getId)
-                        .collect(Collectors.toSet()));
+                            .map(CourseBase::getId)
+                            .collect(Collectors.toSet()));
                     return dto;
                 })
                 .collect(Collectors.toList());
@@ -131,7 +135,7 @@ public class CourseTeacherServiceImpl implements CourseTeacherService {
     public List<CourseBaseDTO> listCoursesByTeacherId(Long teacherId) {
         CourseTeacher teacher = courseTeacherRepository.findById(teacherId)
                 .orElseThrow(() -> new ContentException(ContentErrorCode.TEACHER_NOT_EXISTS));
-        
+
         return teacher.getCourses().stream()
                 .map(course -> modelMapper.map(course, CourseBaseDTO.class))
                 .collect(Collectors.toList());
@@ -142,15 +146,102 @@ public class CourseTeacherServiceImpl implements CourseTeacherService {
     public CourseTeacherDTO getTeacherDetail(Long organizationId, Long teacherId) {
         CourseTeacher teacher = courseTeacherRepository.findById(teacherId)
                 .orElseThrow(() -> new ContentException(ContentErrorCode.TEACHER_NOT_EXISTS));
-        
+
         if (!teacher.getOrganizationId().equals(organizationId)) {
             throw new ContentException(ContentErrorCode.COURSE_ORG_NOT_MATCH);
         }
-        
+
         CourseTeacherDTO dto = modelMapper.map(teacher, CourseTeacherDTO.class);
         dto.setCourseIds(teacher.getCourses().stream()
-            .map(CourseBase::getId)
-            .collect(Collectors.toSet()));
+                .map(CourseBase::getId)
+                .collect(Collectors.toSet()));
         return dto;
     }
-} 
+
+    @Override
+    @Transactional
+    public String uploadTeacherAvatarTemp(Long teacherId, MultipartFile file) {
+        // 1. 验证教师存在
+        CourseTeacher teacher = courseTeacherRepository.findById(teacherId)
+                .orElseThrow(() -> new ContentException(ContentErrorCode.TEACHER_NOT_EXISTS));
+
+        try {
+            // 2. 上传到临时存储
+            CommonResponse<String> tempResponse = mediaFeignClient.uploadImageTemp(file);
+            if (!tempResponse.isSuccess()) {
+                throw new ContentException(ContentErrorCode.UPLOAD_LOGO_FAILED, tempResponse.getMessage());
+            }
+
+            log.info("教师头像上传到临时存储成功，教师ID：{}，临时key：{}", teacherId, tempResponse.getData());
+            return tempResponse.getData();
+        } catch (ContentException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("上传教师头像到临时存储失败：", e);
+            throw new ContentException(ContentErrorCode.UPLOAD_LOGO_FAILED);
+        }
+    }
+
+    @Override
+    @Transactional
+    public void confirmTeacherAvatar(Long teacherId, String tempKey) {
+        // 1. 获取教师信息
+        CourseTeacher teacher = courseTeacherRepository.findById(teacherId)
+                .orElseThrow(() -> new ContentException(ContentErrorCode.TEACHER_NOT_EXISTS));
+
+        try {
+            // 2. 保存到永久存储
+            Map<String, String> params = new HashMap<>();
+            params.put("tempKey", tempKey);
+            CommonResponse<MediaFileDTO> saveResponse = mediaFeignClient.saveTempFile(params);
+
+            if (!saveResponse.isSuccess()) {
+                throw new ContentException(ContentErrorCode.UPLOAD_LOGO_FAILED, saveResponse.getMessage());
+            }
+
+            // 3. 更新教师头像URL
+            MediaFileDTO mediaFileDTO = saveResponse.getData();
+            teacher.setAvatar(mediaFileDTO.getUrl());
+            courseTeacherRepository.save(teacher);
+
+            log.info("教师头像确认保存成功，教师ID：{}，文件ID：{}", teacherId, mediaFileDTO.getMediaFileId());
+        } catch (ContentException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("确认保存教师头像失败：", e);
+            throw new ContentException(ContentErrorCode.UPLOAD_LOGO_FAILED);
+        }
+    }
+
+    @Override
+    @Transactional
+    public void deleteTeacherAvatar(Long teacherId) {
+        // 1. 获取教师信息
+        CourseTeacher teacher = courseTeacherRepository.findById(teacherId)
+                .orElseThrow(() -> new ContentException(ContentErrorCode.TEACHER_NOT_EXISTS));
+
+        String avatarUrl = teacher.getAvatar();
+        if (avatarUrl == null || avatarUrl.isEmpty()) {
+            return; // 没有头像，直接返回
+        }
+
+        try {
+            // 2. 调用媒体服务删除文件
+            CommonResponse<?> response = mediaFeignClient.deleteMediaFile(avatarUrl);
+            if (!response.isSuccess()) {
+                throw new ContentException(ContentErrorCode.DELETE_LOGO_FAILED, response.getMessage());
+            }
+
+            // 3. 清除教师头像URL
+            teacher.setAvatar(null);
+            courseTeacherRepository.save(teacher);
+
+            log.info("教师头像删除成功，教师ID：{}", teacherId);
+        } catch (ContentException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("删除教师头像失败：", e);
+            throw new ContentException(ContentErrorCode.DELETE_LOGO_FAILED);
+        }
+    }
+}

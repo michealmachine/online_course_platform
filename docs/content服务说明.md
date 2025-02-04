@@ -38,6 +38,8 @@
   - name: 教师名称
   - position: 职位
   - organizationId: 机构ID
+  - description: 教师简介
+  - avatar: 教师头像URL (可选)
   
 - 关联关系:
   - 多对多 CourseBase (课程基本信息)
@@ -287,13 +289,17 @@ erDiagram
   ```
 
 ### 2. 教师相关DTO
-- CourseTeacherDTO：课程教师DTO
-  ```java
-  private Long id;              // 教师ID
-  private String name;          // 教师名称
-  private String position;      // 职位
-  private Set<Long> courseIds;  // 关联课程ID
-  ```
+- CourseTeacherDTO
+```java
+public class CourseTeacherDTO {
+    private Long id;              // 教师ID
+    private String name;          // 教师名称
+    private String position;      // 职位
+    private String description;   // 简介
+    private String avatar;        // 头像URL
+    private Set<Long> courseIds;  // 关联课程ID
+}
+```
 
 - SaveCourseTeacherDTO：保存教师DTO
   ```java

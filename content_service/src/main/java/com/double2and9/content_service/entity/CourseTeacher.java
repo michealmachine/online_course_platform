@@ -1,4 +1,5 @@
 package com.double2and9.content_service.entity;
+
 import jakarta.persistence.*;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -49,11 +50,7 @@ public class CourseTeacher {
      * 所属课程
      */
     @ManyToMany(fetch = FetchType.LAZY)
-    @JoinTable(
-        name = "course_teacher_relation",
-        joinColumns = @JoinColumn(name = "teacher_id"),
-        inverseJoinColumns = @JoinColumn(name = "course_id")
-    )
+    @JoinTable(name = "course_teacher_relation", joinColumns = @JoinColumn(name = "teacher_id"), inverseJoinColumns = @JoinColumn(name = "course_id"))
     @ToString.Exclude
     @EqualsAndHashCode.Exclude
     private Set<CourseBase> courses = new HashSet<>();
@@ -69,4 +66,11 @@ public class CourseTeacher {
      */
     @Column(nullable = false)
     private Date updateTime;
+
+    /**
+     * 教师头像URL
+     * 可选字段，存储头像图片的访问地址
+     */
+    @Column(length = 1024)
+    private String avatar;
 }

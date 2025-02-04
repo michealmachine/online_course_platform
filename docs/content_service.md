@@ -265,6 +265,45 @@ DELETE /course/{courseId}/logo
 }
 ```
 
+#### 4.1.5 教师头像管理接口
+```http
+# 上传教师头像到临时存储
+POST /course-teacher/{teacherId}/avatar/temp
+Content-Type: multipart/form-data
+
+请求参数：
+- file: 头像图片文件
+
+响应：
+{
+  "code": 0,
+  "message": "success",
+  "data": "temp-key-123" // 临时存储key
+}
+
+# 确认并保存临时头像
+POST /course-teacher/{teacherId}/avatar/confirm
+Content-Type: application/json
+
+请求参数：
+- tempKey: 临时存储key
+
+响应：
+{
+  "code": 0,
+  "message": "success"
+}
+
+# 删除教师头像
+DELETE /course-teacher/{teacherId}/avatar
+
+响应：
+{
+  "code": 0,
+  "message": "success"
+}
+```
+
 ### 4.2 课程计划接口
 #### 4.2.1 查询课程计划树
 http
@@ -333,6 +372,34 @@ sequenceDiagram
     Media->>DB: 保存媒资记录
     Media-->>Content: 返回访问URL
     Content->>DB: 更新课程封面URL
+    Content-->>Client: 返回处理结果
+```
+
+### 5.5 教师头像管理流程
+
+```mermaid
+sequenceDiagram
+    participant Client as 前端
+    participant Content as Content Service
+    participant Media as Media Service
+    participant Redis as Redis临时存储
+    participant MinIO as MinIO永久存储
+    participant DB as Database
+
+    Client->>Content: 上传教师头像请求
+    Content->>Media: Feign调用临时上传接口
+    Media->>Media: 校验文件
+    Media->>Redis: 存储临时文件
+    Media-->>Content: 返回临时key
+    Content-->>Client: 返回临时key
+    
+    Client->>Content: 确认保存请求
+    Content->>Media: Feign调用永久保存接口
+    Media->>Redis: 获取临时文件
+    Media->>MinIO: 保存到永久存储
+    Media->>DB: 保存媒资记录
+    Media-->>Content: 返回访问URL
+    Content->>DB: 更新教师头像URL
     Content-->>Client: 返回处理结果
 ```
 
@@ -667,6 +734,7 @@ json
 #### 10.2.1 查询课程计划树
 http
 GET /teachplan/tree/{courseId}
+
 **响应示例：**
 json
 {

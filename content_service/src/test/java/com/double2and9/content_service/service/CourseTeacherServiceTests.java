@@ -1,23 +1,35 @@
 package com.double2and9.content_service.service;
 
+import com.double2and9.base.dto.CommonResponse;
+import com.double2and9.base.dto.MediaFileDTO;
+import com.double2and9.content_service.client.MediaFeignClient;
 import com.double2and9.content_service.common.exception.ContentException;
 import com.double2and9.content_service.dto.AddCourseDTO;
 import com.double2and9.content_service.dto.CourseBaseDTO;
 import com.double2and9.content_service.dto.CourseTeacherDTO;
 import com.double2and9.content_service.dto.SaveCourseTeacherDTO;
+import com.double2and9.content_service.entity.CourseTeacher;
+import com.double2and9.content_service.repository.CourseTeacherRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.annotation.Rollback;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
-
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verify;
 
 @SpringBootTest
 @Transactional
@@ -31,6 +43,12 @@ public class CourseTeacherServiceTests {
 
     @Autowired
     private CourseBaseService courseBaseService;
+
+    @Autowired
+    private CourseTeacherRepository courseTeacherRepository;
+
+    @MockBean
+    private MediaFeignClient mediaFeignClient;
 
     private Long courseId;
 
@@ -182,5 +200,81 @@ public class CourseTeacherServiceTests {
         Long wrongOrgId = 9999L;
         assertThrows(ContentException.class,
                 () -> courseTeacherService.getTeacherDetail(wrongOrgId, teacherId));
+    }
+
+    @Test
+    void testTeacherAvatar_TwoPhase() throws IOException {
+        // 1. 创建测试教师
+        SaveCourseTeacherDTO teacherDTO = new SaveCourseTeacherDTO();
+        teacherDTO.setOrganizationId(TEST_ORG_ID);
+        teacherDTO.setName("测试教师");
+        teacherDTO.setPosition("讲师");
+        teacherDTO.setCourseIds(Set.of(courseId));
+        courseTeacherService.saveCourseTeacher(teacherDTO);
+
+        List<CourseTeacherDTO> teachers = courseTeacherService.listByCourseId(courseId);
+        Long teacherId = teachers.get(0).getId();
+
+        // 2. 准备测试文件
+        MultipartFile file = new MockMultipartFile(
+                "file",
+                "test.jpg",
+                "image/jpeg",
+                "test image content".getBytes());
+
+        // 3. Mock临时上传响应
+        when(mediaFeignClient.uploadImageTemp(any()))
+                .thenReturn(CommonResponse.success("temp-key-123"));
+
+        // 4. Mock永久保存响应
+        MediaFileDTO mediaFileDTO = new MediaFileDTO();
+        mediaFileDTO.setMediaFileId("test-file-id");
+        mediaFileDTO.setUrl("/test/url");
+        when(mediaFeignClient.saveTempFile(any()))
+                .thenReturn(CommonResponse.success(mediaFileDTO));
+
+        // 5. 执行临时上传
+        String tempKey = courseTeacherService.uploadTeacherAvatarTemp(teacherId, file);
+        assertEquals("temp-key-123", tempKey);
+
+        // 6. 执行确认保存
+        courseTeacherService.confirmTeacherAvatar(teacherId, tempKey);
+
+        // 7. 验证调用和结果
+        verify(mediaFeignClient).uploadImageTemp(any());
+        verify(mediaFeignClient).saveTempFile(argThat(params -> "temp-key-123".equals(params.get("tempKey"))));
+
+        CourseTeacherDTO updatedTeacher = courseTeacherService.getTeacherDetail(TEST_ORG_ID, teacherId);
+        assertEquals("/test/url", updatedTeacher.getAvatar());
+    }
+
+    @Test
+    void testDeleteTeacherAvatar() {
+        // 1. 创建带头像的教师
+        SaveCourseTeacherDTO teacherDTO = new SaveCourseTeacherDTO();
+        teacherDTO.setOrganizationId(TEST_ORG_ID);
+        teacherDTO.setName("测试教师");
+        teacherDTO.setCourseIds(Set.of(courseId));
+        courseTeacherService.saveCourseTeacher(teacherDTO);
+
+        List<CourseTeacherDTO> teachers = courseTeacherService.listByCourseId(courseId);
+        Long teacherId = teachers.get(0).getId();
+
+        // 2. 设置头像URL
+        CourseTeacher teacher = courseTeacherRepository.findById(teacherId).orElseThrow();
+        teacher.setAvatar("/test/url");
+        courseTeacherRepository.save(teacher);
+
+        // 3. Mock删除响应
+        when(mediaFeignClient.deleteMediaFile(any()))
+                .thenReturn(CommonResponse.success(null));
+
+        // 4. 执行删除
+        courseTeacherService.deleteTeacherAvatar(teacherId);
+
+        // 5. 验证结果
+        verify(mediaFeignClient).deleteMediaFile("/test/url");
+        CourseTeacherDTO updatedTeacher = courseTeacherService.getTeacherDetail(TEST_ORG_ID, teacherId);
+        assertNull(updatedTeacher.getAvatar());
     }
 }
