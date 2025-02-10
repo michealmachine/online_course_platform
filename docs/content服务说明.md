@@ -9,16 +9,17 @@
   - brief: 课程简介
   - logo: 课程封面图片URL
   - mt/st: 课程分类(大类/小类)
-  - status: 课程状态
+  - status: 课程业务状态(DRAFT/PUBLISHED/OFFLINE)
   - organizationId: 机构ID
   - qq: 咨询QQ
-  - valid: 课程有效性标识，true表示有效，false表示已删除
+  - valid: 课程有效性标识
 
 - 关联关系:
   - 一对一 CourseMarket (共享主键)
-  - 一对多 Teachplan (通过course_id关联)
-  - 一对多 CourseTeacher (通过course_id关联)
-  - 与CoursePublish/CoursePublishPre的关联需要补充实体类
+  - 一对多 Teachplan
+  - 多对多 CourseTeacher
+  - 一对一 CoursePublish (共享主键)
+  - 一对一 CoursePublishPre (共享主键)
 
 ### 2. CourseMarket (课程营销信息)
 - 主要字段:
@@ -82,23 +83,22 @@
 - 主要字段:
   - id: 与课程ID相同
   - name: 课程名称
-  - status: 发布状态
+  - status: 发布状态(PUBLISHED/OFFLINE)
   - publishTime: 发布时间
-  
+
 - 关联关系:
-  - 一对一 CourseBase (课程基本信息)
-  - 使用@MapsId共享主键
+  - 一对一 CourseBase (共享主键)
 
 ### 7. CoursePublishPre (课程预发布)
 - 主要字段:
   - id: 与课程ID相同
   - name: 课程名称
-  - status: 审核状态
+  - status: 审核状态(SUBMITTED/APPROVED/REJECTED)
+  - auditMessage: 审核意见
   - previewTime: 预览时间
-  
+
 - 关联关系:
-  - 一对一 CourseBase (课程基本信息)
-  - 使用@MapsId共享主键
+  - 一对一 CourseBase (共享主键)
 
 ### 8. MediaFile (媒资文件)
 - 主要字段:
@@ -172,28 +172,26 @@ erDiagram
 ### 1. CourseBaseService (课程基础服务)
 - 主要功能：
   - 课程的CRUD操作
-  - 课程分页查询
-  - 课程分类树查询
-  - 课程预览
+  - 课程状态管理
   - 课程审核流程管理
   - 课程发布管理
 
 - 关键方法：
   ```java
-  // 创建课程
+  // 创建课程(初始状态为草稿)
   Long createCourse(AddCourseDTO addCourseDTO);
   
-  // 分页查询课程
-  PageResult<CourseBaseDTO> queryCourseList(PageParams params, QueryCourseParamsDTO queryParams);
-  
-  // 课程预览
-  CoursePreviewDTO preview(Long courseId);
-  
-  // 提交审核
+  // 提交审核(创建/更新预发布记录)
   void submitForAudit(Long courseId);
   
-  // 审核课程
+  // 审核课程(更新预发布记录状态)
   void auditCourse(CourseAuditDTO auditDTO);
+  
+  // 发布课程(创建发布记录)
+  void publishCourse(Long courseId);
+  
+  // 下线课程
+  void offlineCourse(Long courseId);
   ```
 
 ### 2. TeachplanService (课程计划服务)
@@ -711,32 +709,43 @@ public class CourseTeacherDTO {
 
 #### 2. 提交课程审核
 - 请求方法：POST
-- 请求路径：/content/course/{courseId}/audit
-- 响应体：
-```json
-{
-    "code": 0,
-    "message": "success"
-}
-```
+- 请求路径：/content/course/{courseId}/audit/submit
+- 响应说明：
+  - 课程必须处于草稿状态
+  - 课程信息必须完整(包括课程计划和教师)
+  - 成功后创建预发布记录,状态为SUBMITTED
 
-#### 3. 课程审核
+#### 3. 审核课程
 - 请求方法：POST
-- 请求路径：/content/course/{courseId}/audit/result
+- 请求路径：/content/course/audit
 - 请求体：
 ```json
 {
-    "auditStatus": "202303",
-    "auditMessage": "审核通过"
+    "courseId": 1,
+    "auditStatus": "pass/reject",
+    "auditMessage": "审核意见"
 }
 ```
-- 响应体：
-```json
-{
-    "code": 0,
-    "message": "success"
-}
-```
+- 响应说明：
+  - 课程必须处于已提交审核状态
+  - 审核不通过必须填写审核意见
+  - 更新预发布记录状态为APPROVED/REJECTED
+
+#### 4. 发布课程
+- 请求方法：POST
+- 请求路径：/content/course/{courseId}/publish
+- 响应说明：
+  - 课程必须审核通过
+  - 更新课程状态为PUBLISHED
+  - 创建发布记录
+
+#### 5. 下线课程
+- 请求方法：POST
+- 请求路径：/content/course/{courseId}/offline
+- 响应说明：
+  - 课程必须处于已发布状态
+  - 更新课程状态为OFFLINE
+  - 更新发布记录状态
 
 ### 课程计划接口
 
@@ -970,3 +979,75 @@ public class CourseBaseDTO {
 3. 权限验证说明
    - 当前通过API路径参数传入机构ID进行验证
    - 后续将通过Token获取机构ID，实现更严格的权限控制
+
+# Content Service 状态管理说明
+
+## 1. 状态定义
+
+### 1.1 课程业务状态 (CourseStatusEnum)
+- DRAFT("202001", "草稿") - 初始状态
+- PUBLISHED("202002", "已发布")
+- OFFLINE("202003", "已下线")
+
+### 1.2 课程审核状态 (CourseAuditStatusEnum)
+- SUBMITTED("202301", "已提交审核")
+- APPROVED("202302", "审核通过")
+- REJECTED("202303", "审核不通过")
+
+## 2. 状态流转说明
+
+### 2.1 课程业务状态流转
+1. 创建课程 -> DRAFT
+2. 发布课程 -> PUBLISHED
+3. 下线课程 -> OFFLINE
+
+### 2.2 课程审核状态流转
+1. 提交审核 -> SUBMITTED
+2. 审核通过 -> APPROVED
+3. 审核不通过 -> REJECTED
+
+### 2.3 状态流转规则
+1. 课程创建后初始状态为草稿(DRAFT)
+2. 只有审核通过(APPROVED)的课程才能发布
+3. 只有已发布(PUBLISHED)的课程才能下线
+4. 已发布的课程不能重复发布
+5. 已下线的课程不能重复下线
+6. 已发布的课程不能删除
+
+## 3. 实体关系说明
+
+### 3.1 CourseBase (课程基本信息)
+- status: 记录课程业务状态
+- 一对一关联 CoursePublishPre 和 CoursePublish
+
+### 3.2 CoursePublishPre (课程预发布)
+- status: 记录课程审核状态
+- 审核通过后可以进行发布操作
+
+### 3.3 CoursePublish (课程发布)
+- status: 记录课程发布状态
+- 发布后的课程信息快照
+
+## 4. 关键操作说明
+
+### 4.1 提交审核
+1. 检查课程当前状态
+2. 验证课程信息完整性
+3. 创建/更新 CoursePublishPre 记录
+4. 设置审核状态为 SUBMITTED
+
+### 4.2 审核操作
+1. 检查课程是否处于待审核状态
+2. 更新 CoursePublishPre 的审核状态
+3. 记录审核意见(如果有)
+
+### 4.3 发布课程
+1. 检查课程审核状态是否为 APPROVED
+2. 更新课程基本状态为 PUBLISHED
+3. 创建/更新 CoursePublish 记录
+4. 设置发布时间和状态
+
+### 4.4 下线课程
+1. 检查课程是否处于已发布状态
+2. 更新课程基本状态为 OFFLINE
+3. 更新 CoursePublish 状态为 OFFLINE

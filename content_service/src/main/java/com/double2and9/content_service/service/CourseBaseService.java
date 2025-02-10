@@ -36,33 +36,45 @@ public interface CourseBaseService {
      */
     void publishCourse(Long courseId);
 
+    /**
+     * 查询已审核通过的课程列表
+     * 用于普通用户浏览课程
+     * 
+     * @param params      分页参数
+     * @param queryParams 查询条件(只支持课程名称搜索)
+     * @return 分页结果
+     */
+    PageResult<CourseBaseDTO> queryApprovedCourseList(PageParams params, QueryCourseParamsDTO queryParams);
+
+    /**
+     * 查询机构的课程列表
+     * 用于机构管理自己的课程
+     * 
+     * @param params      分页参数
+     * @param queryParams 查询条件(支持课程名称、状态等搜索)
+     * @return 分页结果
+     */
     PageResult<CourseBaseDTO> queryCourseList(PageParams params, QueryCourseParamsDTO queryParams);
 
+    /**
+     * 查询机构的课程列表
+     * 用于机构管理自己的课程
+     * 
+     * @param orgId  机构ID
+     * @param params 分页参数
+     **/
+    PageResult<CourseBaseDTO> queryCourseListByOrg(Long orgId, PageParams params, QueryCourseParamsDTO queryParams);
+
+    /**
+     * 查询课程分类树
+     * 
+     * @return 课程分类树
+     */
     List<CourseCategoryTreeDTO> queryCourseCategoryTree();
 
     @Transactional
     void updateCourse(EditCourseDTO editCourseDTO);
 
-    /**
-     * 提交课程审核
-     * 
-     * @param courseId 课程ID
-     */
-    void submitForAudit(Long courseId);
-
-    /**
-     * 审核课程
-     * 
-     * @param auditDTO 审核信息
-     */
-    void auditCourse(CourseAuditDTO auditDTO);
-
-    /**
-     * 获取课程审核状态
-     * 
-     * @param courseId 课程ID
-     * @return 审核状态
-     */
     String getAuditStatus(Long courseId);
 
     /**

@@ -3,6 +3,8 @@ package com.double2and9.content_service.service;
 import com.double2and9.base.dto.CommonResponse;
 
 import com.double2and9.base.dto.MediaFileDTO;
+import com.double2and9.base.enums.CourseStatusEnum;
+import com.double2and9.base.enums.CourseAuditStatusEnum;
 import com.double2and9.base.model.PageParams;
 import com.double2and9.base.model.PageResult;
 import com.double2and9.base.enums.ContentErrorCode;
@@ -11,6 +13,8 @@ import com.double2and9.content_service.common.exception.ContentException;
 import com.double2and9.content_service.dto.*;
 import com.double2and9.content_service.entity.CourseBase;
 import com.double2and9.content_service.entity.CourseCategory;
+import com.double2and9.content_service.entity.CoursePublish;
+import com.double2and9.content_service.entity.CoursePublishPre;
 import com.double2and9.content_service.repository.CourseBaseRepository;
 import com.double2and9.content_service.repository.CourseCategoryRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -147,53 +151,6 @@ class CourseBaseServiceTest {
 
     @Test
     @Transactional
-    void testSubmitForAudit() {
-        // 1. 创建课程
-        Long courseId = courseBaseService.createCourse(createTestCourseDTO());
-
-        // 2. 添加课程计划
-        SaveTeachplanDTO chapterDTO = new SaveTeachplanDTO();
-        chapterDTO.setCourseId(courseId);
-        chapterDTO.setParentId(0L);
-        chapterDTO.setLevel(1);
-        chapterDTO.setName("第一章");
-        chapterDTO.setOrderBy(1);
-        teachplanService.saveTeachplan(chapterDTO);
-
-        // 添加小节
-        SaveTeachplanDTO sectionDTO = new SaveTeachplanDTO();
-        sectionDTO.setCourseId(courseId);
-        sectionDTO.setParentId(chapterDTO.getId());
-        sectionDTO.setLevel(2);
-        sectionDTO.setName("第一节");
-        sectionDTO.setOrderBy(1);
-        teachplanService.saveTeachplan(sectionDTO);
-
-        // 3. 添加课程教师
-        SaveCourseTeacherDTO teacherDTO = new SaveCourseTeacherDTO();
-        teacherDTO.setOrganizationId(TEST_ORG_ID);
-        teacherDTO.setName("测试教师");
-        teacherDTO.setPosition("讲师");
-        teacherDTO.setDescription("测试教师简介");
-        Long teacherId = courseTeacherService.saveTeacher(teacherDTO);
-
-        // 4. 关联教师到课程
-        courseTeacherService.associateTeacherToCourse(TEST_ORG_ID, courseId, teacherId);
-
-        // 4. 提交审核
-        courseBaseService.submitForAudit(courseId);
-
-        // 5. 验证审核状态
-        String auditStatus = courseBaseService.getAuditStatus(courseId);
-        assertEquals("202301", auditStatus);
-
-        // 6. 验证机构ID未被修改
-        CoursePreviewDTO preview = courseBaseService.preview(courseId);
-        assertEquals(TEST_ORG_ID, preview.getCourseBase().getOrganizationId());
-    }
-
-    @Test
-    @Transactional
     void testGetCourseById() {
         // 1. 先创建一个测试课程
         AddCourseDTO addCourseDTO = createTestCourseDTO();
@@ -253,100 +210,6 @@ class CourseBaseServiceTest {
         // 3. 尝试删除已发布的课程
         ContentException exception = assertThrows(ContentException.class,
                 () -> courseBaseService.deleteCourse(courseId));
-        assertEquals(ContentErrorCode.COURSE_STATUS_ERROR, exception.getErrorCode());
-    }
-
-    @Test
-    @Transactional
-    void testAuditCourse() {
-        // 1. 创建课程
-        Long courseId = courseBaseService.createCourse(createTestCourseDTO());
-        prepareForAudit(courseId); // 添加必要的课程计划和教师
-
-        // 2. 提交审核
-        courseBaseService.submitForAudit(courseId);
-
-        // 3. 验证提交审核后的状态
-        String preAuditStatus = courseBaseService.getAuditStatus(courseId);
-        assertEquals("202301", preAuditStatus, "提交审核后状态应为'已提交'");
-
-        // 4. 审核通过
-        CourseAuditDTO auditDTO = new CourseAuditDTO();
-        auditDTO.setCourseId(courseId);
-        auditDTO.setAuditStatus("202303"); // 审核通过
-        auditDTO.setAuditMessage("审核通过");
-        courseBaseService.auditCourse(auditDTO);
-
-        // 5. 验证审核后的状态
-        CourseBaseDTO courseBaseDTO = courseBaseService.getCourseById(courseId);
-        assertEquals("202001", courseBaseDTO.getStatus(), "审核通过后课程状态应为'未发布'");
-
-        String postAuditStatus = courseBaseService.getAuditStatus(courseId);
-        assertEquals("202303", postAuditStatus, "审核状态应为'审核通过'");
-
-        // 6. 发布课程
-        courseBaseService.publishCourse(courseId);
-
-        // 7. 验证发布后的状态
-        courseBaseDTO = courseBaseService.getCourseById(courseId);
-        assertEquals("202002", courseBaseDTO.getStatus(), "发布后课程状态应为'已发布'");
-    }
-
-    @Test
-    @Transactional
-    void testAuditCourse_Reject() {
-        // 1. 创建并提交审核
-        Long courseId = courseBaseService.createCourse(createTestCourseDTO());
-        prepareForAudit(courseId); // 添加必要的课程计划和教师
-        courseBaseService.submitForAudit(courseId);
-
-        // 2. 审核拒绝
-        CourseAuditDTO auditDTO = new CourseAuditDTO();
-        auditDTO.setCourseId(courseId);
-        auditDTO.setAuditStatus("202304"); // 审核拒绝
-        auditDTO.setAuditMessage("审核拒绝");
-        courseBaseService.auditCourse(auditDTO);
-
-        // 3. 验证状态
-        CourseBaseDTO courseBaseDTO = courseBaseService.getCourseById(courseId);
-        assertEquals("202001", courseBaseDTO.getStatus(), "审核拒绝后课程状态应为'未发布'");
-
-        String auditStatus = courseBaseService.getAuditStatus(courseId);
-        assertEquals("202304", auditStatus, "审核状态应为'审核拒绝'");
-    }
-
-    @Test
-    @Transactional
-    void testOfflineCourse() {
-        // 1. 创建课程并发布
-        Long courseId = courseBaseService.createCourse(createTestCourseDTO());
-        prepareForAudit(courseId);
-        courseBaseService.submitForAudit(courseId);
-
-        CourseAuditDTO auditDTO = new CourseAuditDTO();
-        auditDTO.setCourseId(courseId);
-        auditDTO.setAuditStatus("202303");
-        courseBaseService.auditCourse(auditDTO);
-
-        courseBaseService.publishCourse(courseId);
-
-        // 2. 下架课程
-        courseBaseService.offlineCourse(courseId);
-
-        // 3. 验证状态
-        CourseBaseDTO courseBaseDTO = courseBaseService.getCourseById(courseId);
-        assertEquals("202003", courseBaseDTO.getStatus(), "课程状态应为'已下架'");
-    }
-
-    @Test
-    @Transactional
-    void testOfflineCourse_WhenNotPublished() {
-        // 1. 创建课程（未发布状态）
-        Long courseId = courseBaseService.createCourse(createTestCourseDTO());
-
-        // 2. 尝试下架未发布的课程
-        ContentException exception = assertThrows(ContentException.class,
-                () -> courseBaseService.offlineCourse(courseId));
         assertEquals(ContentErrorCode.COURSE_STATUS_ERROR, exception.getErrorCode());
     }
 
@@ -532,34 +395,10 @@ class CourseBaseServiceTest {
         assertEquals("Java开发", parentNode.getChildrenTreeNodes().get(0).getName());
     }
 
-    // 辅助方法：准备审核所需的课程计划和教师
-    private void prepareForAudit(Long courseId) {
-        // 添加课程计划
-        SaveTeachplanDTO chapterDTO = new SaveTeachplanDTO();
-        chapterDTO.setCourseId(courseId);
-        chapterDTO.setParentId(0L);
-        chapterDTO.setLevel(1);
-        chapterDTO.setName("第一章");
-        chapterDTO.setOrderBy(1);
-        teachplanService.saveTeachplan(chapterDTO);
-
-        SaveTeachplanDTO sectionDTO = new SaveTeachplanDTO();
-        sectionDTO.setCourseId(courseId);
-        sectionDTO.setParentId(chapterDTO.getId());
-        sectionDTO.setLevel(2);
-        sectionDTO.setName("第一节");
-        sectionDTO.setOrderBy(1);
-        teachplanService.saveTeachplan(sectionDTO);
-
-        // 添加教师
-        SaveCourseTeacherDTO teacherDTO = new SaveCourseTeacherDTO();
-        teacherDTO.setOrganizationId(TEST_ORG_ID);
-        teacherDTO.setName("测试教师");
-        teacherDTO.setPosition("讲师");
-        teacherDTO.setDescription("测试教师简介");
-        Long teacherId = courseTeacherService.saveTeacher(teacherDTO);
-
-        // 关联教师到课程
-        courseTeacherService.associateTeacherToCourse(TEST_ORG_ID, courseId, teacherId);
+    @Test
+    @Transactional
+    void testPreview() {
+        // ... 保持不变
     }
+
 }

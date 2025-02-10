@@ -1,5 +1,6 @@
 package com.double2and9.content_service.controller;
 
+import com.double2and9.base.enums.CourseStatusEnum;
 import com.double2and9.base.model.PageParams;
 import com.double2and9.base.model.PageResult;
 import com.double2and9.content_service.common.exception.ContentException;
@@ -9,33 +10,36 @@ import com.double2and9.content_service.dto.CourseCategoryTreeDTO;
 import com.double2and9.content_service.dto.AddCourseDTO;
 import com.double2and9.content_service.dto.EditCourseDTO;
 import com.double2and9.content_service.dto.CoursePreviewDTO;
-import com.double2and9.content_service.dto.CourseAuditDTO;
 import com.double2and9.content_service.service.CourseBaseService;
 import com.double2and9.content_service.common.model.ContentResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.multipart.MultipartFile;
-
+import com.double2and9.base.enums.ContentErrorCode;
 import java.util.List;
+import java.util.Map;
+import java.util.HashMap;
 
 /**
  * 课程管理控制器
  * 提供课程相关的REST API接口,包括:
  * - 课程基本信息的CRUD操作
- * - 课程封面管理(两步式上传)
- * - 课程审核和发布流程
- * - 课程分类管理
- *
- * 审核权限接口说明：
- * 1. /admin/* 路径下的接口需要管理员权限
- * 2. /audit/* 路径下的接口需要审核人员权限
- * 3. /organization/* 路径下的接口需要机构权限且只能操作自己机构的数据
+ * - 课程封面管理
+ * - 课程发布和下架
+ * 
+ * 权限说明：
+ * 1. 管理员权限接口 (/admin/*)
+ * - 可以查看和操作所有机构的课程
+ * 
+ * 2. 机构权限接口 (/organization/*)
+ * - 只能操作自己机构的课程
  */
-@Tag(name = "课程管理", description = "提供课程的增删改查、审核、发布等接口")
+@Tag(name = "课程管理", description = "提供课程的增删改查、发布等接口")
 @Slf4j
 @RestController
 @RequestMapping("/course")
@@ -47,14 +51,10 @@ public class CourseController {
         this.courseBaseService = courseBaseService;
     }
 
-    @Operation(summary = "分页查询课程列表")
-    @GetMapping("/list")
-    public ContentResponse<PageResult<CourseBaseDTO>> list(
-            @Parameter(description = "分页参数") PageParams pageParams,
-            @Parameter(description = "查询条件") QueryCourseParamsDTO queryParams) {
-        return ContentResponse.success(courseBaseService.queryCourseList(pageParams, queryParams));
-    }
-
+    /**
+     * 创建课程
+     * 权限：机构用户（只能为自己机构创建课程）
+     */
     @Operation(summary = "创建课程", description = "创建新的课程，包含基本信息和营销信息")
     @PostMapping
     public ContentResponse<Long> createCourse(
@@ -83,22 +83,6 @@ public class CourseController {
         return ContentResponse.success(courseBaseService.preview(courseId));
     }
 
-    @Operation(summary = "提交课程审核")
-    @PostMapping("/{courseId}/audit/submit")
-    public ContentResponse<Void> submitForAudit(
-            @Parameter(description = "课程ID") @PathVariable Long courseId) {
-        courseBaseService.submitForAudit(courseId);
-        return ContentResponse.success(null);
-    }
-
-    @Operation(summary = "审核课程")
-    @PostMapping("/audit")
-    public ContentResponse<Void> auditCourse(
-            @Parameter(description = "审核信息") @RequestBody @Validated CourseAuditDTO auditDTO) {
-        courseBaseService.auditCourse(auditDTO);
-        return ContentResponse.success(null);
-    }
-
     @Operation(summary = "获取课程详情")
     @GetMapping("/{courseId}")
     public ContentResponse<CourseBaseDTO> getCourseById(
@@ -119,6 +103,10 @@ public class CourseController {
         return ContentResponse.success(null);
     }
 
+    /**
+     * 发布课程
+     * 权限：机构用户（只能发布本机构的已审核通过的课程）
+     */
     @Operation(summary = "发布课程")
     @PostMapping("/{courseId}/publish")
     public ContentResponse<Void> publishCourse(
@@ -129,6 +117,12 @@ public class CourseController {
         return ContentResponse.success(null);
     }
 
+    /**
+     * 下架课程
+     * 权限：
+     * - 机构用户：只能下架本机构的课程
+     * - 管理员：可下架任意课程
+     */
     @Operation(summary = "下架课程")
     @PostMapping("/{courseId}/offline")
     public ContentResponse<Void> offlineCourse(
@@ -140,41 +134,26 @@ public class CourseController {
     }
 
     /**
-     * 查询机构的课程列表
-     * 权限要求：机构权限，只能查询自己机构的课程
+     * 查询机构课程列表
+     * 权限：
+     * - 机构用户：只能查询本机构课程
      */
     @Operation(summary = "查询机构课程列表", description = "查询指定机构的课程列表，支持状态筛选")
     @GetMapping("/organization/{organizationId}")
     public ContentResponse<PageResult<CourseBaseDTO>> queryCourseList(
             @Parameter(description = "机构ID", required = true) @PathVariable Long organizationId,
             @Parameter(description = "课程状态") @RequestParam(required = false) String status,
-            @Parameter(description = "审核状态") @RequestParam(required = false) String auditStatus,
             @Parameter(description = "分页参数") PageParams pageParams) {
 
-        log.info("查询机构课程列表，机构ID：{}，状态：{}，审核状态：{}",
-                organizationId, status, auditStatus);
+        log.info("查询机构课程列表，机构ID：{}，状态：{}", organizationId, status);
 
         // 构建查询参数
         QueryCourseParamsDTO queryParams = new QueryCourseParamsDTO();
-        queryParams.setOrganizationId(organizationId);
         queryParams.setStatus(status);
-        queryParams.setAuditStatus(auditStatus);
 
+        // 使用 queryCourseListByOrg 方法,强制限制机构ID
         return ContentResponse.success(
-                courseBaseService.queryCourseList(pageParams, queryParams));
-    }
-
-    /**
-     * 重新提交审核
-     * 注意：后续会加入认证和鉴权，确保只能重新提交自己机构的课程
-     */
-    @Operation(summary = "重新提交审核", description = "将审核不通过的课程重新提交审核")
-    @PostMapping("/{courseId}/resubmit")
-    public ContentResponse<Void> resubmitForAudit(
-            @Parameter(description = "课程ID", required = true) @PathVariable Long courseId) {
-        log.info("重新提交课程审核，课程ID：{}", courseId);
-        courseBaseService.submitForAudit(courseId);
-        return ContentResponse.success(null);
+                courseBaseService.queryCourseListByOrg(organizationId, pageParams, queryParams));
     }
 
     /**
@@ -185,6 +164,8 @@ public class CourseController {
      * @param file     封面图片文件
      * @return 临时存储的key
      * @throws ContentException 当课程不存在或上传失败时
+     *                          上传课程封面（两步式上传）
+     *                          权限：机构用户（只能为本机构课程上传封面）
      */
     @Operation(summary = "上传课程封面到临时存储")
     @PostMapping("/{courseId}/logo/temp")
@@ -204,6 +185,9 @@ public class CourseController {
      * @param courseId 课程ID
      * @param tempKey  临时存储key
      * @throws ContentException 当课程不存在、临时文件不存在或保存失败时
+     *                          确认课程封面
+     *                          权限：机构用户（只能为本机构课程确认封面）
+     * 
      */
     @Operation(summary = "确认并保存临时课程封面")
     @PostMapping("/{courseId}/logo/confirm")
@@ -222,6 +206,7 @@ public class CourseController {
      *
      * @param courseId 课程ID
      * @throws ContentException 当课程不存在或删除失败时
+     *                          权限：机构用户（只能删除本机构课程的封面）
      */
     @Operation(summary = "删除课程封面")
     @DeleteMapping("/{courseId}/logo")
@@ -234,8 +219,8 @@ public class CourseController {
     }
 
     /**
-     * 管理员查询所有课程列表
-     * 权限要求：管理员权限
+     * 管理员查询所有课程
+     * 权限：仅管理员
      */
     @Operation(summary = "管理员查询课程列表", description = "管理员查询所有机构的课程列表，支持多条件筛选")
     @GetMapping("/admin/list")
@@ -257,5 +242,16 @@ public class CourseController {
 
         return ContentResponse.success(
                 courseBaseService.queryCourseList(pageParams, queryParams));
+    }
+
+    /**
+     * 查询已通过审核的课程列表
+     */
+    @Operation(summary = "查询已通过审核的课程列表")
+    @GetMapping("/list")
+    public ContentResponse<PageResult<CourseBaseDTO>> listApprovedCourses(
+            @Parameter(description = "分页参数") PageParams pageParams,
+            @Parameter(description = "查询条件") QueryCourseParamsDTO queryParams) {
+        return ContentResponse.success(courseBaseService.queryApprovedCourseList(pageParams, queryParams));
     }
 }

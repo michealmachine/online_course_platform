@@ -152,24 +152,62 @@ Content-Type: {{contentType}}
 ### 11. 提交课程审核
 POST {{host}}/course/{{courseId}}/audit/submit
 
+> {%
+    client.test("提交审核成功", function() {
+        client.assert(response.status === 200, "Response status is not 200");
+        client.assert(response.body.code === "0", "Response code is not 0");
+    });
+%}
+
+### 11.1 检查提交审核后的状态
+GET {{host}}/course/{{courseId}}
+
+> {%
+    client.test("检查审核状态", function() {
+        client.assert(response.status === 200, "Response status is not 200");
+        client.assert(response.body.data.status === CourseStatusEnum.SUBMITTED.getCode(), 
+            "Status is not 202004 (已提交审核)");
+    });
+%}
+
 ### 12. 审核课程（通过）
 POST {{host}}/course/audit
-Content-Type: {{contentType}}
+Content-Type: application/json
 
 {
   "courseId": {{courseId}},
-  "auditStatus": "202303",
-  "auditMessage": "课程内容完整，审核通过"
+  "auditStatus": "pass"
 }
 
-### 13. 发布课程
-POST {{host}}/course/{{courseId}}/publish
-
-### 14. 分页查询课程（验证发布后的课程可以被查询到）
-GET {{host}}/course/list?pageNo=1&pageSize=10&courseName=Java&organizationId=1234&status=202002
-
-### 15. 查询课程详情
+### 12.1 检查审核通过后的状态
 GET {{host}}/course/{{courseId}}
 
-### 16. 下架课程
+> {%
+    client.test("检查审核通过状态", function() {
+        client.assert(response.status === 200, "Response status is not 200");
+        client.assert(response.body.data.status === CourseStatusEnum.APPROVED.getCode(), 
+            "Status is not 202005 (审核通过)");
+    });
+%}
+
+### 13. 审核课程（不通过）
+POST {{host}}/course/audit
+Content-Type: application/json
+
+{
+  "courseId": {{courseId}},
+  "auditStatus": "reject",
+  "auditMessage": "课程内容需要完善"
+}
+
+### 14. 发布课程
+POST {{host}}/course/{{courseId}}/publish
+
+### 15. 分页查询课程（验证发布后的课程可以被查询到）
+GET {{host}}/course/list?pageNo=1&pageSize=10&courseName=Java&organizationId=1234&status=202002
+
+### 16. 查询课程详情
+GET {{host}}/course/{{courseId}}
+
+### 17. 下架课程
 POST {{host}}/course/{{courseId}}/offline

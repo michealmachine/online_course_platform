@@ -1,14 +1,18 @@
 package com.double2and9.base.enums;
 
+import com.double2and9.base.exception.ErrorCode;
 import lombok.Getter;
 
+/**
+ * 内容服务错误码
+ */
 @Getter
 public enum ContentErrorCode {
     // 课程相关错误 1001xx
     COURSE_NOT_EXISTS(100101, "课程不存在"),
     COURSE_NAME_EMPTY(100102, "课程名称不能为空"),
     COURSE_CATEGORY_NOT_EXISTS(100103, "课程分类不存在"),
-    COURSE_AUDIT_STATUS_ERROR(100104, "课程审核状态错误"),
+    COURSE_AUDIT_STATUS_ERROR(100106, "课程审核状态错误"),
     COURSE_STATUS_ERROR(100105, "课程状态错误"),
     COURSE_PUBLISH_ERROR(100106, "课程发布失败"),
     COURSE_ORG_NOT_MATCH(100106, "课程与机构不匹配"),
@@ -45,7 +49,11 @@ public enum ContentErrorCode {
      */
     PARAMS_ERROR(100100, "参数错误"),
     PARAMS_EMPTY(100101, "必填参数为空"),
-    PARAMS_INVALID(100102, "参数格式不正确");
+    PARAMS_INVALID(100102, "参数格式不正确"),
+
+    PARAM_ERROR(400001, "参数错误"),
+    FILE_UPLOAD_ERROR(400007, "文件上传失败"),
+    FILE_DELETE_ERROR(400008, "文件删除失败");
 
     private final int code;
     private final String message;
@@ -54,4 +62,5 @@ public enum ContentErrorCode {
         this.code = code;
         this.message = message;
     }
+
 }

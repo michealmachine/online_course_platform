@@ -63,4 +63,7 @@ public interface CourseBaseRepository extends JpaRepository<CourseBase, Long>, J
                         String name,
                         String status,
                         Pageable pageable);
+
+        @Query("SELECT c FROM CourseBase c JOIN c.coursePublishPre p WHERE p.status = :status")
+        Page<CourseBase> findByPublishPreStatus(@Param("status") String status, Pageable pageable);
 }

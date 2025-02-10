@@ -170,6 +170,9 @@ content_service/
     - 202001：未发布
     - 202002：已发布
     - 202003：已下线
+    - 202004：已提交审核
+    - 202005：审核通过
+    - 202006：审核不通过
 对应枚举类：CourseStatusEnum
 
 - 审核状态：
@@ -1459,3 +1462,173 @@ GET /content/course/list?pageNo=1&pageSize=10&organizationId=1234
 3. 错误码应当具有明确的业务含义
 4. 响应消息应当清晰描述操作结果或错误原因
 5. 敏感信息不应在响应中返回
+```
+
+### 课程审核状态流转
+
+```mermaid
+stateDiagram-v2
+    [*] --> 未提交: 创建课程
+    未提交 --> 已提交: 提交审核
+    已提交 --> 审核通过: 审核通过
+    已提交 --> 审核不通过: 审核拒绝
+    审核不通过 --> 已提交: 修改重提
+    审核通过 --> 已发布: 发布课程
+```
+
+状态说明:
+- 未提交(202301): 课程创建后的初始状态
+- 已提交(202302): 提交审核后的状态
+- 审核通过(202303): 审核人员审核通过
+- 审核不通过(202304): 审核人员审核拒绝
+- 已发布(202304): 审核通过后发布
+
+注意:
+1. CourseBase 和 CoursePublishPre 的状态需要同步修改
+2. 只有未提交或审核不通过状态可以提交审核
+3. 只有审核通过状态可以发布课程
+4. 状态变更需要在事务中完成
+
+## 11. 待优化事项
+
+### 11.1 课程审核流程优化
+1. 当前问题:
+   - 审核人员可以看到所有课程
+   - 没有区分待审核/已审核课程的查询
+   - 缺少审核工作流的管理
+
+2. 优化方向:
+   - 审核人员只能看到待审核的课程
+   - 添加审核任务列表接口
+   - 支持按审核状态筛选(待审核/已审核/审核不通过)
+   - 记录审核历史
+   - 优化审核工作流程
+
+3. 具体改进计划:
+   ```java
+   // 待添加的接口
+   public interface CourseAuditService {
+       // 查询待审核课程列表
+       PageResult<CourseAuditDTO> getPendingAuditCourses(PageParams pageParams);
+       
+       // 查询审核历史
+       PageResult<CourseAuditHistoryDTO> getAuditHistory(Long courseId);
+       
+       // 分配审核任务
+       void assignAuditTask(Long courseId, Long auditorId);
+   }
+   ```
+
+4. 数据模型调整:
+   - 添加审核任务表(course_audit_task)
+   - 添加审核历史表(course_audit_history)
+   - 完善审核状态流转记录
+
+5. 接口调整:
+   - POST /course/audit/tasks - 获取审核任务列表
+   - GET /course/audit/history/{courseId} - 获取审核历史
+   - POST /course/audit/assign - 分配审核任务
+
+## 12. 系统重构计划
+
+### 12.1 接口职责分离
+
+#### 当前问题
+1. 审核与课程基本信息混杂
+   - CourseController 中混合了审核和基础信息接口
+   - 职责不清导致维护困难
+   - 权限控制不够清晰
+
+#### 优化方案
+1. 拆分控制器
+```java
+@RestController
+@RequestMapping("/course/audit")
+public class CourseAuditController {
+    // 审核相关接口
+    @PostMapping("/submit")
+    public ContentResponse<Void> submitForAudit(Long courseId);
+    
+    @PostMapping("/approve")
+    public ContentResponse<Void> approveAudit(CourseAuditDTO auditDTO);
+    
+    @GetMapping("/tasks")
+    public ContentResponse<PageResult<CourseAuditTaskDTO>> getAuditTasks(PageParams pageParams);
+}
+```
+
+2. 服务层职责划分
+```java
+public interface CourseAuditService {
+    // 提交审核
+    void submitForAudit(Long courseId);
+    
+    // 审核操作
+    void auditCourse(CourseAuditDTO auditDTO);
+    
+    // 查询审核任务
+    PageResult<CourseAuditTaskDTO> getAuditTasks(PageParams pageParams);
+    
+    // 查询审核历史
+    List<CourseAuditHistoryDTO> getAuditHistory(Long courseId);
+}
+```
+
+### 12.2 数据模型优化
+
+#### 当前问题
+1. 审核数据与课程数据耦合
+2. 缺少审核任务和历史记录
+3. 状态流转不够清晰
+
+#### 优化方案
+1. 新增数据表
+```sql
+-- 审核任务表
+CREATE TABLE course_audit_task (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    course_id BIGINT NOT NULL,
+    auditor_id BIGINT,
+    status VARCHAR(10) NOT NULL,
+    create_time DATETIME NOT NULL,
+    update_time DATETIME NOT NULL,
+    FOREIGN KEY (course_id) REFERENCES course_base(id)
+);
+
+-- 审核历史表
+CREATE TABLE course_audit_history (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    course_id BIGINT NOT NULL,
+    auditor_id BIGINT NOT NULL,
+    audit_status VARCHAR(10) NOT NULL,
+    audit_message VARCHAR(500),
+    audit_time DATETIME NOT NULL,
+    FOREIGN KEY (course_id) REFERENCES course_base(id)
+);
+```
+
+2. 实体关系调整
+```mermaid
+erDiagram
+    CourseBase ||--|| CoursePublishPre : has
+    CoursePublishPre ||--o{ CourseAuditTask : generates
+    CourseAuditTask ||--o{ CourseAuditHistory : records
+```
+
+### 12.3 接口重构计划
+
+1. 审核流程接口
+   - /course/audit/tasks - 获取审核任务列表
+   - /course/audit/tasks/{taskId}/approve - 审核通过
+   - /course/audit/tasks/{taskId}/reject - 审核拒绝
+   - /course/audit/history/{courseId} - 查询审核历史
+
+2. 权限控制
+   - 审核人员只能看到待审核任务
+   - 机构用户只能看到自己的课程审核状态
+   - 管理员可以查看所有审核记录
+
+3. 状态流转规范
+   - 明确区分业务状态和审核状态
+   - 完善状态流转的日志记录
+   - 添加状态变更通知机制

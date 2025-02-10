@@ -1,4 +1,5 @@
 package com.double2and9.content_service.entity;
+
 import jakarta.persistence.*;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -26,8 +27,11 @@ public class CoursePublishPre {
     private String name;
 
     /**
-     * 预发布状态
-     * 例如：已提交、审核中、审核通过、审核未通过等
+     * 审核状态
+     * 使用 CourseAuditStatusEnum:
+     * 202004: 已提交审核
+     * 202005: 审核通过
+     * 202006: 审核不通过
      */
     @Column(length = 20)
     private String status;
@@ -59,8 +63,8 @@ public class CoursePublishPre {
     /**
      * 对应的课程基本信息
      */
-    @MapsId
     @OneToOne(fetch = FetchType.LAZY)
+    @MapsId
     @JoinColumn(name = "id")
     @ToString.Exclude
     @EqualsAndHashCode.Exclude

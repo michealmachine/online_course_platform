@@ -1,5 +1,6 @@
 package com.double2and9.content_service.entity;
 
+import com.double2and9.base.enums.CourseStatusEnum;
 import jakarta.persistence.*;
 import lombok.Data;
 import lombok.ToString;
@@ -74,12 +75,14 @@ public class CourseBase {
     private String charge;
 
     /**
-     * 课程状态
-     * 对应数据字典: course_status
-     * 例如：未发布、已发布、已下线等
+     * 课程业务状态
+     * 使用 CourseStatusEnum:
+     * 202001: 草稿
+     * 202002: 已发布
+     * 202003: 已下线
      */
     @Column(length = 20)
-    private String status;
+    private String status = CourseStatusEnum.DRAFT.getCode(); // 默认为草稿状态
 
     /**
      * 课程有效性，true有效，false无效
@@ -150,4 +153,10 @@ public class CourseBase {
      */
     @Column(name = "organization_id", nullable = false)
     private Long organizationId;
+
+    /**
+     * 审核人ID
+     */
+    @Column(name = "auditor_id")
+    private Long auditorId;
 }

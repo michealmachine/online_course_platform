@@ -1,7 +1,10 @@
 package com.double2and9.content_service.repository;
 
+import com.double2and9.base.enums.CourseAuditStatusEnum;
+import com.double2and9.base.enums.CourseStatusEnum;
 import com.double2and9.content_service.entity.CourseBase;
 import com.double2and9.content_service.entity.CourseTeacher;
+import com.double2and9.content_service.entity.CoursePublishPre;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -149,5 +152,58 @@ public class CourseBaseRepositoryTest {
         // 验证结果
         assertEquals(1, result.getTotalElements());
         assertEquals("Java课程", result.getContent().get(0).getName());
+    }
+
+    @Test
+    void testFindByPublishPreStatus() {
+        // 1. 准备测试数据
+        CourseBase courseBase = new CourseBase();
+        courseBase.setName("测试课程");
+        courseBase.setBrief("测试简介");
+        courseBase.setOrganizationId(TEST_ORG_ID); // 设置机构ID
+        courseBase.setStatus(CourseStatusEnum.DRAFT.getCode()); // 设置课程状态
+        courseBase.setCreateTime(new Date()); // 设置创建时间
+        courseBase.setUpdateTime(new Date()); // 设置更新时间
+        courseBase.setValid(true); // 设置有效标志
+
+        // 创建预发布记录
+        CoursePublishPre publishPre = new CoursePublishPre();
+        publishPre.setStatus(CourseAuditStatusEnum.SUBMITTED.getCode());
+        publishPre.setName(courseBase.getName()); // 设置预发布记录的名称
+        publishPre.setCourseBase(courseBase);
+        publishPre.setCreateTime(new Date()); // 设置创建时间
+        publishPre.setUpdateTime(new Date()); // 设置更新时间
+        courseBase.setCoursePublishPre(publishPre);
+
+        courseBaseRepository.save(courseBase);
+
+        // 2. 测试查询
+        Page<CourseBase> result = courseBaseRepository.findByPublishPreStatus(
+                CourseAuditStatusEnum.SUBMITTED.getCode(),
+                PageRequest.of(0, 10));
+
+        // 3. 验证结果
+        assertNotNull(result);
+        assertTrue(result.hasContent());
+        assertEquals(1, result.getTotalElements());
+        assertEquals(courseBase.getId(), result.getContent().get(0).getId());
+
+        // 验证预发布记录
+        CoursePublishPre foundPublishPre = result.getContent().get(0).getCoursePublishPre();
+        assertNotNull(foundPublishPre);
+        assertEquals(CourseAuditStatusEnum.SUBMITTED.getCode(), foundPublishPre.getStatus());
+        assertEquals(courseBase.getName(), foundPublishPre.getName());
+    }
+
+    @Test
+    void testFindByPublishPreStatusWhenEmpty() {
+        // 测试没有数据时的情况
+        Page<CourseBase> result = courseBaseRepository.findByPublishPreStatus(
+                CourseAuditStatusEnum.SUBMITTED.getCode(),
+                PageRequest.of(0, 10));
+
+        assertNotNull(result);
+        assertFalse(result.hasContent());
+        assertEquals(0, result.getTotalElements());
     }
 }

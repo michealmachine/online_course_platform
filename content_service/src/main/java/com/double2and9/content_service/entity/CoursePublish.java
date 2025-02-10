@@ -1,4 +1,5 @@
 package com.double2and9.content_service.entity;
+
 import jakarta.persistence.*;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -26,8 +27,11 @@ public class CoursePublish {
     private String name;
 
     /**
-     * 发布状态
-     * 例如：未发布、已发布、下线等
+     * 课程业务状态
+     * 使用 CourseStatusEnum:
+     * 202002: 已发布
+     * 202003: 已下线
+     * 注：发布记录只能是已发布或已下线状态
      */
     @Column(length = 20)
     private String status;

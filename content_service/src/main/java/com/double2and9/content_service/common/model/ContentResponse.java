@@ -16,10 +16,18 @@ public class ContentResponse<T> {
         return response;
     }
 
+    public static <T> ContentResponse<T> success(T data, String message) {
+        ContentResponse<T> response = new ContentResponse<>();
+        response.setCode(0);
+        response.setMessage(message);
+        response.setData(data);
+        return response;
+    }
+
     public static <T> ContentResponse<T> error(int code, String message) {
         ContentResponse<T> response = new ContentResponse<>();
         response.setCode(code);
         response.setMessage(message);
         return response;
     }
-} 
+}

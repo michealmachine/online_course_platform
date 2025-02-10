@@ -3,12 +3,11 @@ package com.double2and9.base.enums;
 import lombok.Getter;
 
 /**
- * 课程状态
+ * 课程业务状态
  */
 @Getter
 public enum CourseStatusEnum {
-    
-    DRAFT("202001", "未发布"),
+    DRAFT("202001", "草稿"),
     PUBLISHED("202002", "已发布"),
     OFFLINE("202003", "已下线");
 
@@ -28,4 +27,4 @@ public enum CourseStatusEnum {
         }
         return null;
     }
-} 
+}

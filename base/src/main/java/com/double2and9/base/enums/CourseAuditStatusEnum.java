@@ -7,11 +7,9 @@ import lombok.Getter;
  */
 @Getter
 public enum CourseAuditStatusEnum {
-    
-    SUBMITTED("202301", "已提交"),
-    AUDITING("202302", "审核中"),
-    APPROVED("202303", "审核通过"),
-    REJECTED("202304", "审核不通过");
+    SUBMITTED("202004", "已提交审核"),
+    APPROVED("202005", "审核通过"),
+    REJECTED("202006", "审核不通过");
 
     private final String code;
     private final String desc;
@@ -29,4 +27,4 @@ public enum CourseAuditStatusEnum {
         }
         return null;
     }
-} 
+}
