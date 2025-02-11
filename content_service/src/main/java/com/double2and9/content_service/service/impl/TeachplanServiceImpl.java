@@ -52,10 +52,10 @@ public class TeachplanServiceImpl implements TeachplanService {
             } else {
                 TeachplanDTO parentNode = teachplanMap.get(parentId);
                 if (parentNode != null) {
-                    if (parentNode.getTeachPlanTreeNodes() == null) {
-                        parentNode.setTeachPlanTreeNodes(new ArrayList<>());
+                    if (parentNode.getChildren() == null) {
+                        parentNode.setChildren(new ArrayList<>());
                     }
-                    parentNode.getTeachPlanTreeNodes().add(dto);
+                    parentNode.getChildren().add(dto);
                 }
             }
         });

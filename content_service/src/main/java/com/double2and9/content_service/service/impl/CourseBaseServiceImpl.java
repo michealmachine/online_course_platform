@@ -200,15 +200,17 @@ public class CourseBaseServiceImpl implements CourseBaseService {
             CourseCategoryTreeDTO node = modelMapper.map(category, CourseCategoryTreeDTO.class);
             nodeMap.put(node.getId(), node);
 
-            if (category.getParentId() == 0L) {
+            // 处理parentId为null的情况
+            Long parentId = category.getParentId();
+            if (parentId == null || parentId == 0L) {
                 rootNodes.add(node);
             } else {
-                CourseCategoryTreeDTO parentNode = nodeMap.get(category.getParentId());
+                CourseCategoryTreeDTO parentNode = nodeMap.get(parentId);
                 if (parentNode != null) {
-                    if (parentNode.getChildrenTreeNodes() == null) {
-                        parentNode.setChildrenTreeNodes(new ArrayList<>());
+                    if (parentNode.getChildren() == null) {
+                        parentNode.setChildren(new ArrayList<>());
                     }
-                    parentNode.getChildrenTreeNodes().add(node);
+                    parentNode.getChildren().add(node);
                 }
             }
         });

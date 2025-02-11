@@ -1,37 +1,21 @@
 package com.double2and9.content_service.dto;
 
+import com.double2and9.content_service.dto.base.CourseBaseInfoDTO;
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
-import lombok.ToString;
-import jakarta.validation.constraints.NotEmpty;
-import jakarta.validation.constraints.NotNull;
-import java.math.BigDecimal;
+import lombok.EqualsAndHashCode;
 
 @Data
-@ToString
-public class EditCourseDTO {
-    @NotNull(message = "课程id不能为空")
-    private Long id;
-    
-    @NotEmpty(message = "课程名称不能为空")
-    private String name;
-    
-    @NotEmpty(message = "课程简介不能为空")
-    private String brief;
-    
-    private String logo;
-    
-    @NotNull(message = "课程大分类不能为空")
-    private Long mt;
-    
-    @NotNull(message = "课程小分类不能为空")
-    private Long st;
-    
-    @NotEmpty(message = "收费规则不能为空")
-    private String charge;
-    
-    private BigDecimal price;
-    private BigDecimal priceOld;
+@EqualsAndHashCode(callSuper = true)
+@Schema(description = "编辑课程DTO")
+public class EditCourseDTO extends CourseBaseInfoDTO {
+
+    @Schema(description = "QQ")
     private String qq;
+
+    @Schema(description = "优惠信息")
     private String discounts;
+
+    @Schema(description = "是否有效")
     private Boolean valid;
-} 
+}

@@ -1,6 +1,5 @@
 package com.double2and9.base.enums;
 
-import com.double2and9.base.exception.ErrorCode;
 import lombok.Getter;
 
 /**

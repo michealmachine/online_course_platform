@@ -1632,3 +1632,52 @@ erDiagram
    - 明确区分业务状态和审核状态
    - 完善状态流转的日志记录
    - 添加状态变更通知机制
+
+### 10.3 DTO设计优化
+
+#### 10.3.1 基础DTO抽取
+1. CourseBaseInfoDTO - 课程基础信息
+```java
+@Data
+@Schema(description = "课程基础信息DTO")
+public class CourseBaseInfoDTO {
+    @Schema(description = "课程ID")
+    private Long id;
+    
+    @Schema(description = "课程名称")
+    @NotEmpty(message = "课程名称不能为空") 
+    private String name;
+    
+    // ... 其他基础字段
+}
+```
+
+2. TreeNodeDTO - 树形结构基类
+```java
+@Data
+public class TreeNodeDTO<T> {
+    @Schema(description = "节点ID")
+    private Long id;
+    
+    @Schema(description = "节点名称")
+    private String name;
+    
+    @Schema(description = "父节点ID")
+    private Long parentId;
+    
+    @Schema(description = "子节点列表")
+    private List<T> children;
+}
+```
+
+#### 10.3.2 命名规范统一
+1. 树形结构子节点统一命名为 children
+2. 校验注解统一使用 @NotEmpty/@NotNull
+3. Swagger注解统一使用 @Schema
+
+#### 10.3.3 优化效果
+1. 提高代码复用性
+2. 减少重复代码
+3. 统一命名规范
+4. 简化维护工作
+5. 提升代码质量
