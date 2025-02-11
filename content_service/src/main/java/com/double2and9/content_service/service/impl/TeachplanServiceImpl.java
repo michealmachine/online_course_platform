@@ -9,12 +9,14 @@ import com.double2and9.content_service.entity.Teachplan;
 import com.double2and9.content_service.repository.CourseBaseRepository;
 import com.double2and9.content_service.repository.TeachplanRepository;
 import com.double2and9.content_service.service.TeachplanService;
+import com.double2and9.content_service.utils.TreeUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.modelmapper.ModelMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -34,33 +36,20 @@ public class TeachplanServiceImpl implements TeachplanService {
 
     @Override
     public List<TeachplanDTO> findTeachplanTree(Long courseId) {
-        // 查询所有课程计划
+        // 1. 查询所有课程计划
         List<Teachplan> teachplans = teachplanRepository.findByCourseBaseIdOrderByOrderBy(courseId);
-
-        // 将课程计划转换为树形结构
-        List<TeachplanDTO> chapters = new ArrayList<>();
-        Map<Long, TeachplanDTO> teachplanMap = new HashMap<>();
-
-        teachplans.forEach(teachplan -> {
-            TeachplanDTO dto = modelMapper.map(teachplan, TeachplanDTO.class);
-            teachplanMap.put(dto.getId(), dto);
-
-            // 处理parentId为null的情况
-            Long parentId = teachplan.getParentId();
-            if (parentId == null || parentId == 0L) {
-                chapters.add(dto);
-            } else {
-                TeachplanDTO parentNode = teachplanMap.get(parentId);
-                if (parentNode != null) {
-                    if (parentNode.getChildren() == null) {
-                        parentNode.setChildren(new ArrayList<>());
-                    }
-                    parentNode.getChildren().add(dto);
-                }
-            }
-        });
-
-        return chapters;
+        
+        // 2. 转换为DTO
+        List<TeachplanDTO> teachplanDTOs = teachplans.stream()
+                .map(teachplan -> modelMapper.map(teachplan, TeachplanDTO.class))
+                .collect(Collectors.toList());
+        
+        // 3. 使用工具类构建树形结构
+        return TreeUtils.buildTree(
+                teachplanDTOs,
+                TeachplanDTO::getId,  // ID获取函数
+                TeachplanDTO::getParentId  // 父ID获取函数
+        );
     }
 
     @Override

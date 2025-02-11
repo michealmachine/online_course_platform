@@ -17,6 +17,7 @@ import com.double2and9.content_service.repository.TeachplanRepository;
 import com.double2and9.content_service.repository.CourseTeacherRepository;
 import com.double2and9.content_service.repository.MediaFileRepository;
 import com.double2and9.content_service.service.CourseBaseService;
+import com.double2and9.content_service.utils.TreeUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.modelmapper.ModelMapper;
 import org.springframework.data.domain.Page;
@@ -188,34 +189,20 @@ public class CourseBaseServiceImpl implements CourseBaseService {
      */
     @Override
     public List<CourseCategoryTreeDTO> queryCourseCategoryTree() {
-        // 查询所有课程分类
+        // 1. 查询所有课程分类
         List<CourseCategory> categories = courseCategoryRepository.findAll();
-
-        // 将课程分类转换为树形结构
-        List<CourseCategoryTreeDTO> rootNodes = new ArrayList<>();
-        Map<Long, CourseCategoryTreeDTO> nodeMap = new HashMap<>();
-
-        // 转换所有节点
-        categories.forEach(category -> {
-            CourseCategoryTreeDTO node = modelMapper.map(category, CourseCategoryTreeDTO.class);
-            nodeMap.put(node.getId(), node);
-
-            // 处理parentId为null的情况
-            Long parentId = category.getParentId();
-            if (parentId == null || parentId == 0L) {
-                rootNodes.add(node);
-            } else {
-                CourseCategoryTreeDTO parentNode = nodeMap.get(parentId);
-                if (parentNode != null) {
-                    if (parentNode.getChildren() == null) {
-                        parentNode.setChildren(new ArrayList<>());
-                    }
-                    parentNode.getChildren().add(node);
-                }
-            }
-        });
-
-        return rootNodes;
+        
+        // 2. 转换为DTO
+        List<CourseCategoryTreeDTO> categoryDTOs = categories.stream()
+                .map(category -> modelMapper.map(category, CourseCategoryTreeDTO.class))
+                .collect(Collectors.toList());
+        
+        // 3. 使用工具类构建树形结构
+        return TreeUtils.buildTree(
+                categoryDTOs,
+                CourseCategoryTreeDTO::getId,
+                CourseCategoryTreeDTO::getParentId
+        );
     }
 
     /**
