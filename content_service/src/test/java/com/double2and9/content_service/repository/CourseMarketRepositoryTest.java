@@ -9,7 +9,7 @@ import org.springframework.test.annotation.Rollback;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.util.Date;
+import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -34,8 +34,8 @@ public class CourseMarketRepositoryTest {
         courseBase.setName("测试课程");
         courseBase.setBrief("测试课程简介");
         courseBase.setOrganizationId(TEST_ORG_ID);
-        courseBase.setCreateTime(new Date());
-        courseBase.setUpdateTime(new Date());
+        courseBase.setCreateTime(LocalDateTime.now());
+        courseBase.setUpdateTime(LocalDateTime.now());
         courseBase = courseBaseRepository.save(courseBase);
 
         // 2. 创建CourseMarket
@@ -46,8 +46,8 @@ public class CourseMarketRepositoryTest {
         courseMarket.setPriceOld(new BigDecimal("199.99"));
         courseMarket.setDiscounts("限时优惠");
         courseMarket.setValid(true);
-        courseMarket.setCreateTime(new Date());
-        courseMarket.setUpdateTime(new Date());
+        courseMarket.setCreateTime(LocalDateTime.now());
+        courseMarket.setUpdateTime(LocalDateTime.now());
 
         // 3. 建立双向关联
         courseMarket.setCourseBase(courseBase);
@@ -70,8 +70,8 @@ public class CourseMarketRepositoryTest {
         courseBase.setName("测试课程");
         courseBase.setBrief("测试课程简介");
         courseBase.setOrganizationId(TEST_ORG_ID);
-        courseBase.setCreateTime(new Date());
-        courseBase.setUpdateTime(new Date());
+        courseBase.setCreateTime(LocalDateTime.now());
+        courseBase.setUpdateTime(LocalDateTime.now());
         courseBase = courseBaseRepository.save(courseBase);
 
         // 2. 创建并保存CourseMarket
@@ -81,8 +81,8 @@ public class CourseMarketRepositoryTest {
         courseMarket.setPrice(BigDecimal.valueOf(100));
         courseMarket.setCharge("201001"); // 设置收费规则
         courseMarket.setValid(true);
-        courseMarket.setCreateTime(new Date());
-        courseMarket.setUpdateTime(new Date());
+        courseMarket.setCreateTime(LocalDateTime.now());
+        courseMarket.setUpdateTime(LocalDateTime.now());
 
         // 建立双向关联
         courseBase.setCourseMarket(courseMarket);

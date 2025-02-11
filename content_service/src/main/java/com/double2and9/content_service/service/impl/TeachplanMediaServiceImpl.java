@@ -15,6 +15,7 @@ import org.modelmapper.ModelMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.Date;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -60,8 +61,8 @@ public class TeachplanMediaServiceImpl implements TeachplanMediaService {
                 TeachplanMedia teachplanMedia = new TeachplanMedia();
                 teachplanMedia.setTeachplan(teachplan);
                 teachplanMedia.setMediaFile(mediaFile);
-                teachplanMedia.setCreateTime(new Date());
-                teachplanMedia.setUpdateTime(new Date());
+                teachplanMedia.setCreateTime(LocalDateTime.now());
+                teachplanMedia.setUpdateTime(LocalDateTime.now());
                 teachplanMediaRepository.save(teachplanMedia);
             }
 

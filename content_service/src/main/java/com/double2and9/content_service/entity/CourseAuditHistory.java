@@ -27,6 +27,12 @@ public class CourseAuditHistory {
     private Long auditorId;
 
     @Column(name = "audit_time", nullable = false)
-    @Temporal(TemporalType.TIMESTAMP)
-    private Date auditTime;
+    private LocalDateTime auditTime;
+
+    @PrePersist
+    public void prePersist() {
+        if (auditTime == null) {
+            auditTime = LocalDateTime.now();
+        }
+    }
 }

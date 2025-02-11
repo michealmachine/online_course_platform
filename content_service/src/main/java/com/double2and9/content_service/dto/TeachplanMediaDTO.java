@@ -4,6 +4,7 @@ import lombok.Data;
 import lombok.ToString;
 import jakarta.validation.constraints.NotNull;
 import io.swagger.v3.oas.annotations.media.Schema;
+import java.time.LocalDateTime;
 
 @Data
 @ToString
@@ -25,4 +26,10 @@ public class TeachplanMediaDTO {
     
     @Schema(description = "媒资文件URL")
     private String url;
+
+    @Schema(description = "创建时间")
+    private LocalDateTime createTime;
+
+    @Schema(description = "更新时间")
+    private LocalDateTime updateTime;
 } 

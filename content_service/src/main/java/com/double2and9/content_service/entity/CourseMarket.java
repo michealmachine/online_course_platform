@@ -5,7 +5,7 @@ import lombok.EqualsAndHashCode;
 import lombok.ToString;
 
 import java.math.BigDecimal;
-import java.util.Date;
+import java.time.LocalDateTime;
 
 /**
  * 课程营销信息
@@ -53,14 +53,14 @@ public class CourseMarket {
     /**
      * 创建时间
      */
-    @Temporal(TemporalType.TIMESTAMP)
-    private Date createTime;
+    @Column
+    private LocalDateTime createTime;
 
     /**
      * 更新时间
      */
-    @Temporal(TemporalType.TIMESTAMP)
-    private Date updateTime;
+    @Column
+    private LocalDateTime updateTime;
 
     /**
      * 对应的课程基本信息

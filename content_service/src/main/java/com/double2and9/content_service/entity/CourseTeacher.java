@@ -5,6 +5,7 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.ToString;
 
+import java.time.LocalDateTime;
 import java.util.Date;
 import java.util.HashSet;
 import java.util.Set;
@@ -59,13 +60,13 @@ public class CourseTeacher {
      * 创建时间
      */
     @Column(nullable = false)
-    private Date createTime;
+    private LocalDateTime createTime;
 
     /**
      * 更新时间
      */
     @Column(nullable = false)
-    private Date updateTime;
+    private LocalDateTime updateTime;
 
     /**
      * 教师头像URL

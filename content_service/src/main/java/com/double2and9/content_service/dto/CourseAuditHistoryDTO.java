@@ -2,7 +2,7 @@ package com.double2and9.content_service.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
-import java.util.Date;
+import java.time.LocalDateTime;
 
 @Data
 @Schema(description = "课程审核历史")
@@ -30,5 +30,5 @@ public class CourseAuditHistoryDTO {
     private String auditMessage;
 
     @Schema(description = "审核时间")
-    private Date auditTime;
+    private LocalDateTime auditTime;
 }

@@ -12,7 +12,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.test.annotation.Rollback;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Date;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -55,8 +55,8 @@ public class TeachplanMediaRepositoryTest {
         TeachplanMedia teachplanMedia = new TeachplanMedia();
         teachplanMedia.setTeachplan(teachplan);
         teachplanMedia.setMediaFile(mediaFile);
-        teachplanMedia.setCreateTime(new Date());
-        teachplanMedia.setUpdateTime(new Date());
+        teachplanMedia.setCreateTime(LocalDateTime.now());
+        teachplanMedia.setUpdateTime(LocalDateTime.now());
 
         // 执行保存
         TeachplanMedia saved = teachplanMediaRepository.save(teachplanMedia);
@@ -85,8 +85,8 @@ public class TeachplanMediaRepositoryTest {
         TeachplanMedia teachplanMedia = new TeachplanMedia();
         teachplanMedia.setTeachplan(teachplan);
         teachplanMedia.setMediaFile(mediaFile);
-        teachplanMedia.setCreateTime(new Date());
-        teachplanMedia.setUpdateTime(new Date());
+        teachplanMedia.setCreateTime(LocalDateTime.now());
+        teachplanMedia.setUpdateTime(LocalDateTime.now());
         teachplanMediaRepository.save(teachplanMedia);
 
         // 执行查询
@@ -115,8 +115,8 @@ public class TeachplanMediaRepositoryTest {
         TeachplanMedia teachplanMedia = new TeachplanMedia();
         teachplanMedia.setTeachplan(teachplan);
         teachplanMedia.setMediaFile(mediaFile);
-        teachplanMedia.setCreateTime(new Date());
-        teachplanMedia.setUpdateTime(new Date());
+        teachplanMedia.setCreateTime(LocalDateTime.now());
+        teachplanMedia.setUpdateTime(LocalDateTime.now());
         teachplanMediaRepository.save(teachplanMedia);
 
         // 执行查询
@@ -142,8 +142,8 @@ public class TeachplanMediaRepositoryTest {
         teachplan.setCourseBase(courseBase);
         teachplan.setLevel(1);
         teachplan.setOrderBy(1);
-        teachplan.setCreateTime(new Date());
-        teachplan.setUpdateTime(new Date());
+        teachplan.setCreateTime(LocalDateTime.now());
+        teachplan.setUpdateTime(LocalDateTime.now());
         teachplan = teachplanRepository.save(teachplan);
 
         // 创建两个媒资文件并关联到同一个课程计划
@@ -174,8 +174,8 @@ public class TeachplanMediaRepositoryTest {
         mediaFile.setOrganizationId(TEST_ORG_ID);
         mediaFile.setFileName(fileName);
         mediaFile.setMediaType("VIDEO");
-        mediaFile.setCreateTime(new Date());
-        mediaFile.setUpdateTime(new Date());
+        mediaFile.setCreateTime(LocalDateTime.now());
+        mediaFile.setUpdateTime(LocalDateTime.now());
         return mediaFileRepository.save(mediaFile);
     }
 
@@ -186,8 +186,8 @@ public class TeachplanMediaRepositoryTest {
         TeachplanMedia teachplanMedia = new TeachplanMedia();
         teachplanMedia.setTeachplan(teachplan);
         teachplanMedia.setMediaFile(mediaFile);
-        teachplanMedia.setCreateTime(new Date());
-        teachplanMedia.setUpdateTime(new Date());
+        teachplanMedia.setCreateTime(LocalDateTime.now());
+        teachplanMedia.setUpdateTime(LocalDateTime.now());
         return teachplanMediaRepository.save(teachplanMedia);
     }
 }

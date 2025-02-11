@@ -5,8 +5,8 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.ToString;
 
+import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Date;
 
 /**
  * 课程计划（大纲）
@@ -49,14 +49,14 @@ public class Teachplan {
     /**
      * 创建时间
      */
-    @Temporal(TemporalType.TIMESTAMP)
-    private Date createTime;
+    @Column(name = "create_time")
+    private LocalDateTime createTime;
 
     /**
      * 更新时间
      */
-    @Temporal(TemporalType.TIMESTAMP)
-    private Date updateTime;
+    @Column(name = "update_time")
+    private LocalDateTime updateTime;
 
     /**
      * 所属课程
@@ -74,4 +74,19 @@ public class Teachplan {
     @ToString.Exclude
     @EqualsAndHashCode.Exclude
     private List<TeachplanMedia> teachplanMedias;
+
+    @PrePersist
+    public void prePersist() {
+        if (createTime == null) {
+            createTime = LocalDateTime.now();
+        }
+        if (updateTime == null) {
+            updateTime = LocalDateTime.now();
+        }
+    }
+
+    @PreUpdate
+    public void preUpdate() {
+        updateTime = LocalDateTime.now();
+    }
 }

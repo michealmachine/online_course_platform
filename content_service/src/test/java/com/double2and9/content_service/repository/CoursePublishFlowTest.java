@@ -9,7 +9,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.annotation.Rollback;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Date;
+import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -41,8 +41,8 @@ public class CoursePublishFlowTest {
         courseBase.setOrganizationId(TEST_ORG_ID);
         courseBase.setCharge("201001");
         courseBase.setValid(true);
-        courseBase.setCreateTime(new Date());
-        courseBase.setUpdateTime(new Date());
+        courseBase.setCreateTime(LocalDateTime.now());
+        courseBase.setUpdateTime(LocalDateTime.now());
         courseBase = courseBaseRepository.save(courseBase);
 
         assertNotNull(courseBase.getId(), "CourseBase ID should not be null");
@@ -52,9 +52,9 @@ public class CoursePublishFlowTest {
         publishPre.setCourseBase(courseBase);
         publishPre.setName("测试课程预发布");
         publishPre.setStatus("审核中");
-        publishPre.setPreviewTime(new Date());
-        publishPre.setCreateTime(new Date());
-        publishPre.setUpdateTime(new Date());
+        publishPre.setPreviewTime(LocalDateTime.now());
+        publishPre.setCreateTime(LocalDateTime.now());
+        publishPre.setUpdateTime(LocalDateTime.now());
         
         CoursePublishPre savedPre = coursePublishPreRepository.save(publishPre);
         assertNotNull(savedPre);
@@ -66,9 +66,9 @@ public class CoursePublishFlowTest {
         coursePublish.setCourseBase(courseBase);
         coursePublish.setName("测试课程发布");
         coursePublish.setStatus("已发布");
-        coursePublish.setPublishTime(new Date());
-        coursePublish.setCreateTime(new Date());
-        coursePublish.setUpdateTime(new Date());
+        coursePublish.setPublishTime(LocalDateTime.now());
+        coursePublish.setCreateTime(LocalDateTime.now());
+        coursePublish.setUpdateTime(LocalDateTime.now());
         
         CoursePublish savedPublish = coursePublishRepository.save(coursePublish);
         assertNotNull(savedPublish);
@@ -96,8 +96,8 @@ public class CoursePublishFlowTest {
         courseBase.setOrganizationId(TEST_ORG_ID);
         courseBase.setCharge("201001");
         courseBase.setValid(true);
-        courseBase.setCreateTime(new Date());
-        courseBase.setUpdateTime(new Date());
+        courseBase.setCreateTime(LocalDateTime.now());
+        courseBase.setUpdateTime(LocalDateTime.now());
         courseBase = courseBaseRepository.save(courseBase);
 
         // 2. 提交审核
@@ -105,9 +105,9 @@ public class CoursePublishFlowTest {
         publishPre.setCourseBase(courseBase);
         publishPre.setName("测试课程预发布");
         publishPre.setStatus("审核中");
-        publishPre.setPreviewTime(new Date());
-        publishPre.setCreateTime(new Date());
-        publishPre.setUpdateTime(new Date());
+        publishPre.setPreviewTime(LocalDateTime.now());
+        publishPre.setCreateTime(LocalDateTime.now());
+        publishPre.setUpdateTime(LocalDateTime.now());
         
         CoursePublishPre savedPre = coursePublishPreRepository.save(publishPre);
         assertNotNull(savedPre);

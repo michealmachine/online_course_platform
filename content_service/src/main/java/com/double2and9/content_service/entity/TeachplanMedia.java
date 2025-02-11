@@ -4,7 +4,7 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.ToString;
 
-import java.util.Date;
+import java.time.LocalDateTime;
 
 /**
  * 课程计划与媒资关联信息
@@ -41,27 +41,27 @@ public class TeachplanMedia {
     /**
      * 创建时间
      */
-    @Column(nullable = false)
-    private Date createTime;
+    @Column(name = "create_time", nullable = false)
+    private LocalDateTime createTime;
 
     /**
      * 更新时间
      */
-    @Column(nullable = false)
-    private Date updateTime;
+    @Column(name = "update_time", nullable = false)
+    private LocalDateTime updateTime;
 
     @PrePersist
     public void prePersist() {
         if (createTime == null) {
-            createTime = new Date();
+            createTime = LocalDateTime.now();
         }
         if (updateTime == null) {
-            updateTime = new Date();
+            updateTime = LocalDateTime.now();
         }
     }
 
     @PreUpdate
     public void preUpdate() {
-        updateTime = new Date();
+        updateTime = LocalDateTime.now();
     }
 }

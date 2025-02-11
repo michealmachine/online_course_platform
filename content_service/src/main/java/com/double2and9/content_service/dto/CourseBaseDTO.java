@@ -1,6 +1,7 @@
 package com.double2and9.content_service.dto;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import lombok.Data;
 import lombok.ToString;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -44,4 +45,10 @@ public class CourseBaseDTO {
 
     @Schema(description = "机构ID")
     private Long organizationId;
+
+    @Schema(description = "创建时间")
+    private LocalDateTime createTime;
+
+    @Schema(description = "更新时间")
+    private LocalDateTime updateTime;
 }

@@ -134,23 +134,38 @@ erDiagram
 - CourseMarket/CoursePublish/CoursePublishPre: 与CourseBase共享主键
 - 其他实体: 自增主键
 
-2. 懒加载配置
+2. 时间字段规范
+- 统一使用 LocalDateTime 类型
+- 字段命名: create_time, update_time, publish_time 等
+- 使用 @Column(name = "xxx_time") 指定列名
+- 实体类中添加 @PrePersist 和 @PreUpdate 自动管理
+- 配置文件中设置 JPA 时区为 UTC
+- 示例:
+  ```java
+  @Column(name = "create_time")
+  private LocalDateTime createTime;
+
+  @PrePersist
+  public void prePersist() {
+      if (createTime == null) {
+          createTime = LocalDateTime.now();
+      }
+  }
+  ```
+
+3. 懒加载配置
 - 所有多对一、一对多关系默认使用懒加载
 - 使用@ToString.Exclude和@EqualsAndHashCode.Exclude避免循环引用
 
-3. 级联操作
+4. 级联操作
 - CourseBase -> CourseMarket: 级联所有操作
 - CourseBase -> Teachplan: 级联所有操作
 - Teachplan -> TeachplanMedia: 级联所有操作
 
-4. 数据完整性
+5. 数据完整性
 - 必填字段使用@Column(nullable = false)
 - 使用外键约束确保关联数据完整性
 - 使用@JoinColumn指定外键列
-
-5. 审计字段
-- 所有实体包含createTime和updateTime
-- 部分实体包含valid字段标识有效性
 
 6. 树形结构
 - Teachplan通过parentId实现树形结构
@@ -1029,6 +1044,71 @@ public class TreeNodeDTO<T> {
 4. 简化维护工作
 5. 提升代码质量
 
+### 10.4 课程计划排序优化
+
+#### 10.4.1 设计思路
+1. 两阶段提交
+   - 移动操作(moveUp/moveDown)只更新内存缓存
+   - 用户确认后才批量更新数据库
+   - 支持撤销未保存的变更
+
+2. 缓存设计
+```java
+@Component
+public class TeachplanOrderCache {
+    private final Map<Long, Integer> orderCache = new ConcurrentHashMap<>();
+    
+    // 缓存排序变更
+    public void cacheOrderChange(Long id1, Integer order1, Long id2, Integer order2);
+    
+    // 获取当前排序(优先从缓存获取)
+    public Integer getCurrentOrder(Long id, Integer defaultOrder);
+    
+    // 批量保存变更
+    public void saveAllChanges();
+    
+    // 丢弃未保存的变更
+    public void discardChanges();
+}
+```
+
+3. 接口设计
+```java
+@RestController
+@RequestMapping("/teachplan")
+public class TeachplanController {
+    // 临时移动操作
+    @PostMapping("/moveup/{teachplanId}")
+    public ContentResponse<Void> moveUp(@PathVariable Long teachplanId);
+    
+    @PostMapping("/movedown/{teachplanId}")
+    public ContentResponse<Void> moveDown(@PathVariable Long teachplanId);
+    
+    // 保存或丢弃变更
+    @PostMapping("/saveorder")
+    public ContentResponse<Void> saveOrderChanges();
+    
+    @PostMapping("/discardorder")
+    public ContentResponse<Void> discardOrderChanges();
+}
+```
+
+#### 10.4.2 优化效果
+1. 性能提升
+   - 减少数据库写操作
+   - 支持批量更新
+   - 避免频繁事务
+
+2. 用户体验
+   - 操作响应更快
+   - 支持撤销操作
+   - 符合用户习惯
+
+3. 数据一致性
+   - 事务原子性
+   - 避免部分更新
+   - 支持回滚
+
 # Content Service 状态管理说明
 
 ## 1. 状态定义
@@ -1100,3 +1180,59 @@ public class TreeNodeDTO<T> {
 1. 检查课程是否处于已发布状态
 2. 更新课程基本状态为 OFFLINE
 3. 更新 CoursePublish 状态为 OFFLINE
+
+## 课程计划排序实现说明
+
+### 1. 缓存设计
+- 使用 ConcurrentHashMap 实现线程安全的内存缓存
+- key 为课程计划ID，value 为临时排序号
+- 支持并发访问和原子操作
+
+### 2. 操作流程
+1. 移动操作
+   - 检查移动合法性
+   - 计算新的排序号
+   - 更新缓存
+   - 不直接操作数据库
+
+2. 查询操作
+   - 优先从缓存获取排序号
+   - 缓存未命中则使用数据库值
+   - 确保显示最新排序状态
+
+3. 保存操作
+   - 获取所有待更新记录
+   - 批量更新排序号
+   - 清空缓存
+   - 事务保证
+
+4. 撤销操作
+   - 清空缓存
+   - 返回数据库状态
+   - 无需数据库操作
+
+### 3. 异常处理
+1. 移动异常
+   - 首节点上移
+   - 末节点下移
+   - 节点不存在
+
+2. 保存异常
+   - 事务回滚
+   - 清空缓存
+   - 返回错误信息
+
+### 4. 注意事项
+1. 并发控制
+   - ConcurrentHashMap 保证缓存线程安全
+   - 事务隔离保证数据一致性
+
+2. 性能优化
+   - 批量更新减少数据库操作
+   - 缓存减少数据库访问
+   - 延迟写入提升响应速度
+
+3. 接口设计
+   - 明确标注临时操作
+   - 完整的操作说明
+   - 统一的返回格式

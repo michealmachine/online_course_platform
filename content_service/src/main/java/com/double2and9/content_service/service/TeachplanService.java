@@ -41,4 +41,14 @@ public interface TeachplanService {
      * @param teachplanId 课程计划ID
      */
     void moveDown(Long teachplanId);
+
+    /**
+     * 保存所有排序变更
+     */
+    void saveOrderChanges();
+
+    /**
+     * 丢弃未保存的排序变更
+     */
+    void discardOrderChanges();
 }

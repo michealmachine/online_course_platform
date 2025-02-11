@@ -28,6 +28,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.Date;
 import java.util.List;
 import java.util.Set;
@@ -372,8 +373,8 @@ class CourseBaseServiceTest {
                 parent.setName("后端开发");
                 parent.setParentId(0L);
                 parent.setLevel(1);
-                parent.setCreateTime(new Date());
-                parent.setUpdateTime(new Date());
+                parent.setCreateTime(LocalDateTime.now());
+                parent.setUpdateTime(LocalDateTime.now());
                 courseCategoryRepository.save(parent);
 
                 // 创建子分类1
@@ -381,8 +382,8 @@ class CourseBaseServiceTest {
                 child1.setName("Java开发");
                 child1.setParentId(parent.getId());
                 child1.setLevel(2);
-                child1.setCreateTime(new Date());
-                child1.setUpdateTime(new Date());
+                child1.setCreateTime(LocalDateTime.now());
+                child1.setUpdateTime(LocalDateTime.now());
                 courseCategoryRepository.save(child1);
 
                 // 创建子分类2
@@ -390,8 +391,8 @@ class CourseBaseServiceTest {
                 child2.setName("Python开发");
                 child2.setParentId(parent.getId());
                 child2.setLevel(2);
-                child2.setCreateTime(new Date());
-                child2.setUpdateTime(new Date());
+                child2.setCreateTime(LocalDateTime.now());
+                child2.setUpdateTime(LocalDateTime.now());
                 courseCategoryRepository.save(child2);
 
                 // 2. 获取课程分类树
@@ -424,6 +425,20 @@ class CourseBaseServiceTest {
         @Transactional
         void testPreview() {
                 // ... 保持不变
+        }
+
+        @Test
+        void testSubmitForAudit() {
+                CourseBase courseBase = new CourseBase();
+                courseBase.setName("测试课程");
+                courseBase.setBrief("测试课程简介");
+                courseBase.setStatus(CourseStatusEnum.DRAFT.getCode());
+                courseBase.setOrganizationId(TEST_ORG_ID);
+                courseBase.setCreateTime(LocalDateTime.now());
+                courseBase.setUpdateTime(LocalDateTime.now());
+                courseBaseRepository.save(courseBase);
+
+                // ... 其他代码保持不变
         }
 
 }

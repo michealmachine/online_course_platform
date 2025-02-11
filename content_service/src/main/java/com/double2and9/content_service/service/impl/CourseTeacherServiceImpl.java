@@ -27,6 +27,7 @@ import java.util.stream.Collectors;
 
 import com.double2and9.base.model.PageParams;
 import com.double2and9.base.model.PageResult;
+import java.time.LocalDateTime;
 
 @Slf4j
 @Service
@@ -76,13 +77,13 @@ public class CourseTeacherServiceImpl implements CourseTeacherService {
                     .orElseThrow(() -> new ContentException(ContentErrorCode.TEACHER_NOT_EXISTS));
         } else {
             teacher = new CourseTeacher();
-            teacher.setCreateTime(new Date());
+            teacher.setCreateTime(LocalDateTime.now());
             teacher.setCourses(new HashSet<>()); // 初始化空的课程集合
         }
 
         // 设置基本信息
         modelMapper.map(teacherDTO, teacher);
-        teacher.setUpdateTime(new Date());
+        teacher.setUpdateTime(LocalDateTime.now());
         teacher.setOrganizationId(teacherDTO.getOrganizationId());
 
         // 保存教师信息
@@ -271,7 +272,7 @@ public class CourseTeacherServiceImpl implements CourseTeacherService {
             teacher.setCourses(new HashSet<>());
         }
         teacher.getCourses().add(course);
-        teacher.setUpdateTime(new Date());
+        teacher.setUpdateTime(LocalDateTime.now());
 
         courseTeacherRepository.save(teacher);
         log.info("教师关联课程成功，教师ID：{}，课程ID：{}", teacherId, courseId);
@@ -297,7 +298,7 @@ public class CourseTeacherServiceImpl implements CourseTeacherService {
         // 移除课程关联
         if (teacher.getCourses() != null) {
             teacher.getCourses().remove(course);
-            teacher.setUpdateTime(new Date());
+            teacher.setUpdateTime(LocalDateTime.now());
             courseTeacherRepository.save(teacher);
         }
 
@@ -315,13 +316,13 @@ public class CourseTeacherServiceImpl implements CourseTeacherService {
                     .orElseThrow(() -> new ContentException(ContentErrorCode.TEACHER_NOT_EXISTS));
         } else {
             teacher = new CourseTeacher();
-            teacher.setCreateTime(new Date());
+            teacher.setCreateTime(LocalDateTime.now());
             teacher.setCourses(new HashSet<>()); // 初始化空的课程集合
         }
 
         // 设置基本信息
         modelMapper.map(teacherDTO, teacher);
-        teacher.setUpdateTime(new Date());
+        teacher.setUpdateTime(LocalDateTime.now());
         teacher.setOrganizationId(teacherDTO.getOrganizationId());
 
         // 保存教师信息

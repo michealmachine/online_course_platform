@@ -1,7 +1,7 @@
 package com.double2and9.content_service.entity;
 import jakarta.persistence.*;
 import lombok.Data;
-import java.util.Date;
+import java.time.LocalDateTime;
 
 /**
  * 课程分类
@@ -38,12 +38,27 @@ public class CourseCategory {
     /**
      * 创建时间
      */
-    @Temporal(TemporalType.TIMESTAMP)
-    private Date createTime;
+    @Column(name = "create_time")
+    private LocalDateTime createTime;
 
     /**
      * 更新时间
      */
-    @Temporal(TemporalType.TIMESTAMP)
-    private Date updateTime;
+    @Column(name = "update_time")
+    private LocalDateTime updateTime;
+
+    @PrePersist
+    public void prePersist() {
+        if (createTime == null) {
+            createTime = LocalDateTime.now();
+        }
+        if (updateTime == null) {
+            updateTime = LocalDateTime.now();
+        }
+    }
+
+    @PreUpdate
+    public void preUpdate() {
+        updateTime = LocalDateTime.now();
+    }
 }

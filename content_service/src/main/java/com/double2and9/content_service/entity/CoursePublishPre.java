@@ -5,7 +5,7 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.ToString;
 
-import java.util.Date;
+import java.time.LocalDateTime;
 
 /**
  * 课程预发布信息
@@ -45,20 +45,20 @@ public class CoursePublishPre {
     /**
      * 预览时间
      */
-    @Temporal(TemporalType.TIMESTAMP)
-    private Date previewTime;
+    @Column(name = "preview_time")
+    private LocalDateTime previewTime;
 
     /**
      * 创建时间
      */
-    @Temporal(TemporalType.TIMESTAMP)
-    private Date createTime;
+    @Column(name = "create_time")
+    private LocalDateTime createTime;
 
     /**
      * 更新时间
      */
-    @Temporal(TemporalType.TIMESTAMP)
-    private Date updateTime;
+    @Column(name = "update_time")
+    private LocalDateTime updateTime;
 
     /**
      * 对应的课程基本信息

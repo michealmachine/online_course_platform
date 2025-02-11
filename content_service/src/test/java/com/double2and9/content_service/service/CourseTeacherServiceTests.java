@@ -22,6 +22,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.Date;
 import java.util.List;
 import java.util.Set;
@@ -194,8 +195,8 @@ public class CourseTeacherServiceTests {
         CourseTeacher teacher = new CourseTeacher();
         teacher.setName("测试教师");
         teacher.setOrganizationId(TEST_ORG_ID);
-        teacher.setCreateTime(new Date());
-        teacher.setUpdateTime(new Date());
+        teacher.setCreateTime(LocalDateTime.now());
+        teacher.setUpdateTime(LocalDateTime.now());
         courseTeacherRepository.save(teacher);
 
         // 执行测试

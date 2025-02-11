@@ -10,7 +10,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.test.annotation.Rollback;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Date;
+import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -41,8 +41,8 @@ public class TeachplanRepositoryTest {
         teachplan.setLevel(1);
         teachplan.setOrderBy(1);
         teachplan.setCourseBase(courseBase);
-        teachplan.setCreateTime(new Date());
-        teachplan.setUpdateTime(new Date());
+        teachplan.setCreateTime(LocalDateTime.now());
+        teachplan.setUpdateTime(LocalDateTime.now());
 
         // 执行保存
         Teachplan saved = teachplanRepository.save(teachplan);
@@ -67,8 +67,8 @@ public class TeachplanRepositoryTest {
         chapter.setLevel(1);
         chapter.setOrderBy(1);
         chapter.setCourseBase(courseBase);
-        chapter.setCreateTime(new Date());
-        chapter.setUpdateTime(new Date());
+        chapter.setCreateTime(LocalDateTime.now());
+        chapter.setUpdateTime(LocalDateTime.now());
         teachplanRepository.save(chapter);
 
         // 执行查询
@@ -93,8 +93,8 @@ public class TeachplanRepositoryTest {
         plan1.setCourseBase(courseBase);
         plan1.setLevel(1);
         plan1.setOrderBy(1);
-        plan1.setCreateTime(new Date());
-        plan1.setUpdateTime(new Date());
+        plan1.setCreateTime(LocalDateTime.now());
+        plan1.setUpdateTime(LocalDateTime.now());
         teachplanRepository.save(plan1);
 
         Teachplan plan2 = new Teachplan();
@@ -102,8 +102,8 @@ public class TeachplanRepositoryTest {
         plan2.setCourseBase(courseBase);
         plan2.setLevel(1);
         plan2.setOrderBy(2);
-        plan2.setCreateTime(new Date());
-        plan2.setUpdateTime(new Date());
+        plan2.setCreateTime(LocalDateTime.now());
+        plan2.setUpdateTime(LocalDateTime.now());
         teachplanRepository.save(plan2);
 
         // 测试分页查询
@@ -131,8 +131,8 @@ public class TeachplanRepositoryTest {
         chapter.setCourseBase(courseBase);
         chapter.setLevel(1);
         chapter.setOrderBy(1);
-        chapter.setCreateTime(new Date());
-        chapter.setUpdateTime(new Date());
+        chapter.setCreateTime(LocalDateTime.now());
+        chapter.setUpdateTime(LocalDateTime.now());
         teachplanRepository.save(chapter);
 
         Teachplan section = new Teachplan();
@@ -141,8 +141,8 @@ public class TeachplanRepositoryTest {
         section.setParentId(chapter.getId());
         section.setLevel(2);
         section.setOrderBy(1);
-        section.setCreateTime(new Date());
-        section.setUpdateTime(new Date());
+        section.setCreateTime(LocalDateTime.now());
+        section.setUpdateTime(LocalDateTime.now());
         teachplanRepository.save(section);
 
         // 测试分页查询一级课程计划

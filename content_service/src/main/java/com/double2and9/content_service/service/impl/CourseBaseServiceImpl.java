@@ -33,6 +33,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 import java.util.HashMap;
 import java.util.Map;
+import java.time.LocalDateTime;
 
 /**
  * 课程基础服务实现类
@@ -126,8 +127,8 @@ public class CourseBaseServiceImpl implements CourseBaseService {
 
         // 添加默认值设置
         courseBase.setStatus("202001"); // 设置初始状态为"未发布"
-        courseBase.setCreateTime(new Date()); // 设置创建时间
-        courseBase.setUpdateTime(new Date()); // 设置更新时间
+        courseBase.setCreateTime(LocalDateTime.now());
+        courseBase.setUpdateTime(LocalDateTime.now());
         courseBase.setValid(true); // 设置有效标志
 
         // 先保存CourseBase以获取ID
@@ -137,8 +138,8 @@ public class CourseBaseServiceImpl implements CourseBaseService {
         CourseMarket courseMarket = modelMapper.map(addCourseDTO, CourseMarket.class);
         courseMarket.setId(savedCourse.getId()); // 设置相同的ID
         courseMarket.setCourseBase(savedCourse);
-        courseMarket.setCreateTime(new Date());
-        courseMarket.setUpdateTime(new Date());
+        courseMarket.setCreateTime(LocalDateTime.now());
+        courseMarket.setUpdateTime(LocalDateTime.now());
         courseBase.setCourseMarket(courseMarket);
 
         // 再次保存以更新关联关系
@@ -163,7 +164,7 @@ public class CourseBaseServiceImpl implements CourseBaseService {
 
         // 更新基本信息
         modelMapper.map(editCourseDTO, courseBase);
-        courseBase.setUpdateTime(new Date()); // 设置更新时间
+        courseBase.setUpdateTime(LocalDateTime.now());
 
         // 更新营销信息
         CourseMarket courseMarket = courseBase.getCourseMarket();
@@ -171,10 +172,10 @@ public class CourseBaseServiceImpl implements CourseBaseService {
             courseMarket = new CourseMarket();
             courseMarket.setCourseBase(courseBase);
             courseBase.setCourseMarket(courseMarket);
-            courseMarket.setCreateTime(new Date()); // 如果是新建的营销信息，设置创建时间
+            courseMarket.setCreateTime(LocalDateTime.now()); // 如果是新建的营销信息，设置创建时间
         }
         modelMapper.map(editCourseDTO, courseMarket);
-        courseMarket.setUpdateTime(new Date()); // 设置营销信息的更新时间
+        courseMarket.setUpdateTime(LocalDateTime.now()); // 设置营销信息的更新时间
 
         // 保存更新
         courseBaseRepository.save(courseBase);
@@ -257,8 +258,8 @@ public class CourseBaseServiceImpl implements CourseBaseService {
         // 设置初始状态为草稿
         courseBase.setStatus(CourseStatusEnum.DRAFT.getCode());
         courseBase.setValid(true);
-        courseBase.setCreateTime(new Date());
-        courseBase.setUpdateTime(new Date());
+        courseBase.setCreateTime(LocalDateTime.now());
+        courseBase.setUpdateTime(LocalDateTime.now());
         return courseBase;
     }
 
@@ -317,7 +318,7 @@ public class CourseBaseServiceImpl implements CourseBaseService {
 
         // 更新课程基本信息状态为已发布
         courseBase.setStatus(CourseStatusEnum.PUBLISHED.getCode());
-        courseBase.setUpdateTime(new Date());
+        courseBase.setUpdateTime(LocalDateTime.now());
 
         // 创建/更新发布记录
         CoursePublish coursePublish = courseBase.getCoursePublish();
@@ -325,13 +326,13 @@ public class CourseBaseServiceImpl implements CourseBaseService {
             coursePublish = new CoursePublish();
             coursePublish.setId(courseId);
             coursePublish.setCourseBase(courseBase);
-            coursePublish.setCreateTime(new Date());
+            coursePublish.setCreateTime(LocalDateTime.now());
         }
 
         coursePublish.setName(courseBase.getName());
         coursePublish.setStatus(CourseStatusEnum.PUBLISHED.getCode());
-        coursePublish.setPublishTime(new Date());
-        coursePublish.setUpdateTime(new Date());
+        coursePublish.setPublishTime(LocalDateTime.now());
+        coursePublish.setUpdateTime(LocalDateTime.now());
 
         courseBase.setCoursePublish(coursePublish);
         courseBaseRepository.save(courseBase);
@@ -426,13 +427,13 @@ public class CourseBaseServiceImpl implements CourseBaseService {
 
         // 更新课程基本信息状态为已下线
         courseBase.setStatus(CourseStatusEnum.OFFLINE.getCode());
-        courseBase.setUpdateTime(new Date());
+        courseBase.setUpdateTime(LocalDateTime.now());
 
         // 更新发布记录状态
         CoursePublish coursePublish = courseBase.getCoursePublish();
         if (coursePublish != null) {
             coursePublish.setStatus(CourseStatusEnum.OFFLINE.getCode());
-            coursePublish.setUpdateTime(new Date());
+            coursePublish.setUpdateTime(LocalDateTime.now());
         }
 
         courseBaseRepository.save(courseBase);

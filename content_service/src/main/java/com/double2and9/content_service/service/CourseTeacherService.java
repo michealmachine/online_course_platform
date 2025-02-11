@@ -125,4 +125,5 @@ public interface CourseTeacherService {
     PageResult<CourseTeacherDTO> listByCourseId(Long courseId, PageParams pageParams);
 
     PageResult<CourseBaseDTO> listCoursesByTeacherId(Long teacherId, PageParams pageParams);
+
 }

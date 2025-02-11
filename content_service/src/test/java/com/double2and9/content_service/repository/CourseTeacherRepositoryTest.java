@@ -10,7 +10,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.test.annotation.Rollback;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Date;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -44,8 +44,8 @@ public class CourseTeacherRepositoryTest {
         teacher.setDescription("测试教师简介");
         teacher.setOrganizationId(TEST_ORG_ID);
         teacher.getCourses().add(courseBase); // 使用Set添加课程
-        teacher.setCreateTime(new Date());
-        teacher.setUpdateTime(new Date());
+        teacher.setCreateTime(LocalDateTime.now());
+        teacher.setUpdateTime(LocalDateTime.now());
 
         // 执行保存
         CourseTeacher saved = courseTeacherRepository.save(teacher);
@@ -71,8 +71,8 @@ public class CourseTeacherRepositoryTest {
         teacher.setPosition("讲师");
         teacher.setOrganizationId(TEST_ORG_ID);
         teacher.getCourses().add(courseBase);
-        teacher.setCreateTime(new Date());
-        teacher.setUpdateTime(new Date());
+        teacher.setCreateTime(LocalDateTime.now());
+        teacher.setUpdateTime(LocalDateTime.now());
         courseTeacherRepository.save(teacher);
 
         // 执行查询 - 修改为使用分页版本
@@ -92,9 +92,8 @@ public class CourseTeacherRepositoryTest {
         CourseTeacher teacher = new CourseTeacher();
         teacher.setName("测试教师");
         teacher.setOrganizationId(TEST_ORG_ID);
-        // 添加必需的时间字段
-        teacher.setCreateTime(new Date());
-        teacher.setUpdateTime(new Date());
+        teacher.setCreateTime(LocalDateTime.now());
+        teacher.setUpdateTime(LocalDateTime.now());
         courseTeacherRepository.save(teacher);
 
         // 测试分页查询
@@ -119,8 +118,8 @@ public class CourseTeacherRepositoryTest {
         teacher.setOrganizationId(TEST_ORG_ID);
         teacher.getCourses().add(course1);
         teacher.getCourses().add(course2);
-        teacher.setCreateTime(new Date());
-        teacher.setUpdateTime(new Date());
+        teacher.setCreateTime(LocalDateTime.now());
+        teacher.setUpdateTime(LocalDateTime.now());
 
         CourseTeacher saved = courseTeacherRepository.save(teacher);
 
@@ -145,8 +144,8 @@ public class CourseTeacherRepositoryTest {
         teacher.setName("测试教师");
         teacher.setPosition("讲师");
         teacher.setOrganizationId(TEST_ORG_ID);
-        teacher.setCreateTime(new Date());
-        teacher.setUpdateTime(new Date());
+        teacher.setCreateTime(LocalDateTime.now());
+        teacher.setUpdateTime(LocalDateTime.now());
         CourseTeacher savedTeacher = courseTeacherRepository.save(teacher);
 
         // 使用正确的机构ID查询
@@ -169,8 +168,8 @@ public class CourseTeacherRepositoryTest {
         teacher.setName("待删除教师");
         teacher.setPosition("讲师");
         teacher.setOrganizationId(TEST_ORG_ID);
-        teacher.setCreateTime(new Date());
-        teacher.setUpdateTime(new Date());
+        teacher.setCreateTime(LocalDateTime.now());
+        teacher.setUpdateTime(LocalDateTime.now());
         CourseTeacher savedTeacher = courseTeacherRepository.save(teacher);
 
         // 验证教师已创建
@@ -194,8 +193,8 @@ public class CourseTeacherRepositoryTest {
         teacher.setPosition("讲师");
         teacher.setOrganizationId(TEST_ORG_ID);
         teacher.getCourses().add(course);
-        teacher.setCreateTime(new Date());
-        teacher.setUpdateTime(new Date());
+        teacher.setCreateTime(LocalDateTime.now());
+        teacher.setUpdateTime(LocalDateTime.now());
         CourseTeacher savedTeacher = courseTeacherRepository.save(teacher);
 
         // 验证教师和课程关联已创建
@@ -224,8 +223,8 @@ public class CourseTeacherRepositoryTest {
         teacher.setDescription("测试教师简介");
         teacher.setOrganizationId(TEST_ORG_ID);
         teacher.getCourses().add(courseBase);
-        teacher.setCreateTime(new Date());
-        teacher.setUpdateTime(new Date());
+        teacher.setCreateTime(LocalDateTime.now());
+        teacher.setUpdateTime(LocalDateTime.now());
         courseTeacherRepository.save(teacher);
 
         // 执行分页查询
@@ -249,8 +248,8 @@ public class CourseTeacherRepositoryTest {
         CourseTeacher teacher = new CourseTeacher();
         teacher.setName("测试教师");
         teacher.setOrganizationId(TEST_ORG_ID);
-        teacher.setCreateTime(new Date());
-        teacher.setUpdateTime(new Date());
+        teacher.setCreateTime(LocalDateTime.now());
+        teacher.setUpdateTime(LocalDateTime.now());
         courseTeacherRepository.save(teacher);
 
         // 测试分页查询

@@ -70,6 +70,13 @@
 - Swagger/OpenAPI：接口文档
 - GitHub Actions：CI/CD
 
+### 2.2 技术规范
+1. 时间类型统一使用 LocalDateTime
+   - 实体类中的时间字段使用 @Column(name = "xxx_time")
+   - 配置 JPA 时区为 UTC
+   - 所有实体类包含 createTime 和 updateTime
+   - 使用 @PrePersist 和 @PreUpdate 自动管理时间
+
 ### 2.2 项目结构
 ```angular2html
 content_service/
@@ -1681,3 +1688,68 @@ public class TreeNodeDTO<T> {
 3. 统一命名规范
 4. 简化维护工作
 5. 提升代码质量
+
+### 10.4 课程计划排序优化
+
+#### 10.4.1 设计思路
+1. 两阶段提交
+   - 移动操作(moveUp/moveDown)只更新内存缓存
+   - 用户确认后才批量更新数据库
+   - 支持撤销未保存的变更
+
+2. 缓存设计
+```java
+@Component
+public class TeachplanOrderCache {
+    private final Map<Long, Integer> orderCache = new ConcurrentHashMap<>();
+    
+    // 缓存排序变更
+    public void cacheOrderChange(Long id1, Integer order1, Long id2, Integer order2);
+    
+    // 获取当前排序(优先从缓存获取)
+    public Integer getCurrentOrder(Long id, Integer defaultOrder);
+    
+    // 批量保存变更
+    public void saveAllChanges();
+    
+    // 丢弃未保存的变更
+    public void discardChanges();
+}
+```
+
+3. 接口设计
+```java
+@RestController
+@RequestMapping("/teachplan")
+public class TeachplanController {
+    // 临时移动操作
+    @PostMapping("/moveup/{teachplanId}")
+    public ContentResponse<Void> moveUp(@PathVariable Long teachplanId);
+    
+    @PostMapping("/movedown/{teachplanId}")
+    public ContentResponse<Void> moveDown(@PathVariable Long teachplanId);
+    
+    // 保存或丢弃变更
+    @PostMapping("/saveorder")
+    public ContentResponse<Void> saveOrderChanges();
+    
+    @PostMapping("/discardorder")
+    public ContentResponse<Void> discardOrderChanges();
+}
+```
+
+#### 10.4.2 优化效果
+1. 性能提升
+   - 减少数据库写操作
+   - 支持批量更新
+   - 避免频繁事务
+
+2. 用户体验
+   - 操作响应更快
+   - 支持撤销操作
+   - 符合用户习惯
+
+3. 数据一致性
+   - 事务原子性
+   - 避免部分更新
+   - 支持回滚

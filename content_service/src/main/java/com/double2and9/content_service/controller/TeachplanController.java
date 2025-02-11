@@ -37,11 +37,9 @@ public class TeachplanController {
 
     /**
      * 查询课程计划树形结构
-     * 
-     * @param courseId 课程id
-     * @return 课程计划树形结构
+     * 返回的顺序会反映缓存中的临时变更
      */
-    @Operation(summary = "查询课程计划树", description = "根据课程ID查询课程计划的树形结构")
+    @Operation(summary = "查询课程计划树", description = "根据课程ID查询课程计划的树形结构，包含临时排序变更")
     @GetMapping("/tree/{courseId}")
     public ContentResponse<List<TeachplanDTO>> getTeachplanTree(
             @Parameter(description = "课程ID", required = true)
@@ -75,34 +73,56 @@ public class TeachplanController {
     }
 
     /**
-     * 课程计划向上移动
+     * 课程计划向上移动(临时操作)
+     * 仅更新缓存中的顺序，不直接更新数据库
      * 
      * @param teachplanId 课程计划ID
      * @return 操作结果
      */
-    @Operation(summary = "上移课程计划")
+    @Operation(summary = "上移课程计划(临时)", description = "仅更新缓存中的顺序，需要调用保存接口才会更新数据库")
     @PostMapping("/moveup/{teachplanId}")
     public ContentResponse<Void> moveUp(
             @Parameter(description = "课程计划ID", required = true)
             @PathVariable Long teachplanId) {
-        log.info("上移课程计划，ID：{}", teachplanId);
         teachplanService.moveUp(teachplanId);
         return ContentResponse.success(null);
     }
 
     /**
-     * 课程计划向下移动
+     * 课程计划向下移动(临时操作)
+     * 仅更新缓存中的顺序，不直接更新数据库
      * 
      * @param teachplanId 课程计划ID
      * @return 操作结果
      */
-    @Operation(summary = "下移课程计划")
+    @Operation(summary = "下移课程计划(临时)", description = "仅更新缓存中的顺序，需要调用保存接口才会更新数据库")
     @PostMapping("/movedown/{teachplanId}")
     public ContentResponse<Void> moveDown(
             @Parameter(description = "课程计划ID", required = true)
             @PathVariable Long teachplanId) {
-        log.info("下移课程计划，ID：{}", teachplanId);
         teachplanService.moveDown(teachplanId);
+        return ContentResponse.success(null);
+    }
+
+    /**
+     * 保存所有排序变更
+     * 将缓存中的临时排序变更一次性写入数据库
+     */
+    @Operation(summary = "保存排序变更", description = "将缓存中的所有临时排序变更一次性写入数据库")
+    @PostMapping("/saveorder")
+    public ContentResponse<Void> saveOrderChanges() {
+        teachplanService.saveOrderChanges();
+        return ContentResponse.success(null);
+    }
+
+    /**
+     * 丢弃所有未保存的排序变更
+     * 清空缓存，恢复到数据库中的顺序
+     */
+    @Operation(summary = "丢弃排序变更", description = "清空缓存中的临时排序变更，恢复到数据库中的顺序")
+    @PostMapping("/discardorder")
+    public ContentResponse<Void> discardOrderChanges() {
+        teachplanService.discardOrderChanges();
         return ContentResponse.success(null);
     }
 

@@ -2,7 +2,7 @@ package com.double2and9.content_service.entity;
 
 import jakarta.persistence.*;
 import lombok.Data;
-import java.util.Date;
+import java.time.LocalDateTime;
 import java.util.List;
 
 /**
@@ -74,24 +74,24 @@ public class MediaFile {
     private String purpose;
 
     @Column(nullable = false)
-    private Date createTime;
+    private LocalDateTime createTime;
 
     @Column(nullable = false)
-    private Date updateTime;
+    private LocalDateTime updateTime;
 
     @PrePersist
     public void prePersist() {
         if (createTime == null) {
-            createTime = new Date();
+            createTime = LocalDateTime.now();
         }
         if (updateTime == null) {
-            updateTime = new Date();
+            updateTime = LocalDateTime.now();
         }
     }
 
     @PreUpdate
     public void preUpdate() {
-        updateTime = new Date();
+        updateTime = LocalDateTime.now();
     }
 
     /**

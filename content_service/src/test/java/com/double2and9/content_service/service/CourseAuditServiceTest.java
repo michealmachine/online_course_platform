@@ -23,6 +23,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.test.annotation.Rollback;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.Date;
 import java.util.List;
 
@@ -60,8 +61,8 @@ class CourseAuditServiceTest {
         courseBase.setBrief("测试简介");
         courseBase.setOrganizationId(TEST_ORG_ID);
         courseBase.setStatus(CourseStatusEnum.DRAFT.getCode());
-        courseBase.setCreateTime(new Date());
-        courseBase.setUpdateTime(new Date());
+        courseBase.setCreateTime(LocalDateTime.now());
+        courseBase.setUpdateTime(LocalDateTime.now());
         courseBaseRepository.save(courseBase);
 
         Long courseId = courseBase.getId();
@@ -174,8 +175,8 @@ class CourseAuditServiceTest {
         courseBase.setBrief("测试课程简介");
         courseBase.setStatus(CourseStatusEnum.DRAFT.getCode());
         courseBase.setOrganizationId(TEST_ORG_ID);
-        courseBase.setCreateTime(new Date());
-        courseBase.setUpdateTime(new Date());
+        courseBase.setCreateTime(LocalDateTime.now());
+        courseBase.setUpdateTime(LocalDateTime.now());
         courseBaseRepository.save(courseBase);
 
         // 2. 添加课程计划
@@ -186,6 +187,17 @@ class CourseAuditServiceTest {
         chapterDTO.setName("第一章");
         chapterDTO.setOrderBy(1);
         Long chapterId = teachplanService.saveTeachplan(chapterDTO);
+
+        SaveTeachplanDTO sectionDTO = new SaveTeachplanDTO();
+        sectionDTO.setCourseId(courseBase.getId());
+        sectionDTO.setParentId(chapterId);
+        sectionDTO.setLevel(2);
+        sectionDTO.setName("第一节");
+        sectionDTO.setOrderBy(1);
+        teachplanService.saveTeachplan(sectionDTO);
+
+        // 如果有排序操作，需要保存
+        teachplanService.saveOrderChanges();
 
         // 3. 添加教师
         SaveCourseTeacherDTO teacherDTO = new SaveCourseTeacherDTO();

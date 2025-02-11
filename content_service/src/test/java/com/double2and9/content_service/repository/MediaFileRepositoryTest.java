@@ -8,7 +8,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Date;
+import java.time.LocalDateTime;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -29,8 +29,8 @@ public class MediaFileRepositoryTest {
         file1.setOrganizationId(TEST_ORG_ID);
         file1.setMediaType("VIDEO");
         file1.setPurpose("COURSE");
-        file1.setCreateTime(new Date());
-        file1.setUpdateTime(new Date());
+        file1.setCreateTime(LocalDateTime.now());
+        file1.setUpdateTime(LocalDateTime.now());
         mediaFileRepository.save(file1);
 
         MediaFile file2 = new MediaFile();
@@ -38,8 +38,8 @@ public class MediaFileRepositoryTest {
         file2.setOrganizationId(TEST_ORG_ID);
         file2.setMediaType("IMAGE");
         file2.setPurpose("COVER");
-        file2.setCreateTime(new Date());
-        file2.setUpdateTime(new Date());
+        file2.setCreateTime(LocalDateTime.now());
+        file2.setUpdateTime(LocalDateTime.now());
         mediaFileRepository.save(file2);
 
         // 测试分页查询

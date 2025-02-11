@@ -12,7 +12,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Date;
+import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -39,8 +39,8 @@ public class CourseBaseRepositoryTest {
         courseBase.setOrganizationId(TEST_ORG_ID);
         courseBase.setValid(true);
         courseBase.setStatus("202001");
-        courseBase.setCreateTime(new Date());
-        courseBase.setUpdateTime(new Date());
+        courseBase.setCreateTime(LocalDateTime.now());
+        courseBase.setUpdateTime(LocalDateTime.now());
 
         CourseBase saved = courseBaseRepository.save(courseBase);
         assertNotNull(saved.getId());
@@ -86,8 +86,8 @@ public class CourseBaseRepositoryTest {
         teacher.setOrganizationId(TEST_ORG_ID);
         teacher.getCourses().add(course);
         // 添加必需的时间字段
-        teacher.setCreateTime(new Date());
-        teacher.setUpdateTime(new Date());
+        teacher.setCreateTime(LocalDateTime.now());
+        teacher.setUpdateTime(LocalDateTime.now());
         teacher = courseTeacherRepository.save(teacher);
 
         // 测试分页查询 - 使用新的方法名
@@ -112,8 +112,8 @@ public class CourseBaseRepositoryTest {
         teacher.setName("测试教师");
         teacher.setOrganizationId(TEST_ORG_ID);
         teacher.getCourses().add(course);
-        teacher.setCreateTime(new Date());
-        teacher.setUpdateTime(new Date());
+        teacher.setCreateTime(LocalDateTime.now());
+        teacher.setUpdateTime(LocalDateTime.now());
         teacher = courseTeacherRepository.save(teacher);
 
         // 测试分页查询 - 使用新的方法名
@@ -162,8 +162,8 @@ public class CourseBaseRepositoryTest {
         courseBase.setBrief("测试简介");
         courseBase.setOrganizationId(TEST_ORG_ID); // 设置机构ID
         courseBase.setStatus(CourseStatusEnum.DRAFT.getCode()); // 设置课程状态
-        courseBase.setCreateTime(new Date()); // 设置创建时间
-        courseBase.setUpdateTime(new Date()); // 设置更新时间
+        courseBase.setCreateTime(LocalDateTime.now()); // 设置创建时间
+        courseBase.setUpdateTime(LocalDateTime.now()); // 设置更新时间
         courseBase.setValid(true); // 设置有效标志
 
         // 创建预发布记录
@@ -171,8 +171,8 @@ public class CourseBaseRepositoryTest {
         publishPre.setStatus(CourseAuditStatusEnum.SUBMITTED.getCode());
         publishPre.setName(courseBase.getName()); // 设置预发布记录的名称
         publishPre.setCourseBase(courseBase);
-        publishPre.setCreateTime(new Date()); // 设置创建时间
-        publishPre.setUpdateTime(new Date()); // 设置更新时间
+        publishPre.setCreateTime(LocalDateTime.now()); // 设置创建时间
+        publishPre.setUpdateTime(LocalDateTime.now()); // 设置更新时间
         courseBase.setCoursePublishPre(publishPre);
 
         courseBaseRepository.save(courseBase);

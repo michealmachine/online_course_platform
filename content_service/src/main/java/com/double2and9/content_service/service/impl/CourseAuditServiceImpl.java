@@ -197,15 +197,7 @@ public class CourseAuditServiceImpl implements CourseAuditService {
                 auditHistory.setAuditStatus(status);
                 auditHistory.setAuditMessage(auditDTO.getAuditMessage());
                 auditHistory.setAuditorId(auditDTO.getAuditorId());
-
-                // 根据实体类中的字段类型选择合适的时间设置方式
-                if (auditHistory.getAuditTime() instanceof Date) {
-                        // 如果是 Date 类型
-                        auditHistory.setAuditTime(new Date());
-                } else {
-                        // 如果是 LocalDateTime 类型
-                        auditHistory.setAuditTime(new Date());
-                }
+                auditHistory.setAuditTime(LocalDateTime.now());
 
                 CourseAuditHistory savedHistory = auditHistoryRepository.save(auditHistory);
 
@@ -214,8 +206,8 @@ public class CourseAuditServiceImpl implements CourseAuditService {
                         throw new ContentException(ContentErrorCode.SYSTEM_ERROR, "审核时间保存失败");
                 }
 
-                // 同时更新预发布记录的时间 - 转换为 Date 类型
-                publishPre.setUpdateTime(Date.from(savedHistory.getAuditTime().toInstant()));
+                // 同时更新预发布记录的时间
+                publishPre.setUpdateTime(LocalDateTime.now());
 
                 // 5. 保存课程更新
                 courseBaseRepository.save(courseBase);

@@ -6,7 +6,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Date;
+import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -25,8 +25,8 @@ public class CourseCategoryRepositoryTest {
         parent.setName("后端开发");
         parent.setParentId(0L);
         parent.setLevel(1);
-        parent.setCreateTime(new Date());
-        parent.setUpdateTime(new Date());
+        parent.setCreateTime(LocalDateTime.now());
+        parent.setUpdateTime(LocalDateTime.now());
         courseCategoryRepository.save(parent);
 
         // 创建子分类
@@ -34,8 +34,8 @@ public class CourseCategoryRepositoryTest {
         child.setName("Java开发");
         child.setParentId(parent.getId());
         child.setLevel(2);
-        child.setCreateTime(new Date());
-        child.setUpdateTime(new Date());
+        child.setCreateTime(LocalDateTime.now());
+        child.setUpdateTime(LocalDateTime.now());
         courseCategoryRepository.save(child);
 
         // 测试查询

@@ -5,7 +5,7 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.ToString;
 
-import java.util.Date;
+import java.time.LocalDateTime;
 
 /**
  * 课程发布信息
@@ -40,19 +40,19 @@ public class CoursePublish {
      * 课程发布时间
      */
     @Temporal(TemporalType.TIMESTAMP)
-    private Date publishTime;
+    private LocalDateTime publishTime;
 
     /**
      * 创建时间
      */
     @Temporal(TemporalType.TIMESTAMP)
-    private Date createTime;
+    private LocalDateTime createTime;
 
     /**
      * 更新时间
      */
     @Temporal(TemporalType.TIMESTAMP)
-    private Date updateTime;
+    private LocalDateTime updateTime;
 
     /**
      * 对应的课程基本信息
