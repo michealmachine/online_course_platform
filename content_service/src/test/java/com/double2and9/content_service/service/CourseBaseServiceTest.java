@@ -31,6 +31,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.Date;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -184,34 +185,102 @@ class CourseBaseServiceTest {
         @Test
         @Transactional
         void testDeleteCourse() {
-                // 1. 创建测试课程
-                Long courseId = courseBaseService.createCourse(createTestCourseDTO());
+                // 1. 准备测试数据
+                CourseBase courseBase = new CourseBase();
+                courseBase.setName("测试课程");
+                courseBase.setBrief("测试简介");
+                courseBase.setStatus(CourseStatusEnum.DRAFT.getCode());
+                courseBase.setOrganizationId(TEST_ORG_ID);
+                courseBaseRepository.save(courseBase);
 
-                // 2. 删除课程
-                courseBaseService.deleteCourse(courseId);
+                // 2. 添加预发布记录
+                CoursePublishPre publishPre = new CoursePublishPre();
+                publishPre.setId(courseBase.getId());
+                publishPre.setCourseBase(courseBase);
+                publishPre.setStatus(CourseAuditStatusEnum.APPROVED.getCode());
+                publishPre.setName(courseBase.getName());
+                courseBase.setCoursePublishPre(publishPre);
 
-                // 3. 验证课程已被删除
-                ContentException exception = assertThrows(ContentException.class,
-                                () -> courseBaseService.getCourseById(courseId));
-                assertEquals(ContentErrorCode.COURSE_NOT_EXISTS, exception.getErrorCode());
+                // 3. 添加发布记录
+                CoursePublish coursePublish = new CoursePublish();
+                coursePublish.setId(courseBase.getId());
+                coursePublish.setCourseBase(courseBase);
+                coursePublish.setStatus(CourseStatusEnum.PUBLISHED.getCode());
+                coursePublish.setName(courseBase.getName());
+                courseBase.setCoursePublish(coursePublish);
+
+                courseBaseRepository.save(courseBase);
+
+                // 4. 执行删除
+                courseBaseService.deleteCourse(courseBase.getId());
+
+                // 5. 验证结果
+                Optional<CourseBase> deletedCourse = courseBaseRepository.findById(courseBase.getId());
+                assertFalse(deletedCourse.isPresent(), "课程应该被删除");
         }
 
         @Test
         @Transactional
-        void testDeleteCourse_WhenPublished() {
-                // 1. 创建课程
-                Long courseId = courseBaseService.createCourse(createTestCourseDTO());
-
-                // 2. 直接修改课程状态为已发布
-                CourseBase courseBase = courseBaseRepository.findById(courseId)
-                                .orElseThrow(() -> new ContentException(ContentErrorCode.COURSE_NOT_EXISTS));
-                courseBase.setStatus("202002"); // 设置为已发布状态
+        void testDeletePublishedCourse() {
+                // 1. 准备已发布的课程
+                CourseBase courseBase = new CourseBase();
+                courseBase.setName("已发布课程");
+                courseBase.setBrief("测试简介");
+                courseBase.setStatus(CourseStatusEnum.PUBLISHED.getCode());
+                courseBase.setOrganizationId(TEST_ORG_ID);
                 courseBaseRepository.save(courseBase);
 
-                // 3. 尝试删除已发布的课程
-                ContentException exception = assertThrows(ContentException.class,
-                                () -> courseBaseService.deleteCourse(courseId));
+                // 2. 验证删除失败
+                ContentException exception = assertThrows(ContentException.class, 
+                                () -> courseBaseService.deleteCourse(courseBase.getId()));
                 assertEquals(ContentErrorCode.COURSE_STATUS_ERROR, exception.getErrorCode());
+        }
+
+        @Test
+        @Transactional
+        void testDeleteCourseUnderReview() {
+                // 1. 准备审核中的课程
+                CourseBase courseBase = new CourseBase();
+                courseBase.setName("审核中课程");
+                courseBase.setBrief("测试简介");
+                courseBase.setStatus(CourseStatusEnum.DRAFT.getCode());
+                courseBase.setOrganizationId(TEST_ORG_ID);
+                courseBaseRepository.save(courseBase);
+
+                // 2. 添加审核中的预发布记录
+                CoursePublishPre publishPre = new CoursePublishPre();
+                publishPre.setId(courseBase.getId());
+                publishPre.setCourseBase(courseBase);
+                publishPre.setStatus(CourseAuditStatusEnum.SUBMITTED.getCode());
+                publishPre.setName(courseBase.getName());
+                courseBase.setCoursePublishPre(publishPre);
+
+                courseBaseRepository.save(courseBase);
+
+                // 3. 验证删除失败
+                ContentException exception = assertThrows(ContentException.class, 
+                                () -> courseBaseService.deleteCourse(courseBase.getId()));
+                assertEquals(ContentErrorCode.COURSE_STATUS_ERROR, exception.getErrorCode());
+        }
+
+        @Test
+        @Transactional
+        void testDeleteCourseWithInvalidLogo() {
+                // 1. 准备带无效logo的课程
+                CourseBase courseBase = new CourseBase();
+                courseBase.setName("测试课程");
+                courseBase.setBrief("测试简介");
+                courseBase.setStatus(CourseStatusEnum.DRAFT.getCode());
+                courseBase.setLogo("invalid/path/logo.jpg");
+                courseBase.setOrganizationId(TEST_ORG_ID);
+                courseBaseRepository.save(courseBase);
+
+                // 2. 执行删除
+                courseBaseService.deleteCourse(courseBase.getId());
+
+                // 3. 验证课程被删除
+                Optional<CourseBase> deletedCourse = courseBaseRepository.findById(courseBase.getId());
+                assertFalse(deletedCourse.isPresent(), "即使logo删除失败，课程也应该被删除");
         }
 
         @Test
@@ -439,6 +508,54 @@ class CourseBaseServiceTest {
                 courseBaseRepository.save(courseBase);
 
                 // ... 其他代码保持不变
+        }
+
+        @Test
+        @Transactional
+        void testDeleteCourse_WithTeacherAssociation() {
+                // 1. 创建课程
+                Long courseId = courseBaseService.createCourse(createTestCourseDTO());
+
+                // 2. 创建并关联教师
+                SaveCourseTeacherDTO teacherDTO = new SaveCourseTeacherDTO();
+                teacherDTO.setOrganizationId(TEST_ORG_ID);
+                teacherDTO.setName("测试教师");
+                teacherDTO.setPosition("讲师");
+                Long teacherId = courseTeacherService.saveTeacher(teacherDTO);
+                courseTeacherService.associateTeacherToCourse(TEST_ORG_ID, courseId, teacherId);
+
+                // 3. 尝试普通删除，应该抛出异常
+                ContentException exception = assertThrows(ContentException.class,
+                        () -> courseBaseService.deleteCourse(courseId));
+                assertEquals(ContentErrorCode.COURSE_HAS_TEACHER, exception.getErrorCode());
+
+                // 4. 使用强制删除
+                courseBaseService.deleteCourseWithRelations(courseId, true);
+
+                // 5. 验证课程和关联都已被删除
+                assertFalse(courseBaseRepository.findById(courseId).isPresent(), "课程应该已被删除");
+                
+                // 验证教师与课程的关联已解除
+                List<CourseTeacherDTO> teachers = courseTeacherService.listByCourseId(courseId);
+                assertTrue(teachers.isEmpty(), "课程的教师关联应该已被解除");
+        }
+
+        @Test
+        @Transactional
+        void testDeleteCourseWithRelations_WhenPublished() {
+                // 1. 创建课程
+                Long courseId = courseBaseService.createCourse(createTestCourseDTO());
+
+                // 2. 设置课程为已发布状态
+                CourseBase courseBase = courseBaseRepository.findById(courseId)
+                        .orElseThrow(() -> new ContentException(ContentErrorCode.COURSE_NOT_EXISTS));
+                courseBase.setStatus(CourseStatusEnum.PUBLISHED.getCode());
+                courseBaseRepository.save(courseBase);
+
+                // 3. 尝试强制删除，应该抛出异常
+                ContentException exception = assertThrows(ContentException.class,
+                        () -> courseBaseService.deleteCourseWithRelations(courseId, true));
+                assertEquals(ContentErrorCode.COURSE_STATUS_ERROR, exception.getErrorCode());
         }
 
 }

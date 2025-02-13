@@ -103,10 +103,14 @@ public class CourseAuditServiceImpl implements CourseAuditService {
                 publishPre.setStatus(CourseAuditStatusEnum.SUBMITTED.getCode());
                 courseBase.setCoursePublishPre(publishPre);
 
-                // 5. 保存更新
+                // 5. 更新课程状态为已发布
+                courseBase.setStatus(CourseStatusEnum.PUBLISHED.getCode());  // 202002
+                courseBase.setUpdateTime(LocalDateTime.now());
+
+                // 6. 保存更新
                 courseBaseRepository.save(courseBase);
 
-                // 6. 发布审核事件
+                // 7. 发布审核事件
                 eventPublisher.publishEvent(new CourseAuditEvent(
                                 CourseAuditStatusEnum.SUBMITTED.getCode(),
                                 courseBase,

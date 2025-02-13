@@ -75,7 +75,15 @@ public interface CourseBaseService {
     @Transactional
     void updateCourse(EditCourseDTO editCourseDTO);
 
-    String getAuditStatus(Long courseId);
+    /**
+     * 获取课程审核状态
+     * 
+     * @param courseId 课程ID
+     * @param organizationId 机构ID
+     * @return 审核状态
+     * @throws ContentException 当课程不存在或无权限访问时
+     */
+    String getAuditStatus(Long courseId, Long organizationId);
 
     /**
      * 根据ID获取课程
@@ -122,4 +130,6 @@ public interface CourseBaseService {
      * @param courseId 课程ID
      */
     void deleteCourseLogo(Long courseId);
+
+    void deleteCourseWithRelations(Long courseId, boolean force);
 }

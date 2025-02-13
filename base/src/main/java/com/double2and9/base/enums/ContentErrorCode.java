@@ -26,6 +26,8 @@ public enum ContentErrorCode {
     // 教师相关错误 1003xx
     TEACHER_NOT_EXISTS(100301, "教师不存在"),
     TEACHER_COURSE_NOT_MATCH(100302, "教师与课程不匹配"),
+    COURSE_HAS_TEACHER(40010, "课程存在教师关联"),
+    COURSE_DELETE_TEACHER_FAILED(40011, "解除课程教师关联失败"),
 
     // 媒资相关错误 1004xx
     MEDIA_NOT_EXISTS(100401, "媒资文件不存在"),
@@ -53,7 +55,10 @@ public enum ContentErrorCode {
 
     PARAM_ERROR(400001, "参数错误"),
     FILE_UPLOAD_ERROR(400007, "文件上传失败"),
-    FILE_DELETE_ERROR(400008, "文件删除失败");
+    FILE_DELETE_ERROR(400008, "文件删除失败"),
+
+    // 权限相关错误 1006xx
+    PERMISSION_DENIED(100601, "没有操作权限");
 
     private final int code;
     private final String message;

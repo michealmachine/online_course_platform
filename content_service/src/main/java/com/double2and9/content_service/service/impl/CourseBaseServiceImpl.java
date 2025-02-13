@@ -35,6 +35,8 @@ import java.util.HashMap;
 import java.util.Map;
 import java.time.LocalDateTime;
 
+import com.double2and9.content_service.service.CourseTeacherService;
+
 /**
  * 课程基础服务实现类
  * 处理课程相关的核心业务逻辑,包括:
@@ -53,7 +55,8 @@ public class CourseBaseServiceImpl implements CourseBaseService {
     private final MediaFileRepository mediaFileRepository;
     private final ModelMapper modelMapper;
     private final MediaFeignClient mediaFeignClient;
-
+    private final CourseTeacherService courseTeacherService;
+    
     /**
      * 构造函数注入依赖
      */
@@ -63,7 +66,8 @@ public class CourseBaseServiceImpl implements CourseBaseService {
             CourseTeacherRepository courseTeacherRepository,
             MediaFileRepository mediaFileRepository,
             ModelMapper modelMapper,
-            MediaFeignClient mediaFeignClient) {
+            MediaFeignClient mediaFeignClient,
+            CourseTeacherService courseTeacherService) {
         this.courseBaseRepository = courseBaseRepository;
         this.courseCategoryRepository = courseCategoryRepository;
         this.teachplanRepository = teachplanRepository;
@@ -71,6 +75,7 @@ public class CourseBaseServiceImpl implements CourseBaseService {
         this.mediaFileRepository = mediaFileRepository;
         this.modelMapper = modelMapper;
         this.mediaFeignClient = mediaFeignClient;
+        this.courseTeacherService = courseTeacherService;
     }
 
     /**
@@ -329,11 +334,13 @@ public class CourseBaseServiceImpl implements CourseBaseService {
             coursePublish.setCreateTime(LocalDateTime.now());
         }
 
+        // 更新发布记录信息
         coursePublish.setName(courseBase.getName());
         coursePublish.setStatus(CourseStatusEnum.PUBLISHED.getCode());
         coursePublish.setPublishTime(LocalDateTime.now());
         coursePublish.setUpdateTime(LocalDateTime.now());
 
+        // 保存更新
         courseBase.setCoursePublish(coursePublish);
         courseBaseRepository.save(courseBase);
 
@@ -341,11 +348,24 @@ public class CourseBaseServiceImpl implements CourseBaseService {
     }
 
     @Override
-    public String getAuditStatus(Long courseId) {
-        return courseBaseRepository.findById(courseId)
-                .map(CourseBase::getCoursePublishPre)
-                .map(CoursePublishPre::getStatus)
-                .orElse(null);
+    public String getAuditStatus(Long courseId, Long organizationId) {
+        // 1. 查询课程并验证存在性
+        CourseBase courseBase = courseBaseRepository.findById(courseId)
+                .orElseThrow(() -> new ContentException(ContentErrorCode.COURSE_NOT_EXISTS));
+        
+        // 2. 验证机构权限
+        if (!organizationId.equals(courseBase.getOrganizationId())) {
+            throw new ContentException(ContentErrorCode.PERMISSION_DENIED);
+        }
+            
+        // 3. 获取预发布记录中的审核状态
+        CoursePublishPre publishPre = courseBase.getCoursePublishPre();
+        if (publishPre != null) {
+            return publishPre.getStatus();
+        }
+        
+        // 4. 如果没有预发布记录,返回空
+        return null;
     }
 
     /**
@@ -393,9 +413,95 @@ public class CourseBaseServiceImpl implements CourseBaseService {
         CourseBase courseBase = courseBaseRepository.findById(courseId)
                 .orElseThrow(() -> new ContentException(ContentErrorCode.COURSE_NOT_EXISTS));
 
-        // 检查课程状态，已发布的课程不能删除
+        // 1. 检查课程状态
         if (CourseStatusEnum.PUBLISHED.getCode().equals(courseBase.getStatus())) {
             throw new ContentException(ContentErrorCode.COURSE_STATUS_ERROR, "已发布的课程不能删除");
+        }
+
+        // 2. 检查审核状态
+        CoursePublishPre publishPre = courseBase.getCoursePublishPre();
+        if (publishPre != null && CourseAuditStatusEnum.SUBMITTED.getCode().equals(publishPre.getStatus())) {
+            throw new ContentException(ContentErrorCode.COURSE_STATUS_ERROR, "审核中的课程不能删除");
+        }
+
+        // 3. 检查是否存在教师关联
+        Page<CourseTeacher> teacherPage = courseTeacherRepository.findByCourseId(
+                courseId,
+                PageRequest.of(0, 1));
+        if (teacherPage.hasContent()) {
+            throw new ContentException(ContentErrorCode.COURSE_HAS_TEACHER, 
+                "课程存在教师关联，请先解除教师关联");
+        }
+
+        // 4. 删除课程相关数据
+        try {
+            // 4.1 删除课程计划
+            List<Teachplan> teachplans = teachplanRepository.findByCourseBaseIdOrderByOrderBy(courseId);
+            if (!teachplans.isEmpty()) {
+                teachplanRepository.deleteAll(teachplans);
+            }
+
+            // 4.2 删除预发布记录
+            if (publishPre != null) {
+                courseBase.setCoursePublishPre(null);
+            }
+
+            // 4.3 删除发布记录
+            CoursePublish coursePublish = courseBase.getCoursePublish();
+            if (coursePublish != null) {
+                courseBase.setCoursePublish(null);
+            }
+
+            // 4.4 删除课程封面 - 恢复容错逻辑
+            if (StringUtils.hasText(courseBase.getLogo())) {
+                try {
+                    deleteCourseLogo(courseId);
+                } catch (Exception e) {
+                    log.error("删除课程封面失败：", e);
+                    // 继续删除课程，不影响主流程
+                }
+            }
+
+            // 4.5 删除课程基本信息
+            courseBaseRepository.delete(courseBase);
+
+            log.info("删除课程成功，courseId：{}", courseId);
+        } catch (Exception e) {
+            log.error("删除课程失败，courseId：{}", courseId, e);
+            throw new ContentException(ContentErrorCode.SYSTEM_ERROR, "删除课程失败");
+        }
+    }
+
+    /**
+     * 删除课程及其所有关联数据
+     * @param courseId 课程ID
+     * @param force 是否强制删除(包括教师关联)
+     */
+    @Transactional
+    public void deleteCourseWithRelations(Long courseId, boolean force) {
+        log.info("删除课程及关联数据，courseId：{}，force：{}", courseId, force);
+
+        CourseBase courseBase = courseBaseRepository.findById(courseId)
+                .orElseThrow(() -> new ContentException(ContentErrorCode.COURSE_NOT_EXISTS));
+
+        // 检查课程状态
+        if (CourseStatusEnum.PUBLISHED.getCode().equals(courseBase.getStatus())) {
+            throw new ContentException(ContentErrorCode.COURSE_STATUS_ERROR, "已发布的课程不能删除");
+        }
+
+        if (force) {
+            // 解除所有教师关联
+            Page<CourseTeacher> teacherPage = courseTeacherRepository.findByCourseId(
+                    courseId,
+                    PageRequest.of(0, Integer.MAX_VALUE));
+            teacherPage.getContent().forEach(teacher -> {
+                try {
+                    courseTeacherService.dissociateTeacherFromCourse(
+                        teacher.getOrganizationId(), courseId, teacher.getId());
+                } catch (Exception e) {
+                    log.error("解除教师关联失败：", e);
+                }
+            });
         }
 
         // 删除课程封面
@@ -404,14 +510,13 @@ public class CourseBaseServiceImpl implements CourseBaseService {
                 deleteCourseLogo(courseId);
             } catch (Exception e) {
                 log.error("删除课程封面失败：", e);
-                // 继续删除课程，不影响主流程
             }
         }
 
-        // 删除课程相关数据
+        // 删除课程
         courseBaseRepository.delete(courseBase);
 
-        log.info("删除课程成功，courseId：{}", courseId);
+        log.info("删除课程及关联数据成功，courseId：{}", courseId);
     }
 
     @Override
