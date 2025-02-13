@@ -24,9 +24,9 @@ public class GlobalExceptionHandler {
      * 处理业务异常
      */
     @ExceptionHandler(ContentException.class)
-    public ContentResponse<Void> handleContentException(ContentException e) {
-        log.warn("业务异常：{}", e.getMessage());
-        return ContentResponse.error(e.getErrorCode().getCode(), e.getErrorCode().getMessage());
+    public ContentResponse<?> handleContentException(ContentException e) {
+        log.warn("业务异常：code={}，message={}", e.getErrorCode(), e.getMessage(), e);
+        return ContentResponse.error(e.getErrorCode().getCode(), e.getMessage());
     }
 
     /**
@@ -66,8 +66,9 @@ public class GlobalExceptionHandler {
      * 处理其他未知异常
      */
     @ExceptionHandler(Exception.class)
-    public ContentResponse<Void> handleException(Exception e) {
+    public ContentResponse<?> handleException(Exception e) {
         log.error("系统异常：", e);
-        return ContentResponse.error(500, "系统内部错误");
+        return ContentResponse.error(ContentErrorCode.SYSTEM_ERROR.getCode(), 
+                                   ContentErrorCode.SYSTEM_ERROR.getMessage());
     }
 } 

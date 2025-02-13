@@ -193,7 +193,7 @@ public class ImageServiceImpl implements ImageService {
      * @return 文件访问URL
      * @throws MediaException 临时文件不存在或上传失败时抛出异常
      */
-    public String saveTempFile(String tempKey) {
+    public MediaFile saveTempFile(String tempKey) {
         // 1. 从Redis获取临时文件
         TempFileDTO tempFile = (TempFileDTO) redisTemplate.opsForValue().get(tempKey);
         if (tempFile == null) {
@@ -219,8 +219,19 @@ public class ImageServiceImpl implements ImageService {
             // 4. 删除临时文件
             redisTemplate.delete(tempKey);
 
-            // 5. 返回访问URL - 使用简单的URL拼接
-            return "/" + bucketName + "/" + objectName;
+            // 5. 创建并返回媒体文件记录
+            MediaFile mediaFile = new MediaFile();
+            mediaFile.setFileName(fileName);
+            mediaFile.setMediaType("IMAGE");
+            mediaFile.setFileSize(tempFile.getFileSize());
+            mediaFile.setFilePath(objectName);
+            mediaFile.setBucket(bucketName);
+            mediaFile.setUrl("/" + bucketName + "/" + objectName);
+            mediaFile.setStatus("NORMAL");
+            mediaFile.setCreateTime(new Date());
+            mediaFile.setUpdateTime(new Date());
+
+            return mediaFileRepository.save(mediaFile);
         } catch (Exception e) {
             log.error("保存文件到永久存储失败", e);
             throw new MediaException(MediaErrorCode.FILE_UPLOAD_FAILED);

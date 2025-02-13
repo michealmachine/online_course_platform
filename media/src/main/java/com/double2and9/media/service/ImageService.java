@@ -51,9 +51,9 @@ public interface ImageService {
      * 将临时文件保存到永久存储
      * 
      * @param tempKey 临时存储key
-     * @return 永久访问URL
+     * @return 媒体文件信息
      */
-    String saveTempFile(String tempKey);
+    MediaFile saveTempFile(String tempKey);
 
     /**
      * 保存临时文件到永久存储（saveTempFile的别名方法）

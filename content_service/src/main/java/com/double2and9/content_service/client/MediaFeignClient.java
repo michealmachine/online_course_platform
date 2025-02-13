@@ -3,7 +3,9 @@ package com.double2and9.content_service.client;
 import com.double2and9.base.dto.CommonResponse;
 import com.double2and9.base.dto.MediaFileDTO;
 import com.double2and9.base.enums.ContentErrorCode;
+import com.double2and9.content_service.config.FeignMultipartConfig;
 import org.springframework.cloud.openfeign.FeignClient;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -17,7 +19,10 @@ import java.util.Map;
  * - 文件访问
  */
 
-@FeignClient(name = "media-service")
+@FeignClient(
+    name = "media-service",
+    configuration = FeignMultipartConfig.class
+)
 public interface MediaFeignClient {
 
         /**
@@ -27,7 +32,7 @@ public interface MediaFeignClient {
          * @param file 要上传的文件
          * @return 包含临时存储key的响应对象
          */
-        @PostMapping("/media/images/temp")
+        @PostMapping(value = "/api/media/images/temp", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
         CommonResponse<String> uploadImageTemp(@RequestPart("file") MultipartFile file);
 
         /**
@@ -37,7 +42,7 @@ public interface MediaFeignClient {
          * @param params 包含tempKey的参数Map
          * @return 包含媒体文件信息的响应对象
          */
-        @PostMapping("/media/temp/save")
+        @PostMapping("/api/media/temp/save")
         CommonResponse<MediaFileDTO> saveTempFile(@RequestBody Map<String, String> params);
 
         /**
@@ -46,6 +51,6 @@ public interface MediaFeignClient {
          * @param url 文件访问URL
          * @return 删除操作的响应对象
          */
-        @DeleteMapping("/media/files/{url}")
-        CommonResponse<?> deleteMediaFile(@PathVariable("url") String url);
+        @DeleteMapping("/api/media/files")
+        CommonResponse<?> deleteMediaFile(@RequestParam("url") String url);
 }

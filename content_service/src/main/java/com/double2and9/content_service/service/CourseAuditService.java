@@ -6,6 +6,8 @@ import com.double2and9.content_service.dto.CourseAuditDTO;
 import com.double2and9.content_service.dto.CoursePublishPreDTO;
 import com.double2and9.content_service.dto.CourseAuditHistoryDTO;
 import com.double2and9.content_service.dto.CourseBaseDTO;
+import com.double2and9.content_service.dto.CourseAuditInfoDTO;
+import com.double2and9.content_service.dto.QueryCourseParamsDTO;
 
 public interface CourseAuditService {
     /**
@@ -39,4 +41,9 @@ public interface CourseAuditService {
      * 获取审核人的审核历史
      */
     PageResult<CourseAuditHistoryDTO> getAuditorHistory(Long auditorId, PageParams pageParams);
+
+    /**
+     * 查询课程列表（包含审核信息）
+     */
+    PageResult<CourseAuditInfoDTO> queryCourseAuditList(PageParams pageParams, QueryCourseParamsDTO queryParams);
 }

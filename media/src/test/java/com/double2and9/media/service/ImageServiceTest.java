@@ -226,11 +226,16 @@ public class ImageServiceTest {
         String tempKey = imageService.uploadImageTemp(file);
 
         // 2. 保存到永久存储
-        String url = imageService.saveTempFile(tempKey);
+        MediaFile mediaFile = imageService.saveTempFile(tempKey);
 
         // 3. 验证
-        assertNotNull(url);
-        assertTrue(url.startsWith("/"));
+        assertNotNull(mediaFile);
+        assertEquals("test.jpg", mediaFile.getFileName());
+        assertEquals("IMAGE", mediaFile.getMediaType());
+        assertTrue(mediaFile.getUrl().startsWith("/"));
+        assertEquals("NORMAL", mediaFile.getStatus());
+        assertNotNull(mediaFile.getCreateTime());
+        assertNotNull(mediaFile.getUpdateTime());
 
         // 4. 验证临时文件已删除
         Object tempFile = redisTemplate.opsForValue().get(tempKey);

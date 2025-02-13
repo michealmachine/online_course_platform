@@ -84,42 +84,6 @@ public class CourseController {
     }
 
     /**
-     * 获取课程审核状态
-     * 用于机构查询自己课程的审核进度
-     * 
-     * 权限:
-     * - 机构用户: 只能查询本机构的课程
-     * - 管理员: 可查询任意课程
-     * 
-     * 返回状态说明:
-     * - SUBMITTED: 已提交审核
-     * - APPROVED: 审核通过
-     * - REJECTED: 审核不通过
-     * - null: 未提交审核
-     * 
-     * 业务规则:
-     * 1. 课程不存在时会抛出 COURSE_NOT_EXISTS 异常
-     * 2. 未提交审核的课程返回 null
-     * 3. 机构只能查询自己的课程,否则抛出 PERMISSION_DENIED 异常
-     * 
-     * @param courseId 课程ID
-     * @param organizationId 当前用户所属机构ID(从token中获取)
-     * @return 审核状态码
-     * @throws ContentException 当课程不存在或无权限访问时
-     */
-    @Operation(summary = "获取课程审核状态")
-    @GetMapping("/{courseId}/audit-status")
-    public ContentResponse<String> getAuditStatus(
-            @Parameter(description = "课程ID", required = true) @PathVariable Long courseId,
-            @Parameter(description = "机构ID", required = true) @RequestParam Long organizationId) {
-        
-        log.info("获取课程审核状态，courseId：{}，organizationId：{}", courseId, organizationId);
-        String auditStatus = courseBaseService.getAuditStatus(courseId, organizationId);
-        log.info("获取课程审核状态成功，courseId：{}，status：{}", courseId, auditStatus);
-        return ContentResponse.success(auditStatus);
-    }
-
-    /**
      * 获取课程详情
      * 返回的 CourseBaseDTO 中包含:
      * - 基本信息(名称、简介等)
@@ -352,42 +316,5 @@ public class CourseController {
         courseBaseService.deleteCourseLogo(courseId);
         log.info("删除课程封面成功，courseId：{}", courseId);
         return ContentResponse.success(null);
-    }
-
-    /**
-     * 管理员查询所有课程
-     * 权限：仅管理员
-     */
-    @Operation(summary = "管理员查询课程列表", description = "管理员查询所有机构的课程列表，支持多条件筛选")
-    @GetMapping("/admin/list")
-    public ContentResponse<PageResult<CourseBaseDTO>> queryAllCourses(
-            @Parameter(description = "机构ID") @RequestParam(required = false) Long organizationId,
-            @Parameter(description = "课程状态") @RequestParam(required = false) String status,
-            @Parameter(description = "审核状态") @RequestParam(required = false) String auditStatus,
-            @Parameter(description = "课程名称") @RequestParam(required = false) String courseName,
-            @Parameter(description = "分页参数") PageParams pageParams) {
-
-        log.info("管理员查询课程列表，机构ID：{}，状态：{}，审核状态：{}，课程名称：{}",
-                organizationId, status, auditStatus, courseName);
-
-        QueryCourseParamsDTO queryParams = new QueryCourseParamsDTO();
-        queryParams.setOrganizationId(organizationId);
-        queryParams.setStatus(status);
-        queryParams.setAuditStatus(auditStatus);
-        queryParams.setCourseName(courseName);
-
-        return ContentResponse.success(
-                courseBaseService.queryCourseList(pageParams, queryParams));
-    }
-
-    /**
-     * 查询已通过审核的课程列表
-     */
-    @Operation(summary = "查询已通过审核的课程列表")
-    @GetMapping("/list")
-    public ContentResponse<PageResult<CourseBaseDTO>> listApprovedCourses(
-            @Parameter(description = "分页参数") PageParams pageParams,
-            @Parameter(description = "查询条件") QueryCourseParamsDTO queryParams) {
-        return ContentResponse.success(courseBaseService.queryApprovedCourseList(pageParams, queryParams));
     }
 }

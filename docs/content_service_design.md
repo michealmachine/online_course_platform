@@ -559,8 +559,6 @@ GET     /course/preview/{courseId}       # 课程预览
 GET     /course/category/tree            # 获取课程分类树
 
 # 课程查询
-GET     /course/list                     # 查询已审核课程
-GET     /course/admin/list               # 管理员查询课程列表
 GET     /course/organization/{orgId}     # 查询机构课程列表
 
 # 课程封面
@@ -579,6 +577,14 @@ POST    /course-audit/approve            # 审核操作
 GET     /course-audit/pending            # 待审核列表
 GET     /course-audit/history/{courseId} # 课程审核历史
 GET     /course-audit/history/auditor/{auditorId} # 审核人历史
+
+# 审核状态查询
+GET     /course-audit/status/{courseId}  # 获取课程审核状态
+GET     /course-audit/detail/{courseId}  # 获取待审核课程详情
+
+# 课程查询
+GET     /course-audit/approved          # 查询已审核通过的课程
+GET     /course-audit/courses           # 管理员查询所有课程列表(包含审核信息)
 ```
 
 #### 6.2.3 教师管理接口 (CourseTeacherController)
@@ -641,19 +647,20 @@ DELETE  /teachplan/media/{teachplanId}/{mediaId} # 解除绑定
   - brief: 课程简介
   - price: 课程价格
 
-#### 6.3.2 课程计划DTO
-- TeachplanDTO: 课程计划树节点
-  - id: 节点ID
-  - name: 节点名称
-  - parentId: 父节点ID
-  - orderBy: 排序号
-  - children: 子节点列表
+#### 6.3.2 课程审核DTO
+- CourseAuditDTO: 课程审核请求
+  - courseId: 课程ID
+  - auditStatus: 审核状态(pass/reject)
+  - auditMessage: 审核意见
+  - auditorId: 审核人ID
 
-- SaveTeachplanDTO: 保存课程计划
-  - courseId: 课程ID(必填)
-  - parentId: 父节点ID(必填)
-  - name: 计划名称(必填)
-  - level: 层级(必填)
+- CourseAuditHistoryDTO: 审核历史记录
+  - id: 记录ID
+  - courseId: 课程ID
+  - auditStatus: 审核状态
+  - auditMessage: 审核意见
+  - auditorId: 审核人ID
+  - auditTime: 审核时间
 
 #### 6.3.3 教师管理DTO
 - CourseTeacherDTO: 教师信息

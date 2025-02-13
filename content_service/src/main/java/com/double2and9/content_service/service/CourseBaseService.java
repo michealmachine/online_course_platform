@@ -3,6 +3,7 @@ package com.double2and9.content_service.service;
 import com.double2and9.base.dto.MediaFileDTO;
 import com.double2and9.base.model.PageParams;
 import com.double2and9.base.model.PageResult;
+import com.double2and9.content_service.common.exception.ContentException;
 import com.double2and9.content_service.dto.*;
 
 import java.util.List;
