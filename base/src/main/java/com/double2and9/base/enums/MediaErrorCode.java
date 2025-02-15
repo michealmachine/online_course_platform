@@ -15,6 +15,12 @@ public enum MediaErrorCode {
     FILE_TYPE_ERROR(200108, "文件类型错误"),
     FILE_UPLOAD_FAILED(200109, "文件上传失败"),
 
+    // 分片上传相关错误 2004xx
+    UPLOAD_SESSION_NOT_FOUND(200401, "上传会话不存在"),
+    UPLOAD_SESSION_INVALID_STATUS(200402, "上传会话状态无效"),
+    INVALID_CHUNK_INDEX(200403, "分片索引无效"),
+    GENERATE_PRESIGNED_URL_FAILED(200404, "生成预签名URL失败"),
+
     // 处理相关错误 2002xx
     PROCESS_FAILED(200201, "文件处理失败"),
     PROCESS_STATUS_ERROR(200202, "处理状态错误"),

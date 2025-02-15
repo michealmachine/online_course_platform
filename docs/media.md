@@ -512,3 +512,74 @@ void testUploadCourseLogo_FileTooLarge() {
 |--------|------|
 | 299901 | 参数错误 |
 | 299999 | 系统内部错误 |
+
+
+媒体文件分片上传完整流程 (文字说明):
+客户端发起 "初始化分片上传" 请求 (Initiate Multipart Upload Request):
+客户端 (例如浏览器或 App) 向后端 API /api/media/upload/initiate 发送 POST 请求。
+请求体中包含文件元数据信息，例如：fileName (文件名), fileSize (文件大小), mediaType (媒体类型), mimeType (MIME 类型), purpose (文件用途), organizationId (机构 ID) 等。
+服务端处理 "初始化分片上传" 请求 (Initiate Multipart Upload):
+MediaUploadController 接收到请求，并调用 MediaUploadService.initiateMultipartUpload() 方法。
+MediaUploadServiceImpl.initiateMultipartUpload() 方法执行以下操作：
+生成唯一的 uploadId (分片上传 ID) 和 mediaFileId (媒体文件 ID)。
+确定文件在 MinIO 存储桶中的存储路径 (bucket 和 filePath)。
+计算分片大小 (chunkSize) 和总分片数 (totalChunks)。
+创建 MultipartUploadRecord 实体对象，记录分片上传会话信息，并将状态设置为 "UPLOADING"。
+将 MultipartUploadRecord 实体对象保存到数据库。
+构建 InitiateMultipartUploadResponseDTO 响应对象，包含 uploadId, mediaFileId, bucket, filePath, chunkSize, totalChunks 等信息。
+MediaUploadController 将 InitiateMultipartUploadResponseDTO 封装在 CommonResponse 中，并返回给客户端。
+客户端接收 "初始化分片上传" 响应 (Initiate Multipart Upload Response):
+客户端接收到 /api/media/upload/initiate 接口的响应，从中获取 uploadId, chunkSize 等关键信息，并保存起来，用于后续的分片上传操作。
+客户端分片上传文件 (Upload Chunks):
+客户端将要上传的文件按照 chunkSize 分割成多个分片 (chunk)。
+循环上传每个分片: 对于每个分片，客户端执行以下操作：
+获取 "分片预签名 URL" (Get Presigned URL for Upload Chunk): 客户端向后端 API /api/media/upload/presigned-url 发送 GET 请求，请求参数包含 uploadId (分片上传 ID) 和 chunkIndex (分片索引，从 1 开始)。 服务端会验证 uploadId 的有效性，并为当前分片生成一个带有上传权限的预签名 URL (Presigned PUT URL)，并返回给客户端。 （这是我们下一步要开发的 API 接口）
+使用预签名 URL 上传分片 (Upload Chunk to MinIO): 客户端使用上一步获取的预签名 URL，向 MinIO 对象存储服务发送 PUT 请求，将当前分片的数据作为请求体上传到 MinIO。 客户端直接与 MinIO 服务交互，无需经过后端服务。
+后端服务更新已上传分片记录 (Update Uploaded Chunks): （可选步骤，可以优化上传进度展示） 客户端可以异步地向后端 API 发送请求，告知服务端某个分片已经上传完成。 服务端可以更新 MultipartUploadRecord 记录中的 uploadedChunks 字段，用于跟踪上传进度。
+客户端发起 "完成分片上传" 请求 (Complete Multipart Upload Request):
+当所有分片都上传完成后，客户端向后端 API /api/media/upload/complete 发送 POST 请求。
+请求体中包含 uploadId (分片上传 ID)。
+服务端处理 "完成分片上传" 请求 (Complete Multipart Upload):
+MediaUploadController 接收到请求，并调用 MediaUploadService.completeMultipartUpload() 方法。
+MediaUploadServiceImpl.completeMultipartUpload() 方法执行以下操作：
+根据 uploadId 从数据库中查询 MultipartUploadRecord 记录。
+合并 MinIO 中的所有分片文件，生成最终的完整文件。 （MinIO 服务端合并分片）
+验证文件完整性 (可选，例如校验 MD5 或 SHA-256)。
+更新 MultipartUploadRecord 记录的状态为 "COMPLETED"，并记录完成时间。
+创建 MediaFile 实体对象，记录最终上传完成的媒体文件信息 (例如文件名, 文件大小, 存储路径, 媒体类型, MIME 类型, 用途等)，并保存到数据库。
+构建 CompleteMultipartUploadResponseDTO 响应对象，包含最终的 mediaFileId 和文件访问 URL 等信息。
+MediaUploadController 将 CompleteMultipartUploadResponseDTO 封装在 CommonResponse 中，并返回给客户端。
+客户端接收 "完成分片上传" 响应 (Complete Multipart Upload Response):
+客户端接收到 /api/media/upload/complete 接口的响应，从中获取最终的 mediaFileId 和文件访问 URL 等信息。
+客户端可以使用文件访问 URL 下载或播放已上传的媒体文件。
+
+sequenceDiagram
+    participant Client
+    participant Backend Service
+    participant MinIO
+
+    Client->>Backend Service: 1. 初始化分片上传 (fileName, fileSize, chunkSize)
+    Backend Service->>Backend Service: 生成 Upload ID, 预签名 URL 策略
+    Backend Service-->>Client: 返回 Upload ID, 预签名 URL 策略
+
+    loop 分片上传
+        Client->>Backend Service: 请求分片预签名 URL (Upload ID, 分片序号)
+        Backend Service->>MinIO: 生成分片预签名 URL (Upload ID, 分片序号)
+        Backend Service-->>Client: 返回分片预签名 URL
+        Client->>MinIO: 2. 上传分片数据 (PUT 预签名 URL)
+        MinIO-->>Client: 返回 分片 ETag
+        Client->>Client: 记录 分片 ETag
+    end
+
+    Client->>Backend Service: 3. 完成分片上传 (Upload ID, ETag 列表)
+    Backend Service->>MinIO: 请求合并分片 (Upload ID, ETag 列表)
+    MinIO->>MinIO: 服务端合并分片
+    MinIO-->>Backend Service: 返回 最终文件 ETag
+    Backend Service->>DB: 创建 MediaFile, MediaProcessHistory 记录
+    Backend Service->>Message Queue: 发送 异步元信息提取任务
+    Backend Service-->>Client: 4. 上传成功响应
+
+    Message Queue-->>Backend Service: 异步元信息提取任务
+    Backend Service->>MinIO: 读取完整视频文件
+    Backend Service->>Backend Service: 提取元信息, 转码等处理
+    Backend Service->>DB: 更新 MediaFile, MediaProcessHistory 记录

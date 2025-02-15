@@ -13,6 +13,8 @@ import java.util.Date;
 @ToString
 @Entity
 @Table(name = "media_file")
+@Inheritance(strategy = InheritanceType.SINGLE_TABLE)
+@DiscriminatorColumn(name = "file_type", discriminatorType = DiscriminatorType.STRING)
 public class MediaFile {
 
     @Id

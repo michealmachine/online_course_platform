@@ -513,15 +513,21 @@ public class ImageServiceTest {
 
     @Test
     void testUploadCourseLogo_FileTooLarge() {
-        // 准备超大文件
-        byte[] largeContent = new byte[3 * 1024 * 1024]; // 3MB
+        // 准备超过10MB的文件
+        byte[] largeContent = new byte[11 * 1024 * 1024]; // 11MB，超过配置的10MB限制
         MockMultipartFile file = new MockMultipartFile(
-                "file", "test.jpg", "image/jpeg", largeContent);
+                "file",
+                "test.jpg",
+                "image/jpeg",
+                largeContent);
 
         // 验证异常
         MediaException exception = assertThrows(MediaException.class,
                 () -> imageService.uploadCourseLogo(1L, 1L, file));
-        assertEquals(MediaErrorCode.FILE_TOO_LARGE, exception.getErrorCode());
+
+        // 验证异常码和消息
+        assertEquals(MediaErrorCode.FILE_TOO_LARGE.getCode(), exception.getCode());
+        assertTrue(exception.getMessage().contains("文件大小超过限制"));
     }
 
     @Test
