@@ -4,6 +4,8 @@ import com.double2and9.media.dto.GetPresignedUrlRequestDTO;
 import com.double2and9.media.dto.GetPresignedUrlResponseDTO;
 import com.double2and9.media.dto.InitiateMultipartUploadRequestDTO;
 import com.double2and9.media.dto.InitiateMultipartUploadResponseDTO;
+import com.double2and9.media.dto.CompleteMultipartUploadRequestDTO;
+import com.double2and9.media.dto.CompleteMultipartUploadResponseDTO;
 
 /**
  * 媒体上传服务接口
@@ -20,4 +22,11 @@ public interface MediaUploadService {
             InitiateMultipartUploadRequestDTO initiateMultipartUploadRequestDTO);
 
     GetPresignedUrlResponseDTO getPresignedUrl(GetPresignedUrlRequestDTO request);
+
+    /**
+     * 完成分片上传
+     * @param request 完成分片上传请求
+     * @return 完成分片上传响应
+     */
+    CompleteMultipartUploadResponseDTO completeMultipartUpload(CompleteMultipartUploadRequestDTO request);
 }

@@ -20,6 +20,11 @@ public enum MediaErrorCode {
     UPLOAD_SESSION_INVALID_STATUS(200402, "上传会话状态无效"),
     INVALID_CHUNK_INDEX(200403, "分片索引无效"),
     GENERATE_PRESIGNED_URL_FAILED(200404, "生成预签名URL失败"),
+    UPLOAD_NOT_COMPLETED(200405, "文件分片未上传完成"),
+    COMPLETE_MULTIPART_UPLOAD_FAILED(200406, "完成分片上传失败"),
+    MERGE_CHUNKS_FAILED(200407, "合并分片失败"),
+    CREATE_MEDIA_FILE_FAILED(200408, "创建媒体文件记录失败"),
+    GET_FILE_SIZE_FAILED(200409, "获取文件大小失败"),
 
     // 处理相关错误 2002xx
     PROCESS_FAILED(200201, "文件处理失败"),

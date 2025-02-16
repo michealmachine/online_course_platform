@@ -5,8 +5,11 @@ import com.double2and9.media.dto.InitiateMultipartUploadRequestDTO;
 import com.double2and9.media.dto.InitiateMultipartUploadResponseDTO;
 import com.double2and9.media.dto.GetPresignedUrlRequestDTO;
 import com.double2and9.media.dto.GetPresignedUrlResponseDTO;
+import com.double2and9.media.dto.CompleteMultipartUploadRequestDTO;
+import com.double2and9.media.dto.CompleteMultipartUploadResponseDTO;
 import com.double2and9.media.service.MediaUploadService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -63,6 +66,24 @@ public class MediaUploadController {
                 request.getChunkIndex(),
                 response.getExpirationTime(),
                 response.getPresignedUrl());
+        
+        return CommonResponse.success(response);
+    }
+
+    @Operation(summary = "完成分片上传")
+    @PostMapping("/complete")
+    public CommonResponse<CompleteMultipartUploadResponseDTO> completeMultipartUpload(
+            @Parameter(description = "完成分片上传请求", required = true)
+            @Valid @RequestBody CompleteMultipartUploadRequestDTO request) {
+        
+        log.info("接收到完成分片上传请求: uploadId={}", request.getUploadId());
+        
+        CompleteMultipartUploadResponseDTO response = mediaUploadService.completeMultipartUpload(request);
+        
+        log.info("完成分片上传成功: uploadId={}, mediaFileId={}, fileUrl={}", 
+                request.getUploadId(),
+                response.getMediaFileId(),
+                response.getFileUrl());
         
         return CommonResponse.success(response);
     }

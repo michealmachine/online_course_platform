@@ -22,6 +22,9 @@ public class MultipartUploadRecord {
     @Column(name = "media_file_id", length = 120)
     private String mediaFileId;           // 关联的媒体文件ID
     
+    @Column(name = "organization_id")
+    private Long organizationId;          // 机构ID
+    
     @Column(name = "file_name", length = 255)
     private String fileName;              // 文件名
     
@@ -34,6 +37,15 @@ public class MultipartUploadRecord {
     @Column(name = "file_path", length = 512)
     private String filePath;              // MinIO文件路径
     
+    @Column(name = "media_type", length = 32)
+    private String mediaType;             // 媒体类型（VIDEO/IMAGE等）
+    
+    @Column(name = "mime_type", length = 128)
+    private String mimeType;              // MIME类型
+    
+    @Column(name = "purpose", length = 32)
+    private String purpose;               // 用途
+    
     @Column(name = "total_chunks")
     private Integer totalChunks;          // 总分片数
     
@@ -43,8 +55,8 @@ public class MultipartUploadRecord {
     @Column(name = "chunk_size")
     private Integer chunkSize;            // 分片大小
     
-    @Column(length = 12)
-    private String status;                // 上传状态(UPLOADING/COMPLETED/ABORTED)
+    @Column(name = "status", length = 32)
+    private String status;                // 上传状态
     
     @Column(name = "create_time")
     private Date createTime;              // 创建时间

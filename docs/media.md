@@ -567,14 +567,13 @@ sequenceDiagram
         Backend Service->>MinIO: 生成分片预签名 URL (Upload ID, 分片序号)
         Backend Service-->>Client: 返回分片预签名 URL
         Client->>MinIO: 2. 上传分片数据 (PUT 预签名 URL)
-        MinIO-->>Client: 返回 分片 ETag
-        Client->>Client: 记录 分片 ETag
+        MinIO-->>Client: 返回 OK
     end
 
-    Client->>Backend Service: 3. 完成分片上传 (Upload ID, ETag 列表)
-    Backend Service->>MinIO: 请求合并分片 (Upload ID, ETag 列表)
+    Client->>Backend Service: 3. 完成分片上传 (Upload ID)
+    Backend Service->>MinIO: 请求合并分片 (Upload ID)
     MinIO->>MinIO: 服务端合并分片
-    MinIO-->>Backend Service: 返回 最终文件 ETag
+    MinIO-->>Backend Service: 返回 OK
     Backend Service->>DB: 创建 MediaFile, MediaProcessHistory 记录
     Backend Service->>Message Queue: 发送 异步元信息提取任务
     Backend Service-->>Client: 4. 上传成功响应

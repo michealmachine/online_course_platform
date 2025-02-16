@@ -4,7 +4,7 @@ import com.double2and9.base.dto.CommonResponse;
 import com.double2and9.base.enums.MediaErrorCode;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
-import org.springframework.validation.BindingResult;
+import org.springframework.validation.BindException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -21,31 +21,29 @@ public class GlobalExceptionHandler {
     /**
      * 处理参数校验异常
      */
-    @ExceptionHandler(MethodArgumentNotValidException.class)
+    @ExceptionHandler({MethodArgumentNotValidException.class, BindException.class})
     @ResponseStatus(HttpStatus.BAD_REQUEST)
-    public CommonResponse<?> handleValidationException(MethodArgumentNotValidException ex) {
-        BindingResult bindingResult = ex.getBindingResult();
-        List<FieldError> fieldErrors = bindingResult.getFieldErrors();
-        
-        String errorMessage = fieldErrors.stream()
-                .map(error -> String.format("%s: %s", error.getField(), error.getDefaultMessage()))
-                .collect(Collectors.joining("; "));
-
-        log.warn("参数校验失败: {}", errorMessage);
-        
-        return CommonResponse.error(
-            String.valueOf(HttpStatus.BAD_REQUEST.value()),
-            errorMessage
-        );
+    public CommonResponse<?> handleValidationException(Exception e) {
+        String message;
+        if (e instanceof MethodArgumentNotValidException) {
+            message = ((MethodArgumentNotValidException) e).getBindingResult()
+                .getFieldError().getDefaultMessage();
+        } else {
+            message = ((BindException) e).getBindingResult()
+                .getFieldError().getDefaultMessage();
+        }
+        log.error("参数校验失败: message={}", message);
+        return CommonResponse.error(String.valueOf(HttpStatus.BAD_REQUEST.value()), message);
     }
 
     /**
      * 处理业务异常
      */
     @ExceptionHandler(MediaException.class)
-    public CommonResponse<?> handleMediaException(MediaException ex) {
-        log.warn("业务异常: {}", ex.getMessage());
-        return CommonResponse.error(String.valueOf(ex.getCode()), ex.getMessage());
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public CommonResponse<?> handleMediaException(MediaException e) {
+        log.error("业务异常: code={}, message={}", e.getCode(), e.getMessage());
+        return CommonResponse.error(String.valueOf(e.getCode()), e.getMessage());
     }
 
     /**
@@ -53,10 +51,10 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(Exception.class)
     @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
-    public CommonResponse<?> handleException(Exception ex) {
-        log.error("系统异常：", ex);
+    public CommonResponse<?> handleException(Exception e) {
+        log.error("系统异常: ", e);
         return CommonResponse.error(
-            String.valueOf(MediaErrorCode.SYSTEM_ERROR.getCode()),
+            String.valueOf(HttpStatus.INTERNAL_SERVER_ERROR.value()), 
             "系统内部错误"
         );
     }
