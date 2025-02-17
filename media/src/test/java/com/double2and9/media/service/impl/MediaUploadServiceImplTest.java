@@ -41,6 +41,7 @@ import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.ListPartsRequest;
 import software.amazon.awssdk.services.s3.model.ListPartsResponse;
 import software.amazon.awssdk.services.s3.model.Part;
+import software.amazon.awssdk.services.s3.model.NoSuchUploadException;
 
 @SpringBootTest
 @Transactional
@@ -485,5 +486,192 @@ public class MediaUploadServiceImplTest {
         assertThatThrownBy(() -> mediaUploadService.completeMultipartUpload(request))
                 .isInstanceOf(MediaException.class)
                 .hasFieldOrPropertyWithValue("code", MediaErrorCode.UPLOAD_NOT_COMPLETED.getCode());
+    }
+
+    @Test
+    void testAbortMultipartUpload() throws Exception {
+        // 1. 初始化上传
+        InitiateMultipartUploadRequestDTO initRequest = new InitiateMultipartUploadRequestDTO();
+        initRequest.setFileName("test-video.mp4");
+        initRequest.setFileSize(10L * 1024 * 1024); // 10MB
+        initRequest.setMediaType("VIDEO");
+        initRequest.setMimeType("video/mp4");
+        initRequest.setPurpose("TEST");
+        initRequest.setOrganizationId(1L);
+
+        InitiateMultipartUploadResponseDTO initResponse = 
+            mediaUploadService.initiateMultipartUpload(initRequest);
+
+        // 2. 上传一个分片
+        GetPresignedUrlRequestDTO urlRequest = new GetPresignedUrlRequestDTO();
+        urlRequest.setUploadId(initResponse.getUploadId());
+        urlRequest.setChunkIndex(1);
+        GetPresignedUrlResponseDTO urlResponse = mediaUploadService.getPresignedUrl(urlRequest);
+
+        byte[] chunkData = new byte[initResponse.getChunkSize()];
+        Arrays.fill(chunkData, (byte) 1);
+
+        URL url = new URL(urlResponse.getPresignedUrl());
+        HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+        conn.setRequestMethod("PUT");
+        conn.setDoOutput(true);
+        try (OutputStream out = conn.getOutputStream()) {
+            out.write(chunkData);
+        }
+
+        // 确保分片上传成功
+        assertThat(conn.getResponseCode()).isEqualTo(200);
+
+        // 验证分片确实上传了
+        ListPartsResponse listPartsResponse = s3Client.listParts(ListPartsRequest.builder()
+            .bucket(initResponse.getBucket())
+            .key(initResponse.getFilePath())
+            .uploadId(initResponse.getUploadId())
+            .build());
+        assertThat(listPartsResponse.hasParts()).isTrue();
+        assertThat(listPartsResponse.parts()).hasSize(1);
+
+        // 3. 取消上传
+        mediaUploadService.abortMultipartUpload(initResponse.getUploadId());
+
+        // 4. 验证记录状态
+        MultipartUploadRecord record = multipartUploadRecordRepository
+            .findByUploadId(initResponse.getUploadId())
+            .orElseThrow();
+        assertThat(record.getStatus()).isEqualTo(UploadStatusEnum.ABORTED.getCode());
+        assertThat(record.getAbortTime()).isNotNull();
+
+        // 5. 验证分片已被清理 - 应该抛出 NoSuchUploadException
+        assertThatThrownBy(() -> s3Client.listParts(ListPartsRequest.builder()
+            .bucket(record.getBucket())
+            .key(record.getFilePath())
+            .uploadId(record.getUploadId())
+            .build()))
+            .isInstanceOf(NoSuchUploadException.class);
+    }
+
+    @Test
+    void testAbortMultipartUploadWithInvalidUploadId() {
+        assertThatThrownBy(() -> mediaUploadService.abortMultipartUpload("invalid-upload-id"))
+            .isInstanceOf(MediaException.class)
+            .hasFieldOrPropertyWithValue("code", MediaErrorCode.UPLOAD_SESSION_NOT_FOUND.getCode());
+    }
+
+    @Test
+    void testAbortMultipartUploadWithCompletedStatus() throws Exception {
+        // 1. 初始化上传
+        InitiateMultipartUploadRequestDTO initRequest = new InitiateMultipartUploadRequestDTO();
+        initRequest.setFileName("test-video.mp4");
+        initRequest.setFileSize(10L * 1024 * 1024);
+        initRequest.setMediaType("VIDEO");
+        initRequest.setMimeType("video/mp4");
+        initRequest.setPurpose("TEST");
+        initRequest.setOrganizationId(1L);
+
+        InitiateMultipartUploadResponseDTO initResponse = 
+            mediaUploadService.initiateMultipartUpload(initRequest);
+
+        // 2. 修改状态为已完成
+        MultipartUploadRecord record = multipartUploadRecordRepository
+            .findByUploadId(initResponse.getUploadId())
+            .orElseThrow();
+        record.setStatus(UploadStatusEnum.COMPLETED.getCode());
+        multipartUploadRecordRepository.save(record);
+
+        // 3. 尝试取消上传
+        assertThatThrownBy(() -> mediaUploadService.abortMultipartUpload(initResponse.getUploadId()))
+            .isInstanceOf(MediaException.class)
+            .hasFieldOrPropertyWithValue("code", MediaErrorCode.UPLOAD_SESSION_INVALID_STATUS.getCode());
+    }
+
+    @Test
+    void testGetUploadStatus() throws Exception {
+        // 1. 初始化上传
+        InitiateMultipartUploadRequestDTO initRequest = new InitiateMultipartUploadRequestDTO();
+        initRequest.setFileName("test-video.mp4");
+        initRequest.setFileSize(10L * 1024 * 1024); // 10MB
+        initRequest.setMediaType("VIDEO");
+        initRequest.setMimeType("video/mp4");
+        initRequest.setPurpose("TEST");
+        initRequest.setOrganizationId(1L);
+
+        InitiateMultipartUploadResponseDTO initResponse = 
+            mediaUploadService.initiateMultipartUpload(initRequest);
+
+        // 2. 上传两个分片
+        for (int i = 1; i <= 2; i++) {
+            GetPresignedUrlRequestDTO urlRequest = new GetPresignedUrlRequestDTO();
+            urlRequest.setUploadId(initResponse.getUploadId());
+            urlRequest.setChunkIndex(i);
+            GetPresignedUrlResponseDTO urlResponse = mediaUploadService.getPresignedUrl(urlRequest);
+
+            byte[] chunkData = new byte[initResponse.getChunkSize()];
+            Arrays.fill(chunkData, (byte) i);
+
+            URL url = new URL(urlResponse.getPresignedUrl());
+            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestMethod("PUT");
+            conn.setDoOutput(true);
+            try (OutputStream out = conn.getOutputStream()) {
+                out.write(chunkData);
+            }
+            assertThat(conn.getResponseCode()).isEqualTo(200);
+        }
+
+        // 3. 获取上传状态
+        UploadStatusResponseDTO status = mediaUploadService.getUploadStatus(initResponse.getUploadId());
+
+        // 4. 验证状态信息
+        assertThat(status).isNotNull();
+        assertThat(status.getUploadId()).isEqualTo(initResponse.getUploadId());
+        assertThat(status.getStatus()).isEqualTo(UploadStatusEnum.UPLOADING.getCode());
+        assertThat(status.getTotalChunks()).isEqualTo(initResponse.getTotalChunks());
+        assertThat(status.getExpirationTime()).isNotNull();
+        
+        // 5. 验证分片信息
+        assertThat(status.getUploadedParts()).hasSize(2);
+        assertThat(status.getUploadedParts()).allSatisfy(part -> {
+            assertThat(part.getPartNumber()).isBetween(1, 2);
+            assertThat(part.getETag()).isNotEmpty();
+            assertThat(part.getSize()).isEqualTo((long) initResponse.getChunkSize());
+        });
+    }
+
+    @Test
+    void testGetUploadStatusWithInvalidUploadId() {
+        assertThatThrownBy(() -> mediaUploadService.getUploadStatus("invalid-upload-id"))
+            .isInstanceOf(MediaException.class)
+            .hasFieldOrPropertyWithValue("code", MediaErrorCode.UPLOAD_SESSION_NOT_FOUND.getCode());
+    }
+
+    @Test
+    void testGetUploadStatusWithCompletedUpload() throws Exception {
+        // 1. 初始化上传
+        InitiateMultipartUploadRequestDTO initRequest = new InitiateMultipartUploadRequestDTO();
+        initRequest.setFileName("test-video.mp4");
+        initRequest.setFileSize(10L * 1024 * 1024);
+        initRequest.setMediaType("VIDEO");
+        initRequest.setMimeType("video/mp4");
+        initRequest.setPurpose("TEST");
+        initRequest.setOrganizationId(1L);
+
+        InitiateMultipartUploadResponseDTO initResponse = 
+            mediaUploadService.initiateMultipartUpload(initRequest);
+
+        // 2. 修改状态为已完成
+        MultipartUploadRecord record = multipartUploadRecordRepository
+            .findByUploadId(initResponse.getUploadId())
+            .orElseThrow();
+        record.setStatus(UploadStatusEnum.COMPLETED.getCode());
+        multipartUploadRecordRepository.save(record);
+
+        // 3. 获取状态
+        UploadStatusResponseDTO status = mediaUploadService.getUploadStatus(initResponse.getUploadId());
+
+        // 4. 验证状态
+        assertThat(status).isNotNull();
+        assertThat(status.getStatus()).isEqualTo(UploadStatusEnum.COMPLETED.getCode());
+        // 已完成的上传，S3 中的分片信息已不存在
+        assertThat(status.getUploadedParts()).isEmpty();
     }
 } 

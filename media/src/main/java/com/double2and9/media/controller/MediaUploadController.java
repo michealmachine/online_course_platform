@@ -7,6 +7,7 @@ import com.double2and9.media.dto.request.GetPresignedUrlRequestDTO;
 import com.double2and9.media.dto.GetPresignedUrlResponseDTO;
 import com.double2and9.media.dto.request.CompleteMultipartUploadRequestDTO;
 import com.double2and9.media.dto.CompleteMultipartUploadResponseDTO;
+import com.double2and9.media.dto.UploadStatusResponseDTO;
 import com.double2and9.media.service.MediaUploadService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -88,6 +89,39 @@ public class MediaUploadController {
                 request.getUploadId(),
                 response.getMediaFileId(),
                 response.getFileUrl());
+        
+        return CommonResponse.success(response);
+    }
+
+    @Operation(summary = "取消分片上传", description = "取消正在进行的分片上传，清理已上传的分片")
+    @PostMapping("/abort")
+    public CommonResponse<Void> abortMultipartUpload(
+            @Parameter(description = "上传ID", required = true)
+            @RequestParam String uploadId) {
+        
+        log.info("接收到取消分片上传请求: uploadId={}", uploadId);
+        
+        mediaUploadService.abortMultipartUpload(uploadId);
+        
+        log.info("取消分片上传成功: uploadId={}", uploadId);
+        
+        return CommonResponse.success(null);
+    }
+
+    @Operation(summary = "查询上传状态", description = "获取分片上传的当前状态，包括已上传的分片信息")
+    @GetMapping("/status")
+    public CommonResponse<UploadStatusResponseDTO> getUploadStatus(
+            @Parameter(description = "上传ID", required = true)
+            @RequestParam String uploadId) {
+        
+        log.info("接收到查询上传状态请求: uploadId={}", uploadId);
+        
+        UploadStatusResponseDTO response = mediaUploadService.getUploadStatus(uploadId);
+        
+        log.info("查询上传状态成功: uploadId={}, status={}, uploadedParts={}", 
+                uploadId,
+                response.getStatus(),
+                response.getUploadedParts().size());
         
         return CommonResponse.success(response);
     }

@@ -7,6 +7,7 @@ import com.double2and9.media.dto.*;
 import com.double2and9.media.dto.request.CompleteMultipartUploadRequestDTO;
 import com.double2and9.media.dto.request.GetPresignedUrlRequestDTO;
 import com.double2and9.media.dto.request.InitiateMultipartUploadRequestDTO;
+import com.double2and9.media.dto.request.UploadedPartDTO;
 import com.double2and9.media.entity.MultipartUploadRecord;
 import com.double2and9.media.repository.MultipartUploadRecordRepository;
 import com.double2and9.media.repository.MediaFileRepository;
@@ -16,31 +17,21 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import io.minio.GetPresignedObjectUrlArgs;
-import io.minio.MinioClient;
-import io.minio.http.Method;
+
 import java.util.Date;
 import java.util.UUID;
-import java.util.concurrent.TimeUnit;
-import io.minio.ComposeObjectArgs;
-import io.minio.ComposeSource;
-import io.minio.StatObjectArgs;
-import io.minio.StatObjectResponse;
+
 import com.double2and9.base.enums.MediaFileStatusEnum;
 import com.double2and9.media.entity.MediaFile;
 import java.util.ArrayList;
 import java.util.List;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.*;
-import software.amazon.awssdk.core.sync.RequestBody;
-import software.amazon.awssdk.services.s3.presigner.model.PresignedUploadPartRequest;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
-import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
 import software.amazon.awssdk.services.s3.model.HeadObjectResponse;
 
 import java.time.Duration;
 import java.util.stream.Collectors;
-import java.util.Comparator;
 
 @Slf4j
 @Service
@@ -309,5 +300,76 @@ public class MediaUploadServiceImpl implements MediaUploadService {
                 .status(UploadStatusEnum.COMPLETED.getCode())
                 .completeTime(record.getCompleteTime().getTime())
                 .build();
+    }
+
+    @Override
+    @Transactional
+    public void abortMultipartUpload(String uploadId) {
+        // 1. 获取上传记录
+        MultipartUploadRecord record = multipartUploadRecordRepository.findByUploadId(uploadId)
+            .orElseThrow(() -> new MediaException(MediaErrorCode.UPLOAD_SESSION_NOT_FOUND));
+
+        // 2. 检查状态 - 只有上传中的才能取消
+        if (!UploadStatusEnum.UPLOADING.getCode().equals(record.getStatus())) {
+            throw new MediaException(MediaErrorCode.UPLOAD_SESSION_INVALID_STATUS);
+        }
+
+        try {
+            // 3. 调用 S3 的取消接口
+            s3Client.abortMultipartUpload(AbortMultipartUploadRequest.builder()
+                .bucket(record.getBucket())
+                .key(record.getFilePath())
+                .uploadId(record.getUploadId())
+                .build());
+
+            // 4. 更新记录状态
+            record.setStatus(UploadStatusEnum.ABORTED.getCode());
+            record.setAbortTime(new Date());
+            multipartUploadRecordRepository.save(record);
+        } catch (Exception e) {
+            log.error("取消分片上传失败", e);
+            throw new MediaException(MediaErrorCode.ABORT_MULTIPART_UPLOAD_FAILED);
+        }
+    }
+
+    @Override
+    public UploadStatusResponseDTO getUploadStatus(String uploadId) {
+        // 1. 获取上传记录
+        MultipartUploadRecord record = multipartUploadRecordRepository.findByUploadId(uploadId)
+            .orElseThrow(() -> new MediaException(MediaErrorCode.UPLOAD_SESSION_NOT_FOUND));
+
+        // 2. 获取已上传分片信息
+        List<UploadedPartDTO> uploadedParts = new ArrayList<>();
+        try {
+            ListPartsResponse listPartsResponse = s3Client.listParts(ListPartsRequest.builder()
+                .bucket(record.getBucket())
+                .key(record.getFilePath())
+                .uploadId(record.getUploadId())
+                .build());
+
+            // 转换 S3 的 Part 对象到我们的 DTO
+            uploadedParts = listPartsResponse.parts().stream()
+                .map(part -> UploadedPartDTO.builder()
+                    .partNumber(part.partNumber())
+                    .eTag(part.eTag())
+                    .size(part.size())
+                    .build())
+                .collect(Collectors.toList());
+        } catch (NoSuchUploadException e) {
+            // 如果上传已经被取消或完成，S3 会抛出这个异常
+            log.warn("上传已不存在: uploadId={}", uploadId);
+        } catch (Exception e) {
+            log.error("获取分片信息失败: uploadId={}", uploadId, e);
+            throw new MediaException(MediaErrorCode.GET_UPLOAD_STATUS_FAILED);
+        }
+
+        // 3. 构建响应
+        return UploadStatusResponseDTO.builder()
+            .uploadId(record.getUploadId())
+            .status(record.getStatus())
+            .totalChunks(record.getTotalChunks())
+            .uploadedParts(uploadedParts)
+            .expirationTime(record.getExpirationTime().getTime())
+            .build();
     }
 } 

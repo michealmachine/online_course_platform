@@ -1,11 +1,13 @@
 package com.double2and9.base.enums;
 
 import lombok.Getter;
+import lombok.AllArgsConstructor;
 
 /**
  * 上传状态枚举
  */
 @Getter
+@AllArgsConstructor
 public enum UploadStatusEnum {
     
     UPLOADING("UPLOADING", "上传中"),
@@ -15,11 +17,6 @@ public enum UploadStatusEnum {
 
     private final String code;
     private final String desc;
-
-    UploadStatusEnum(String code, String desc) {
-        this.code = code;
-        this.desc = desc;
-    }
 
     public static UploadStatusEnum getByCode(String code) {
         for (UploadStatusEnum value : values()) {

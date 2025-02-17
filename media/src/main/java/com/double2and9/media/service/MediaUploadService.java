@@ -6,6 +6,7 @@ import com.double2and9.media.dto.request.InitiateMultipartUploadRequestDTO;
 import com.double2and9.media.dto.InitiateMultipartUploadResponseDTO;
 import com.double2and9.media.dto.request.CompleteMultipartUploadRequestDTO;
 import com.double2and9.media.dto.CompleteMultipartUploadResponseDTO;
+import com.double2and9.media.dto.UploadStatusResponseDTO;
 
 /**
  * 媒体上传服务接口
@@ -34,4 +35,17 @@ public interface MediaUploadService {
      * @return 完成分片上传响应
      */
     CompleteMultipartUploadResponseDTO completeMultipartUpload(CompleteMultipartUploadRequestDTO request);
+
+    /**
+     * 取消分片上传
+     * @param uploadId 上传ID
+     */
+    void abortMultipartUpload(String uploadId);
+
+    /**
+     * 获取上传状态
+     * @param uploadId 上传ID
+     * @return 上传状态信息
+     */
+    UploadStatusResponseDTO getUploadStatus(String uploadId);
 }

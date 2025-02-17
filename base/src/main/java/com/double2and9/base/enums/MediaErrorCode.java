@@ -30,6 +30,7 @@ public enum MediaErrorCode {
     VERIFY_CHUNKS_FAILED(200410, "分片校验失败"),
     ABORT_MULTIPART_UPLOAD_FAILED(200411, "取消分片上传失败"),
     UPLOAD_SESSION_COMPLETED(200408, "上传会话已完成"),
+    GET_UPLOAD_STATUS_FAILED(200412, "获取上传状态失败"),
 
     // 处理相关错误 2002xx
     PROCESS_FAILED(200201, "文件处理失败"),
