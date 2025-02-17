@@ -4,6 +4,9 @@ import com.double2and9.base.enums.MediaErrorCode;
 import com.double2and9.base.enums.UploadStatusEnum;
 import com.double2and9.media.common.exception.MediaException;
 import com.double2and9.media.dto.*;
+import com.double2and9.media.dto.request.CompleteMultipartUploadRequestDTO;
+import com.double2and9.media.dto.request.GetPresignedUrlRequestDTO;
+import com.double2and9.media.dto.request.InitiateMultipartUploadRequestDTO;
 import com.double2and9.media.entity.MultipartUploadRecord;
 import com.double2and9.media.repository.MultipartUploadRecordRepository;
 import com.double2and9.media.repository.MediaFileRepository;
@@ -27,6 +30,17 @@ import com.double2and9.base.enums.MediaFileStatusEnum;
 import com.double2and9.media.entity.MediaFile;
 import java.util.ArrayList;
 import java.util.List;
+import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.*;
+import software.amazon.awssdk.core.sync.RequestBody;
+import software.amazon.awssdk.services.s3.presigner.model.PresignedUploadPartRequest;
+import software.amazon.awssdk.services.s3.presigner.S3Presigner;
+import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
+import software.amazon.awssdk.services.s3.model.HeadObjectResponse;
+
+import java.time.Duration;
+import java.util.stream.Collectors;
+import java.util.Comparator;
 
 @Slf4j
 @Service
@@ -35,7 +49,8 @@ public class MediaUploadServiceImpl implements MediaUploadService {
 
     private final MultipartUploadRecordRepository multipartUploadRecordRepository;
     private final MediaFileRepository mediaFileRepository;
-    private final MinioClient minioClient;
+    private final S3Client s3Client;
+    private final S3Presigner s3Presigner;
     
     @Value("${minio.bucket-name}")
     private String defaultBucketName;
@@ -58,7 +73,6 @@ public class MediaUploadServiceImpl implements MediaUploadService {
             InitiateMultipartUploadRequestDTO request) {
         
         // 1. 生成唯一标识
-        String uploadId = UUID.randomUUID().toString();
         String mediaFileId = generateMediaFileId(request.getOrganizationId(), request.getFileName());
         
         // 2. 生成存储路径
@@ -74,9 +88,19 @@ public class MediaUploadServiceImpl implements MediaUploadService {
         int chunkSize = defaultChunkSize;
         int totalChunks = calculateTotalChunks(request.getFileSize(), chunkSize);
         
+        // 初始化S3分片上传
+        CreateMultipartUploadRequest createMultipartUploadRequest = CreateMultipartUploadRequest.builder()
+                .bucket(defaultBucketName)
+                .key(filePath)
+                .contentType(request.getMimeType())
+                .build();
+                
+        CreateMultipartUploadResponse s3Response = s3Client.createMultipartUpload(createMultipartUploadRequest);
+        String uploadId = s3Response.uploadId();  // 直接使用S3的uploadId
+        
         // 4. 创建上传记录
         MultipartUploadRecord record = new MultipartUploadRecord();
-        record.setUploadId(uploadId);
+        record.setUploadId(uploadId);  // 使用S3的uploadId作为主键
         record.setMediaFileId(mediaFileId);
         record.setOrganizationId(request.getOrganizationId());
         record.setFileName(request.getFileName());
@@ -87,7 +111,6 @@ public class MediaUploadServiceImpl implements MediaUploadService {
         record.setMimeType(request.getMimeType());
         record.setPurpose(request.getPurpose());
         record.setTotalChunks(totalChunks);
-        record.setUploadedChunks(0);
         record.setChunkSize(chunkSize);
         record.setStatus(UploadStatusEnum.UPLOADING.getCode());
         record.setInitiateTime(new Date());
@@ -155,71 +178,37 @@ public class MediaUploadServiceImpl implements MediaUploadService {
         log.debug("开始处理获取预签名URL请求: request={}", request);
         
         // 1. 查询上传记录
-        log.debug("查询上传记录: uploadId={}", request.getUploadId());
         MultipartUploadRecord record = multipartUploadRecordRepository.findByUploadId(request.getUploadId())
                 .orElseThrow(() -> new MediaException(MediaErrorCode.UPLOAD_SESSION_NOT_FOUND));
-        log.debug("查询到上传记录: record={}", record);
         
         // 2. 验证上传状态
         if (!"UPLOADING".equals(record.getStatus())) {
-            log.warn("上传会话状态无效: uploadId={}, status={}", request.getUploadId(), record.getStatus());
             throw new MediaException(MediaErrorCode.UPLOAD_SESSION_INVALID_STATUS);
         }
         
         // 3. 验证分片索引
         if (request.getChunkIndex() > record.getTotalChunks()) {
-            log.warn("分片索引无效: uploadId={}, chunkIndex={}, totalChunks={}", 
-                    request.getUploadId(), 
-                    request.getChunkIndex(), 
-                    record.getTotalChunks());
             throw new MediaException(MediaErrorCode.INVALID_CHUNK_INDEX);
         }
         
         try {
-            // 4. 生成分片对象名称
-            String chunkObjectName = String.format("%s.part%d", 
-                    record.getFilePath(), 
-                    request.getChunkIndex());
-            log.debug("生成分片对象名称: chunkObjectName={}", chunkObjectName);
-            
-            // 5. 生成预签名URL
-            log.debug("开始生成预签名URL: bucket={}, object={}, expiry={}s",
-                    record.getBucket(),
-                    chunkObjectName,
-                    presignedUrlExpirationSeconds);
-            String presignedUrl = minioClient.getPresignedObjectUrl(
-                    GetPresignedObjectUrlArgs.builder()
-                            .method(Method.PUT)
+            String presignedUrl = s3Presigner.presignUploadPart(builder -> builder
+                    .uploadPartRequest(req -> req
                             .bucket(record.getBucket())
-                            .object(chunkObjectName)
-                            .expiry(presignedUrlExpirationSeconds, TimeUnit.SECONDS)
-                            .build());
-            
-            // 6. 计算过期时间
-            long expirationTime = System.currentTimeMillis() + 
-                    (presignedUrlExpirationSeconds * 1000L);
-            
-            // 7. 构建响应
-            GetPresignedUrlResponseDTO response = GetPresignedUrlResponseDTO.builder()
+                            .key(record.getFilePath())
+                            .uploadId(record.getUploadId())
+                            .partNumber(request.getChunkIndex())
+                            .build())
+                    .signatureDuration(Duration.ofSeconds(presignedUrlExpirationSeconds))
+            ).url().toString();
+
+            return GetPresignedUrlResponseDTO.builder()
                     .presignedUrl(presignedUrl)
                     .chunkIndex(request.getChunkIndex())
-                    .expirationTime(expirationTime)
+                    .expirationTime(System.currentTimeMillis() + (presignedUrlExpirationSeconds * 1000L))
                     .build();
-            
-            log.info("成功生成预签名URL: uploadId={}, chunkIndex={}, expirationTime={}, presignedUrl={}",
-                    request.getUploadId(),
-                    request.getChunkIndex(),
-                    expirationTime,
-                    presignedUrl);
-            
-            return response;
-            
         } catch (Exception e) {
-            log.error("生成预签名URL失败: uploadId={}, chunkIndex={}, error={}", 
-                    request.getUploadId(), 
-                    request.getChunkIndex(), 
-                    e.getMessage(),
-                    e);
+            log.error("生成预签名URL失败", e);
             throw new MediaException(MediaErrorCode.GENERATE_PRESIGNED_URL_FAILED);
         }
     }
@@ -227,139 +216,98 @@ public class MediaUploadServiceImpl implements MediaUploadService {
     @Override
     @Transactional
     public CompleteMultipartUploadResponseDTO completeMultipartUpload(CompleteMultipartUploadRequestDTO request) {
-        log.info("开始处理完成分片上传请求: request={}", request);
-        
+        // 获取上传记录
+        MultipartUploadRecord record = multipartUploadRecordRepository.findByUploadId(request.getUploadId())
+            .orElseThrow(() -> new MediaException(MediaErrorCode.UPLOAD_SESSION_NOT_FOUND));
+
+        // 检查状态
+        if (UploadStatusEnum.COMPLETED.getCode().equals(record.getStatus())) {
+            throw new MediaException(MediaErrorCode.UPLOAD_SESSION_INVALID_STATUS);
+        }
+
         try {
-            // 1. 查询上传记录
-            MultipartUploadRecord record = multipartUploadRecordRepository.findByUploadId(request.getUploadId())
-                    .orElseThrow(() -> new MediaException(MediaErrorCode.UPLOAD_SESSION_NOT_FOUND));
-            
-            // 2. 验证上传状态
-            if (!UploadStatusEnum.UPLOADING.getCode().equals(record.getStatus())) {
-                log.warn("上传会话状态无效: uploadId={}, status={}", 
-                        request.getUploadId(), record.getStatus());
-                throw new MediaException(MediaErrorCode.UPLOAD_SESSION_INVALID_STATUS);
-            }
-            
-            // 3. 验证分片数量
-            if (record.getUploadedChunks() < record.getTotalChunks()) {
-                log.warn("分片未上传完成: uploadId={}, uploadedChunks={}, totalChunks={}", 
-                        request.getUploadId(), 
-                        record.getUploadedChunks(), 
-                        record.getTotalChunks());
+            // 获取所有已上传分片的信息
+            ListPartsResponse listPartsResponse = s3Client.listParts(ListPartsRequest.builder()
+                .bucket(record.getBucket())
+                .key(record.getFilePath())
+                .uploadId(record.getUploadId())
+                .build());
+
+            // 检查分片是否都已上传
+            if (listPartsResponse.parts().size() < record.getTotalChunks()) {
                 throw new MediaException(MediaErrorCode.UPLOAD_NOT_COMPLETED);
             }
-            
-            // 4. 分片合并
-            log.debug("开始分片合并: uploadId={}, bucket={}, filePath={}", 
-                    request.getUploadId(),
-                    record.getBucket(),
-                    record.getFilePath());
-            
-            List<ComposeSource> sources = new ArrayList<>();
-            for (int i = 1; i <= record.getTotalChunks(); i++) {
-                String chunkObjectName = String.format("%s.part%d", record.getFilePath(), i);
-                sources.add(
-                    ComposeSource.builder()
-                        .bucket(record.getBucket())
-                        .object(chunkObjectName)
-                        .build()
-                );
-            }
-            
-            try {
-                minioClient.composeObject(
-                    ComposeObjectArgs.builder()
-                        .bucket(record.getBucket())
-                        .object(record.getFilePath())
-                        .sources(sources)
-                        .build()
-                );
-                log.debug("分片合并成功: uploadId={}", request.getUploadId());
-            } catch (Exception e) {
-                log.error("分片合并失败: uploadId={}, error={}", request.getUploadId(), e.getMessage(), e);
-                throw new MediaException(MediaErrorCode.MERGE_CHUNKS_FAILED, e);
-            }
 
-            // 5. 更新上传记录状态
+            // 按分片号排序并构建完成请求
+            List<CompletedPart> completedParts = listPartsResponse.parts().stream()
+                .map(part -> CompletedPart.builder()
+                    .partNumber(part.partNumber())
+                    .eTag(part.eTag())
+                    .build())
+                .collect(Collectors.toList());
+
+            // 完成分片上传
+            s3Client.completeMultipartUpload(CompleteMultipartUploadRequest.builder()
+                .bucket(record.getBucket())
+                .key(record.getFilePath())
+                .uploadId(record.getUploadId())
+                .multipartUpload(CompletedMultipartUpload.builder()
+                    .parts(completedParts)
+                    .build())
+                .build());
+
+            // 更新记录状态
             record.setStatus(UploadStatusEnum.COMPLETED.getCode());
             record.setCompleteTime(new Date());
-            record.setUploadedChunks(record.getTotalChunks());
             multipartUploadRecordRepository.save(record);
-            
-            // 6. 创建MediaFile记录
-            log.debug("创建MediaFile记录: uploadId={}, mediaFileId={}", 
-                    request.getUploadId(),
-                    record.getMediaFileId());
-            
-            MediaFile mediaFile = new MediaFile();
-            mediaFile.setOrganizationId(record.getOrganizationId());
-            mediaFile.setMediaFileId(record.getMediaFileId());
-            mediaFile.setFileName(record.getFileName());
-            mediaFile.setFilePath(record.getFilePath());
-            mediaFile.setBucket(record.getBucket());
-            mediaFile.setMediaType(record.getMediaType());
-            mediaFile.setMimeType(record.getMimeType());
-            mediaFile.setPurpose(record.getPurpose());
-            mediaFile.setCreateTime(new Date());
-            mediaFile.setStatus(MediaFileStatusEnum.NORMAL.getCode());
-            
-            try {
-                StatObjectResponse stat = minioClient.statObject(
-                    StatObjectArgs.builder()
-                        .bucket(record.getBucket())
-                        .object(record.getFilePath())
-                        .build()
-                );
-                mediaFile.setFileSize(stat.size());
-            } catch (Exception e) {
-                log.error("获取文件大小失败: uploadId={}, error={}", request.getUploadId(), e.getMessage(), e);
-                mediaFile.setFileSize(record.getFileSize()); // 使用上传时提供的文件大小
-            }
-            
-            try {
-                mediaFileRepository.save(mediaFile);
-                log.debug("MediaFile记录创建成功: mediaFileId={}", mediaFile.getMediaFileId());
-            } catch (Exception e) {
-                log.error("创建MediaFile记录失败: mediaFileId={}, error={}", 
-                    mediaFile.getMediaFileId(), e.getMessage(), e);
-                // 回滚状态
-                record.setStatus(UploadStatusEnum.UPLOADING.getCode());
-                record.setCompleteTime(null);
-                multipartUploadRecordRepository.save(record);
-                throw new MediaException(MediaErrorCode.CREATE_MEDIA_FILE_FAILED, e);
-            }
 
-            // 7. 构建文件访问URL
-            String fileUrl = String.format("%s/%s/%s", 
-                    minioEndpoint,
-                    record.getBucket(), 
-                    record.getFilePath());
-            
-            // 8. 构建响应
-            CompleteMultipartUploadResponseDTO response = CompleteMultipartUploadResponseDTO.builder()
-                    .mediaFileId(record.getMediaFileId())
-                    .fileUrl(fileUrl)
-                    .fileSize(record.getFileSize())
-                    .status(UploadStatusEnum.COMPLETED.getCode())
-                    .completeTime(record.getCompleteTime().getTime())
-                    .build();
-            
-            log.info("完成分片上传成功: uploadId={}, mediaFileId={}, fileUrl={}", 
-                    request.getUploadId(),
-                    response.getMediaFileId(),
-                    response.getFileUrl());
-            
-            return response;
-            
+            // 创建媒体文件记录
+            MediaFile mediaFile = createMediaFile(record);
+            mediaFileRepository.save(mediaFile);
+
+            return buildCompleteResponse(record, mediaFile);
         } catch (MediaException e) {
             throw e;
         } catch (Exception e) {
-            log.error("完成分片上传失败: uploadId={}, error={}", 
-                    request.getUploadId(), 
-                    e.getMessage(),
-                    e);
-            throw new MediaException(MediaErrorCode.COMPLETE_MULTIPART_UPLOAD_FAILED);
+            log.error("完成分片上传失败", e);
+            throw new MediaException(MediaErrorCode.MERGE_CHUNKS_FAILED);
         }
+    }
+
+    private MediaFile createMediaFile(MultipartUploadRecord record) {
+        MediaFile mediaFile = new MediaFile();
+        mediaFile.setOrganizationId(record.getOrganizationId());
+        mediaFile.setMediaFileId(record.getMediaFileId());
+        mediaFile.setFileName(record.getFileName());
+        mediaFile.setFilePath(record.getFilePath());
+        mediaFile.setBucket(record.getBucket());
+        mediaFile.setMediaType(record.getMediaType());
+        mediaFile.setMimeType(record.getMimeType());
+        mediaFile.setPurpose(record.getPurpose());
+        mediaFile.setCreateTime(new Date());
+        mediaFile.setStatus(MediaFileStatusEnum.NORMAL.getCode());
+        
+        try {
+            HeadObjectResponse response = s3Client.headObject(req -> req
+                    .bucket(record.getBucket())
+                    .key(record.getFilePath())
+            );
+            mediaFile.setFileSize(response.contentLength());
+        } catch (Exception e) {
+            log.error("获取文件大小失败", e);
+            mediaFile.setFileSize(record.getFileSize());
+        }
+        
+        return mediaFile;
+    }
+
+    private CompleteMultipartUploadResponseDTO buildCompleteResponse(MultipartUploadRecord record, MediaFile mediaFile) {
+        return CompleteMultipartUploadResponseDTO.builder()
+                .mediaFileId(record.getMediaFileId())
+                .fileUrl(String.format("%s/%s/%s", minioEndpoint, record.getBucket(), record.getFilePath()))
+                .fileSize(mediaFile.getFileSize())
+                .status(UploadStatusEnum.COMPLETED.getCode())
+                .completeTime(record.getCompleteTime().getTime())
+                .build();
     }
 } 

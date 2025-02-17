@@ -32,7 +32,6 @@ public class MultipartUploadRecordRepositoryTest {
         record.setBucket("test-bucket");
         record.setFilePath("/test/path/video.mp4");
         record.setTotalChunks(10);
-        record.setUploadedChunks(0);
         record.setChunkSize(1024 * 1024); // 1MB
         record.setStatus("UPLOADING");
         record.setExpirationTime(new Date(System.currentTimeMillis() + 3600000)); // 1小时后过期
@@ -55,21 +54,6 @@ public class MultipartUploadRecordRepositoryTest {
         Optional<MultipartUploadRecord> foundByMediaId = repository.findByMediaFileId(saved.getMediaFileId());
         assertThat(foundByMediaId).isPresent();
         assertThat(foundByMediaId.get().getUploadId()).isEqualTo(saved.getUploadId());
-    }
-
-    @Test
-    public void testUpdateUploadedChunks() {
-        // 创建测试记录
-        MultipartUploadRecord saved = createTestRecord();
-        
-        // 更新已上传分片数
-        int updated = repository.updateUploadedChunks(saved.getUploadId(), 5);
-        assertThat(updated).isEqualTo(1);
-        
-        // 验证更新结果
-        Optional<MultipartUploadRecord> found = repository.findByUploadId(saved.getUploadId());
-        assertThat(found).isPresent();
-        assertThat(found.get().getUploadedChunks()).isEqualTo(5);
     }
 
     @Test

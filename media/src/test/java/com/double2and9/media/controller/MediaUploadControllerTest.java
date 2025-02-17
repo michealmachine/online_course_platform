@@ -1,6 +1,6 @@
 package com.double2and9.media.controller;
 
-import com.double2and9.media.dto.InitiateMultipartUploadRequestDTO;
+import com.double2and9.media.dto.request.InitiateMultipartUploadRequestDTO;
 import com.double2and9.media.dto.InitiateMultipartUploadResponseDTO;
 import com.double2and9.media.service.MediaUploadService;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -42,7 +42,7 @@ public class MediaUploadControllerTest {
         request.setMediaType("VIDEO");
         request.setMimeType("video/mp4");
         request.setPurpose("TEST");
-        request.setOrganizationId(1L);
+        // 不再在请求DTO中设置organizationId
 
         // 2. 准备模拟响应
         InitiateMultipartUploadResponseDTO mockResponse = InitiateMultipartUploadResponseDTO.builder()
@@ -57,8 +57,9 @@ public class MediaUploadControllerTest {
         when(mediaUploadService.initiateMultipartUpload(any()))
                 .thenReturn(mockResponse);
 
-        // 3. 执行测试请求
+        // 3. 执行测试请求，添加organizationId作为请求参数
         mockMvc.perform(post("/api/media/upload/initiate")
+                .param("organizationId", "1")  // 添加organizationId作为请求参数
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
@@ -78,11 +79,29 @@ public class MediaUploadControllerTest {
         request.setFileName("test-video.mp4");
         // 缺少其他必填字段
 
-        // 2. 执行测试请求
+        // 2. 执行测试请求，添加organizationId作为请求参数
         mockMvc.perform(post("/api/media/upload/initiate")
+                .param("organizationId", "1")  // 添加organizationId作为请求参数
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value(400));
+    }
+
+    @Test
+    public void testInitiateMultipartUploadWithoutOrganizationId() throws Exception {
+        // 1. 准备请求数据
+        InitiateMultipartUploadRequestDTO request = new InitiateMultipartUploadRequestDTO();
+        request.setFileName("test-video.mp4");
+        request.setFileSize(10L * 1024 * 1024);
+        request.setMediaType("VIDEO");
+        request.setMimeType("video/mp4");
+        request.setPurpose("TEST");
+
+        // 2. 执行测试请求，不添加organizationId参数
+        mockMvc.perform(post("/api/media/upload/initiate")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest()); // 应该返回400错误，因为缺少必需的organizationId参数
     }
 } 

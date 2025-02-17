@@ -10,6 +10,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -56,6 +57,16 @@ public class GlobalExceptionHandler {
         return CommonResponse.error(
             String.valueOf(HttpStatus.INTERNAL_SERVER_ERROR.value()), 
             "系统内部错误"
+        );
+    }
+
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public CommonResponse<?> handleMissingServletRequestParameterException(MissingServletRequestParameterException e) {
+        log.warn("缺少必需的请求参数: {}", e.getParameterName());
+        return CommonResponse.error(
+            String.valueOf(HttpStatus.BAD_REQUEST.value()), 
+            "缺少必需的请求参数: " + e.getParameterName()
         );
     }
 } 

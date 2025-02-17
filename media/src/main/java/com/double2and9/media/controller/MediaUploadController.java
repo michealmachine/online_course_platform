@@ -1,11 +1,11 @@
 package com.double2and9.media.controller;
 
 import com.double2and9.base.dto.CommonResponse;
-import com.double2and9.media.dto.InitiateMultipartUploadRequestDTO;
+import com.double2and9.media.dto.request.InitiateMultipartUploadRequestDTO;
 import com.double2and9.media.dto.InitiateMultipartUploadResponseDTO;
-import com.double2and9.media.dto.GetPresignedUrlRequestDTO;
+import com.double2and9.media.dto.request.GetPresignedUrlRequestDTO;
 import com.double2and9.media.dto.GetPresignedUrlResponseDTO;
-import com.double2and9.media.dto.CompleteMultipartUploadRequestDTO;
+import com.double2and9.media.dto.request.CompleteMultipartUploadRequestDTO;
 import com.double2and9.media.dto.CompleteMultipartUploadResponseDTO;
 import com.double2and9.media.service.MediaUploadService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @Tag(name = "媒体文件上传接口", description = "处理媒体文件的分片上传相关操作")
@@ -32,13 +33,16 @@ public class MediaUploadController {
     @Operation(summary = "初始化分片上传", description = "创建分片上传会话，返回uploadId等信息")
     @PostMapping("/initiate")
     public CommonResponse<InitiateMultipartUploadResponseDTO> initiateMultipartUpload(
+            @RequestParam Long organizationId,
             @RequestBody @Valid InitiateMultipartUploadRequestDTO request) {
+        
+        request.setOrganizationId(organizationId);
         
         log.info("初始化分片上传请求: fileName={}, fileSize={}, mediaType={}, organizationId={}",
                 request.getFileName(),
                 request.getFileSize(),
                 request.getMediaType(),
-                request.getOrganizationId());
+                organizationId);
         
         InitiateMultipartUploadResponseDTO response = mediaUploadService.initiateMultipartUpload(request);
         

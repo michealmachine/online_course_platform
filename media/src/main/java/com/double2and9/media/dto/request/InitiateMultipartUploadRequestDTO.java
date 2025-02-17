@@ -1,4 +1,4 @@
-package com.double2and9.media.dto;
+package com.double2and9.media.dto.request;
 
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
@@ -25,6 +25,5 @@ public class InitiateMultipartUploadRequestDTO {
     
     private String purpose;
     
-    @NotNull(message = "机构ID不能为空")
     private Long organizationId;
 } 

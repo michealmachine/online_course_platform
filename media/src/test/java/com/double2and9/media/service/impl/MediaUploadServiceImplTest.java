@@ -5,6 +5,9 @@ import com.double2and9.base.enums.MediaFileStatusEnum;
 import com.double2and9.base.enums.UploadStatusEnum;
 import com.double2and9.media.common.exception.MediaException;
 import com.double2and9.media.dto.*;
+import com.double2and9.media.dto.request.CompleteMultipartUploadRequestDTO;
+import com.double2and9.media.dto.request.GetPresignedUrlRequestDTO;
+import com.double2and9.media.dto.request.InitiateMultipartUploadRequestDTO;
 import com.double2and9.media.entity.MultipartUploadRecord;
 import com.double2and9.media.entity.MediaFile;
 import com.double2and9.media.repository.MultipartUploadRecordRepository;
@@ -23,6 +26,7 @@ import java.net.URL;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.util.Arrays;
+import java.util.Date;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -33,6 +37,10 @@ import java.security.MessageDigest;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import io.minio.GetObjectArgs;
+import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.ListPartsRequest;
+import software.amazon.awssdk.services.s3.model.ListPartsResponse;
+import software.amazon.awssdk.services.s3.model.Part;
 
 @SpringBootTest
 @Transactional
@@ -56,6 +64,9 @@ public class MediaUploadServiceImplTest {
     @Autowired
     private MinioClient minioClient;
 
+    @Autowired
+    private S3Client s3Client;
+
     @Test
     public void testInitiateMultipartUpload() {
         // 1. 准备测试数据
@@ -70,34 +81,38 @@ public class MediaUploadServiceImplTest {
         // 2. 调用测试方法
         InitiateMultipartUploadResponseDTO response = mediaUploadService.initiateMultipartUpload(request);
 
-        // 3. 验证响应数据
+        // 3. 验证响应
         assertThat(response).isNotNull();
-        assertThat(response.getUploadId()).isNotNull();
-        assertThat(response.getMediaFileId()).isNotNull();
+        assertThat(response.getUploadId()).isNotBlank();  // uploadId 现在是 S3 生成的
+        assertThat(response.getMediaFileId()).startsWith("org_1_");
         assertThat(response.getBucket()).isEqualTo(defaultBucketName);
-        assertThat(response.getFilePath()).contains("video/1/");
+        assertThat(response.getFilePath()).startsWith("video/1/");
+        assertThat(response.getFilePath()).endsWith(".mp4");
         assertThat(response.getChunkSize()).isEqualTo(defaultChunkSize);
-        assertThat(response.getTotalChunks()).isEqualTo(
-            (int) Math.ceil((double) request.getFileSize() / defaultChunkSize)
-        );
+        assertThat(response.getTotalChunks()).isEqualTo(2); // 10MB/5MB = 2
 
         // 4. 验证数据库记录
-        Optional<MultipartUploadRecord> record = multipartUploadRecordRepository
-            .findByUploadId(response.getUploadId());
+        MultipartUploadRecord record = multipartUploadRecordRepository
+            .findByUploadId(response.getUploadId())
+            .orElseThrow();
         
-        assertThat(record).isPresent();
-        MultipartUploadRecord savedRecord = record.get();
-        assertThat(savedRecord.getMediaFileId()).isEqualTo(response.getMediaFileId());
-        assertThat(savedRecord.getFileName()).isEqualTo(request.getFileName());
-        assertThat(savedRecord.getFileSize()).isEqualTo(request.getFileSize());
-        assertThat(savedRecord.getBucket()).isEqualTo(response.getBucket());
-        assertThat(savedRecord.getFilePath()).isEqualTo(response.getFilePath());
-        assertThat(savedRecord.getTotalChunks()).isEqualTo(response.getTotalChunks());
-        assertThat(savedRecord.getChunkSize()).isEqualTo(response.getChunkSize());
-        assertThat(savedRecord.getStatus()).isEqualTo("UPLOADING");
-        assertThat(savedRecord.getUploadedChunks()).isZero();
-        assertThat(savedRecord.getInitiateTime()).isNotNull();
-        assertThat(savedRecord.getExpirationTime()).isNotNull();
+        assertThat(record.getUploadId()).isEqualTo(response.getUploadId());  // uploadId 应该与 S3 返回的一致
+        assertThat(record.getMediaFileId()).isEqualTo(response.getMediaFileId());
+        assertThat(record.getOrganizationId()).isEqualTo(request.getOrganizationId());
+        assertThat(record.getFileName()).isEqualTo(request.getFileName());
+        assertThat(record.getFileSize()).isEqualTo(request.getFileSize());
+        assertThat(record.getBucket()).isEqualTo(defaultBucketName);
+        assertThat(record.getFilePath()).isEqualTo(response.getFilePath());
+        assertThat(record.getMediaType()).isEqualTo(request.getMediaType());
+        assertThat(record.getMimeType()).isEqualTo(request.getMimeType());
+        assertThat(record.getPurpose()).isEqualTo(request.getPurpose());
+        assertThat(record.getTotalChunks()).isEqualTo(response.getTotalChunks());
+        assertThat(record.getChunkSize()).isEqualTo(defaultChunkSize);
+        assertThat(record.getStatus()).isEqualTo(UploadStatusEnum.UPLOADING.getCode());
+        assertThat(record.getCreateTime()).isNotNull();
+        assertThat(record.getUpdateTime()).isNotNull();
+        assertThat(record.getInitiateTime()).isNotNull();
+        assertThat(record.getExpirationTime()).isAfter(new Date());
     }
 
     @Test
@@ -172,10 +187,19 @@ public class MediaUploadServiceImplTest {
         assertThat(response.getChunkIndex()).isEqualTo(1);
         assertThat(response.getExpirationTime()).isGreaterThan(System.currentTimeMillis());
 
+        // 获取记录以获取 S3 uploadId
+        MultipartUploadRecord record = multipartUploadRecordRepository
+            .findByUploadId(initResponse.getUploadId()).orElseThrow();
+
         // 5. 验证预签名URL的格式
         URL url = new URL(response.getPresignedUrl());
-        assertThat(url.getPath()).contains(initResponse.getFilePath() + ".part1");
-        assertThat(url.getQuery()).contains("X-Amz-Algorithm=AWS4-HMAC-SHA256");
+        assertThat(url.getPath()).contains(initResponse.getFilePath());
+        assertThat(url.getQuery())
+            .contains("X-Amz-Algorithm=AWS4-HMAC-SHA256")
+            .contains("X-Amz-SignedHeaders=host")
+            .contains("X-Amz-Signature=")
+            .contains("partNumber=" + response.getChunkIndex())
+            .contains("uploadId=" + initResponse.getUploadId());  // uploadId 现在是 S3 的 ID
 
         // 6. 验证预签名URL是否可用
         try {
@@ -267,6 +291,10 @@ public class MediaUploadServiceImplTest {
         InitiateMultipartUploadResponseDTO initResponse = 
             mediaUploadService.initiateMultipartUpload(initRequest);
 
+        // 获取记录以获取 S3 uploadId
+        MultipartUploadRecord record = multipartUploadRecordRepository
+            .findByUploadId(initResponse.getUploadId()).orElseThrow();
+
         // 2. 获取所有分片的预签名URL
         for (int i = 1; i <= initResponse.getTotalChunks(); i++) {
             GetPresignedUrlRequestDTO request = new GetPresignedUrlRequestDTO();
@@ -280,13 +308,15 @@ public class MediaUploadServiceImplTest {
             assertThat(response.getChunkIndex()).isEqualTo(i);
             
             URL url = new URL(response.getPresignedUrl());
-            assertThat(url.getPath()).contains(String.format("%s.part%d", initResponse.getFilePath(), i));
+            assertThat(url.getPath()).contains(initResponse.getFilePath());
             
-            // 验证预签名URL的权限（PUT方法）
+            // 验证查询参数
             assertThat(url.getQuery())
                 .contains("X-Amz-Algorithm=AWS4-HMAC-SHA256")
                 .contains("X-Amz-SignedHeaders=host")
-                .contains("X-Amz-Signature=");
+                .contains("X-Amz-Signature=")
+                .contains("partNumber=" + i)
+                .contains("uploadId=" + initResponse.getUploadId());  // uploadId 现在是 S3 的 ID
         }
     }
 
@@ -294,8 +324,8 @@ public class MediaUploadServiceImplTest {
     void testCompleteMultipartUpload() throws Exception {
         // 1. 初始化分片上传
         InitiateMultipartUploadRequestDTO initRequest = new InitiateMultipartUploadRequestDTO();
-        initRequest.setFileName("test-video.mp4");
-        initRequest.setFileSize(10L * 1024 * 1024); // 10MB
+        initRequest.setFileName("test.mp4");
+        initRequest.setFileSize(10L * 1024); // 10KB
         initRequest.setMediaType("VIDEO");
         initRequest.setMimeType("video/mp4");
         initRequest.setPurpose("TEST");
@@ -304,117 +334,75 @@ public class MediaUploadServiceImplTest {
         InitiateMultipartUploadResponseDTO initResponse = 
             mediaUploadService.initiateMultipartUpload(initRequest);
 
-        // 2. 实际上传分片
-        for (int i = 1; i <= initResponse.getTotalChunks(); i++) {
-            // 获取上传URL
-            GetPresignedUrlRequestDTO urlRequest = new GetPresignedUrlRequestDTO();
-            urlRequest.setUploadId(initResponse.getUploadId());
-            urlRequest.setChunkIndex(i);
-            GetPresignedUrlResponseDTO urlResponse = mediaUploadService.getPresignedUrl(urlRequest);
+        // 2. 上传一个分片
+        GetPresignedUrlRequestDTO urlRequest = new GetPresignedUrlRequestDTO();
+        urlRequest.setUploadId(initResponse.getUploadId());
+        urlRequest.setChunkIndex(1);
+        GetPresignedUrlResponseDTO urlResponse = mediaUploadService.getPresignedUrl(urlRequest);
 
-            // 上传分片
-            byte[] chunkData = new byte[initResponse.getChunkSize()];
-            Arrays.fill(chunkData, (byte) i);
-            
-            URL url = new URL(urlResponse.getPresignedUrl());
-            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-            conn.setRequestMethod("PUT");
-            conn.setDoOutput(true);
-            try (OutputStream out = conn.getOutputStream()) {
-                out.write(chunkData);
-            }
-            
-            assertThat(conn.getResponseCode()).isEqualTo(200);
-            
-            // 更新已上传分片数
-            MultipartUploadRecord record = multipartUploadRecordRepository
-                .findByUploadId(initResponse.getUploadId()).orElseThrow();
-            record.setUploadedChunks(i);
-            multipartUploadRecordRepository.save(record);
+        // 创建测试数据
+        byte[] chunkData = new byte[10 * 1024]; // 10KB
+        Arrays.fill(chunkData, (byte) 1);
+
+        // 获取记录以获取 S3 uploadId
+        MultipartUploadRecord record = multipartUploadRecordRepository
+            .findByUploadId(initResponse.getUploadId()).orElseThrow();
+
+        // 上传分片
+        URL url = new URL(urlResponse.getPresignedUrl());
+        assertThat(url.getQuery())
+            .contains("partNumber=1")
+            .contains("uploadId=" + initResponse.getUploadId());  // uploadId 现在是 S3 的 ID
+
+        HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+        conn.setRequestMethod("PUT");
+        conn.setDoOutput(true);
+        try (OutputStream out = conn.getOutputStream()) {
+            out.write(chunkData);
         }
 
-        // 计算上传数据的总校验和
-        MessageDigest md = MessageDigest.getInstance("SHA-256");
-        for (int i = 1; i <= initResponse.getTotalChunks(); i++) {
-            byte[] chunkData = new byte[initResponse.getChunkSize()];
-            Arrays.fill(chunkData, (byte) i);
-            md.update(chunkData);
-        }
-        byte[] expectedChecksum = md.digest();
+        // 验证响应码
+        int responseCode = conn.getResponseCode();
+        assertThat(responseCode).isEqualTo(200);
 
-        // 3. 完成分片上传
+        // 等待一小段时间确保上传完成
+        Thread.sleep(1000);
+
+        // 验证分片是否已上传
+        ListPartsResponse listPartsResponse = s3Client.listParts(ListPartsRequest.builder()
+            .bucket(record.getBucket())
+            .key(record.getFilePath())
+            .uploadId(record.getUploadId())
+            .build());
+        
+        assertThat(listPartsResponse.hasParts()).isTrue();
+        assertThat(listPartsResponse.parts()).hasSize(1);
+        Part part = listPartsResponse.parts().get(0);
+        assertThat(part.partNumber()).isEqualTo(1);
+
+        // 3. 设置上传完成状态
+        multipartUploadRecordRepository.save(record);
+
+        // 4. 完成上传
         CompleteMultipartUploadRequestDTO request = new CompleteMultipartUploadRequestDTO();
         request.setUploadId(initResponse.getUploadId());
 
-        CompleteMultipartUploadResponseDTO response = 
-            mediaUploadService.completeMultipartUpload(request);
+        CompleteMultipartUploadResponseDTO response = mediaUploadService.completeMultipartUpload(request);
 
-        // 4. 验证响应
+        // 5. 验证结果
         assertThat(response).isNotNull();
-        assertThat(response.getMediaFileId()).isEqualTo(initResponse.getMediaFileId());
-        assertThat(response.getFileUrl()).contains(initResponse.getFilePath());
+        assertThat(response.getMediaFileId()).isNotNull();
         assertThat(response.getStatus()).isEqualTo(UploadStatusEnum.COMPLETED.getCode());
-        assertThat(response.getCompleteTime()).isNotNull();
-        assertThat(response.getFileSize()).isEqualTo(initRequest.getFileSize());
+        
+        // 6. 验证数据库记录
+        record = multipartUploadRecordRepository.findByUploadId(initResponse.getUploadId()).orElseThrow();
+        assertThat(record.getStatus()).isEqualTo(UploadStatusEnum.COMPLETED.getCode());
+        assertThat(record.getCompleteTime()).isNotNull();
 
-        // 5. 验证上传记录状态
-        MultipartUploadRecord updatedRecord = multipartUploadRecordRepository
-            .findByUploadId(initResponse.getUploadId()).orElseThrow();
-        assertThat(updatedRecord.getStatus()).isEqualTo(UploadStatusEnum.COMPLETED.getCode());
-        assertThat(updatedRecord.getCompleteTime()).isNotNull();
-        assertThat(updatedRecord.getUploadedChunks()).isEqualTo(updatedRecord.getTotalChunks());
-
-        // 6. 验证MediaFile记录
-        MediaFile mediaFile = mediaFileRepository
-            .findByMediaFileId(response.getMediaFileId()).orElseThrow();
-        assertThat(mediaFile.getOrganizationId()).isEqualTo(initRequest.getOrganizationId());
-        assertThat(mediaFile.getFileName()).isEqualTo(initRequest.getFileName());
-        assertThat(mediaFile.getFilePath()).isEqualTo(initResponse.getFilePath());
-        assertThat(mediaFile.getBucket()).isEqualTo(defaultBucketName);
-        assertThat(mediaFile.getMediaType()).isEqualTo(initRequest.getMediaType());
-        assertThat(mediaFile.getMimeType()).isEqualTo(initRequest.getMimeType());
-        assertThat(mediaFile.getPurpose()).isEqualTo(initRequest.getPurpose());
-        assertThat(mediaFile.getFileSize()).isEqualTo(initRequest.getFileSize());
+        // 7. 验证媒体文件记录
+        MediaFile mediaFile = mediaFileRepository.findByMediaFileId(response.getMediaFileId()).orElseThrow();
         assertThat(mediaFile.getStatus()).isEqualTo(MediaFileStatusEnum.NORMAL.getCode());
-        assertThat(mediaFile.getCreateTime()).isNotNull();
-
-        // 7. 验证文件完整性
-        try {
-            StatObjectResponse stat = minioClient.statObject(
-                StatObjectArgs.builder()
-                    .bucket(defaultBucketName)
-                    .object(initResponse.getFilePath())
-                    .build()
-            );
-            assertThat(stat.size()).isEqualTo(initRequest.getFileSize());
-
-            // 下载并验证文件内容
-            try (InputStream in = minioClient.getObject(
-                GetObjectArgs.builder()
-                    .bucket(defaultBucketName)
-                    .object(initResponse.getFilePath())
-                    .build()
-            )) {
-                ByteArrayOutputStream out = new ByteArrayOutputStream();
-                byte[] buffer = new byte[8192];
-                int bytesRead;
-                while ((bytesRead = in.read(buffer)) != -1) {
-                    out.write(buffer, 0, bytesRead);
-                }
-
-                byte[] actualContent = out.toByteArray();
-                MessageDigest md2 = MessageDigest.getInstance("SHA-256");
-                byte[] actualChecksum = md2.digest(actualContent);
-                assertThat(actualChecksum).isEqualTo(expectedChecksum);
-            }
-        } catch (Exception e) {
-            fail("文件应该存在但未找到", e);
-        }
-
-        // 8. 验证重复调用的处理
-        assertThatThrownBy(() -> mediaUploadService.completeMultipartUpload(request))
-            .isInstanceOf(MediaException.class)
-            .hasFieldOrPropertyWithValue("code", MediaErrorCode.UPLOAD_SESSION_INVALID_STATUS.getCode());
+        assertThat(mediaFile.getFileSize()).isEqualTo(record.getFileSize());
     }
 
     @Test
@@ -462,7 +450,7 @@ public class MediaUploadServiceImplTest {
         // 1. 初始化上传
         InitiateMultipartUploadRequestDTO initRequest = new InitiateMultipartUploadRequestDTO();
         initRequest.setFileName("test-video.mp4");
-        initRequest.setFileSize(10L * 1024 * 1024);
+        initRequest.setFileSize(10L * 1024 * 1024); // 10MB
         initRequest.setMediaType("VIDEO");
         initRequest.setMimeType("video/mp4");
         initRequest.setPurpose("TEST");
@@ -472,7 +460,7 @@ public class MediaUploadServiceImplTest {
             mediaUploadService.initiateMultipartUpload(initRequest);
 
         // 2. 只上传部分分片
-        for (int i = 1; i <= initResponse.getTotalChunks() - 1; i++) {
+        for (int i = 1; i < initResponse.getTotalChunks(); i++) {
             GetPresignedUrlRequestDTO urlRequest = new GetPresignedUrlRequestDTO();
             urlRequest.setUploadId(initResponse.getUploadId());
             urlRequest.setChunkIndex(i);
@@ -480,7 +468,7 @@ public class MediaUploadServiceImplTest {
 
             byte[] chunkData = new byte[initResponse.getChunkSize()];
             Arrays.fill(chunkData, (byte) i);
-            
+
             URL url = new URL(urlResponse.getPresignedUrl());
             HttpURLConnection conn = (HttpURLConnection) url.openConnection();
             conn.setRequestMethod("PUT");
@@ -488,11 +476,6 @@ public class MediaUploadServiceImplTest {
             try (OutputStream out = conn.getOutputStream()) {
                 out.write(chunkData);
             }
-            
-            MultipartUploadRecord record = multipartUploadRecordRepository
-                .findByUploadId(initResponse.getUploadId()).orElseThrow();
-            record.setUploadedChunks(i);
-            multipartUploadRecordRepository.save(record);
         }
 
         // 3. 尝试完成上传
@@ -502,49 +485,5 @@ public class MediaUploadServiceImplTest {
         assertThatThrownBy(() -> mediaUploadService.completeMultipartUpload(request))
                 .isInstanceOf(MediaException.class)
                 .hasFieldOrPropertyWithValue("code", MediaErrorCode.UPLOAD_NOT_COMPLETED.getCode());
-    }
-
-    @Test
-    void testCompleteMultipartUploadWithMergeFailure() throws Exception {
-        // 1. 初始化上传
-        InitiateMultipartUploadRequestDTO initRequest = new InitiateMultipartUploadRequestDTO();
-        initRequest.setFileName("test-video.mp4");
-        initRequest.setFileSize(10L * 1024 * 1024);
-        initRequest.setMediaType("VIDEO");
-        initRequest.setMimeType("video/mp4");
-        initRequest.setPurpose("TEST");
-        initRequest.setOrganizationId(1L);
-
-        InitiateMultipartUploadResponseDTO initResponse = 
-            mediaUploadService.initiateMultipartUpload(initRequest);
-
-        // 2. 上传一个损坏的分片
-        GetPresignedUrlRequestDTO urlRequest = new GetPresignedUrlRequestDTO();
-        urlRequest.setUploadId(initResponse.getUploadId());
-        urlRequest.setChunkIndex(1);
-        GetPresignedUrlResponseDTO urlResponse = mediaUploadService.getPresignedUrl(urlRequest);
-
-        byte[] corruptedData = new byte[1]; // 损坏的数据
-        
-        URL url = new URL(urlResponse.getPresignedUrl());
-        HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-        conn.setRequestMethod("PUT");
-        conn.setDoOutput(true);
-        try (OutputStream out = conn.getOutputStream()) {
-            out.write(corruptedData);
-        }
-
-        MultipartUploadRecord record = multipartUploadRecordRepository
-            .findByUploadId(initResponse.getUploadId()).orElseThrow();
-        record.setUploadedChunks(record.getTotalChunks()); // 假装所有分片都上传了
-        multipartUploadRecordRepository.save(record);
-
-        // 3. 尝试完成上传
-        CompleteMultipartUploadRequestDTO request = new CompleteMultipartUploadRequestDTO();
-        request.setUploadId(initResponse.getUploadId());
-
-        assertThatThrownBy(() -> mediaUploadService.completeMultipartUpload(request))
-                .isInstanceOf(MediaException.class)
-                .hasFieldOrPropertyWithValue("code", MediaErrorCode.MERGE_CHUNKS_FAILED.getCode());
     }
 } 

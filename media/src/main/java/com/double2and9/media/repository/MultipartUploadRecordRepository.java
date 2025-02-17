@@ -35,15 +35,6 @@ public interface MultipartUploadRecordRepository extends JpaRepository<Multipart
     List<MultipartUploadRecord> findByStatusAndExpirationTimeBefore(String status, Date expirationTime);
     
     /**
-     * 更新已上传分片数
-     */
-    @Modifying(clearAutomatically = true)
-    @Transactional
-    @Query("UPDATE MultipartUploadRecord m SET m.uploadedChunks = :uploadedChunks, m.updateTime = CURRENT_TIMESTAMP " +
-           "WHERE m.uploadId = :uploadId")
-    int updateUploadedChunks(String uploadId, Integer uploadedChunks);
-    
-    /**
      * 更新上传状态
      */
     @Modifying(clearAutomatically = true)

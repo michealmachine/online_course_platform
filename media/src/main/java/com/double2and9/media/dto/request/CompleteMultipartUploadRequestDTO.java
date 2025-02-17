@@ -1,4 +1,4 @@
-package com.double2and9.media.dto;
+package com.double2and9.media.dto.request;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;

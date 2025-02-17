@@ -553,32 +553,78 @@ MediaUploadController 将 CompleteMultipartUploadResponseDTO 封装在 CommonRes
 客户端接收到 /api/media/upload/complete 接口的响应，从中获取最终的 mediaFileId 和文件访问 URL 等信息。
 客户端可以使用文件访问 URL 下载或播放已上传的媒体文件。
 
+
+
+需要开发的内容详细描述:
+1. 客户端 (Client-side Development):
+核心上传功能:
+初始化上传请求: 实现调用后端 /initiate-upload API 的功能，发送文件名、文件大小等信息，并接收后端返回的 uploadId、chunkSize 等信息。
+获取预签名 URL 请求: 实现循环调用后端 /presigned-url API 的功能，根据 uploadId 和 chunkIndex 获取每个分片的预签名 URL。
+分片上传逻辑: 实现使用 fetch API 或选定的上传库，根据预签名 URL 将文件分片上传到 MinIO 的逻辑。需要处理文件分片、循环上传、请求头设置等细节。
+完成上传请求: 在所有分片上传完成后，实现调用后端 /complete-upload API 的功能，发送 uploadId 通知后端合并分片。
+上传进度显示: 在用户界面上显示上传进度条和上传百分比，实时反馈上传状态。
+用户交互和体验:
+文件选择: 提供文件选择控件 (例如 <input type="file">)，允许用户选择要上传的视频文件。
+上传状态展示: 清晰地展示上传状态，包括 "准备上传"、"上传中"、"上传完成"、"上传失败" 等状态。
+错误提示: 当上传过程中发生错误时 (例如网络错误、服务器错误)，向用户显示友好的错误提示信息。
+可选功能 (后续迭代):
+断点续传: 实现断点续传功能，允许用户在网络中断或关闭浏览器后，下次继续上传未完成的文件。
+暂停/取消上传: 提供暂停和取消上传的功能。
+
+```mermaid
+sequence
 sequenceDiagram
-    participant Client
-    participant Backend Service
-    participant MinIO
+participant Client
+participant Backend Service
+participant MinIO
+participant DB
+Client->>Backend Service: 1. 初始化分片上传 (fileName, fileSize, mimeType, purpose, organizationId, fileSha256Hex)
+Backend Service->>Backend Service: 生成 Upload ID, 预签名 URL 策略
+Backend Service->>DB: 创建 MultipartUploadRecord (INITIATED)
+Backend Service-->>Client: 返回 Upload ID, 预签名 URL 策略
+loop 分片上传
+Client->>Backend Service: 请求分片预签名 URL (Upload ID, 分片序号)
+Backend Service->>MinIO: 生成分片预签名 URL (Upload ID, 分片序号)
+Backend Service-->>Client: 返回分片预签名 URL
+Client->>MinIO: 2. 上传分片数据 (PUT 预签名 URL)
+MinIO-->>Client: 返回 OK
+Client->>Backend Service: 更新分片上传进度 (Upload ID, uploadedChunks)
+Backend Service->>DB: 更新 MultipartUploadRecord (uploadedChunks)
+end
+Client->>Backend Service: 3. 完成分片上传 (Upload ID)
+Backend Service->>DB: 查询 MultipartUploadRecord (Upload ID)
+Backend Service->>MinIO: 请求合并分片 (Upload ID)
+MinIO->>MinIO: 服务端合并分片
+MinIO-->>Backend Service: 返回 OK
+Backend Service->>Backend Service: 文件大小校验, SHA-256 校验
+alt 校验成功
+Backend Service->>DB: 更新 MultipartUploadRecord (COMPLETED), 创建 MediaFile, MediaProcessHistory 记录
+Backend Service->>Message Queue: 发送 异步元信息提取任务
+Backend Service-->>Client: 4. 上传成功响应
+else 校验失败
+Backend Service->>Backend Service: 清理已上传分片和合并文件
+Backend Service->>DB: 更新 MultipartUploadRecord (FAILED)
+Backend Service-->>Client: 4. 上传失败响应 (Error)
+end
+Message Queue-->>Backend Service: 异步元信息提取任务
+Backend Service->>MinIO: 读取完整视频文件
+Backend Service->>Backend Service: 提取元信息, 转码等处理
+Backend Service->>DB: 更新 MediaFile, MediaProcessHistory 记录
+```
 
-    Client->>Backend Service: 1. 初始化分片上传 (fileName, fileSize, chunkSize)
-    Backend Service->>Backend Service: 生成 Upload ID, 预签名 URL 策略
-    Backend Service-->>Client: 返回 Upload ID, 预签名 URL 策略
+**流程图更新说明:**
 
-    loop 分片上传
-        Client->>Backend Service: 请求分片预签名 URL (Upload ID, 分片序号)
-        Backend Service->>MinIO: 生成分片预签名 URL (Upload ID, 分片序号)
-        Backend Service-->>Client: 返回分片预签名 URL
-        Client->>MinIO: 2. 上传分片数据 (PUT 预签名 URL)
-        MinIO-->>Client: 返回 OK
-    end
+*   **步骤 1 "初始化分片上传"**:  在请求参数中增加了 `fileSha256Hex`，表示客户端会在初始化上传时提供文件的 SHA-256 哈希值。
+*   **循环 "分片上传"**:  在每次分片上传后，客户端会向后端发送 "更新分片上传进度" 请求，后端会更新 `MultipartUploadRecord` 中的 `uploadedChunks` 字段。
+*   **步骤 3 "完成分片上传"**:
+    *   后端在合并分片后，增加了 "**文件大小校验, SHA-256 校验**" 步骤。
+    *   增加了一个 `alt 校验成功/校验失败` 分支，明确表示了校验成功和失败两种情况下的后续流程：
+        *   **校验成功**:  继续创建 `MediaFile` 记录，发送消息队列任务，并返回上传成功响应。
+        *   **校验失败**:  清理已上传的文件，更新 `MultipartUploadRecord` 状态为 `FAILED`，并返回上传失败响应。
 
-    Client->>Backend Service: 3. 完成分片上传 (Upload ID)
-    Backend Service->>MinIO: 请求合并分片 (Upload ID)
-    MinIO->>MinIO: 服务端合并分片
-    MinIO-->>Backend Service: 返回 OK
-    Backend Service->>DB: 创建 MediaFile, MediaProcessHistory 记录
-    Backend Service->>Message Queue: 发送 异步元信息提取任务
-    Backend Service-->>Client: 4. 上传成功响应
+**第一步完成后的测试:**
 
-    Message Queue-->>Backend Service: 异步元信息提取任务
-    Backend Service->>MinIO: 读取完整视频文件
-    Backend Service->>Backend Service: 提取元信息, 转码等处理
-    Backend Service->>DB: 更新 MediaFile, MediaProcessHistory 记录
+*   **视觉检查:**  打开 `docs/media.md` 文件，查看流程图是否已经更新，新的步骤和分支是否清晰地显示出来。
+*   **理解验证:**  仔细阅读更新后的流程图，确认新的流程是否准确地反映了包含 SHA-256 校验的文件上传流程。
+
+**完成第一步后，请告诉我，我们就可以开始进行第二步，修改 `MultipartUploadRecord.java` 实体类了。**

@@ -16,8 +16,8 @@ import java.util.Date;
 public class MultipartUploadRecord {
     
     @Id
-    @Column(name = "upload_id", length = 120)
-    private String uploadId;              // 分片上传ID
+    @Column(name = "upload_id", length = 255)
+    private String uploadId;              // 分片上传ID，使用S3返回的uploadId
     
     @Column(name = "media_file_id", length = 120)
     private String mediaFileId;           // 关联的媒体文件ID
@@ -32,10 +32,10 @@ public class MultipartUploadRecord {
     private Long fileSize;                // 文件总大小
     
     @Column(name = "bucket", length = 255)
-    private String bucket;                // MinIO存储桶
+    private String bucket;                // S3存储桶
     
     @Column(name = "file_path", length = 512)
-    private String filePath;              // MinIO文件路径
+    private String filePath;              // S3文件路径
     
     @Column(name = "media_type", length = 32)
     private String mediaType;             // 媒体类型（VIDEO/IMAGE等）
@@ -48,9 +48,6 @@ public class MultipartUploadRecord {
     
     @Column(name = "total_chunks")
     private Integer totalChunks;          // 总分片数
-    
-    @Column(name = "uploaded_chunks")
-    private Integer uploadedChunks;       // 已上传分片数
     
     @Column(name = "chunk_size")
     private Integer chunkSize;            // 分片大小
@@ -83,9 +80,6 @@ public class MultipartUploadRecord {
         }
         if (updateTime == null) {
             updateTime = new Date();
-        }
-        if (uploadedChunks == null) {
-            uploadedChunks = 0;
         }
     }
 

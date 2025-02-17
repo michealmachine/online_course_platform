@@ -1,10 +1,10 @@
 package com.double2and9.media.service;
 
-import com.double2and9.media.dto.GetPresignedUrlRequestDTO;
+import com.double2and9.media.dto.request.GetPresignedUrlRequestDTO;
 import com.double2and9.media.dto.GetPresignedUrlResponseDTO;
-import com.double2and9.media.dto.InitiateMultipartUploadRequestDTO;
+import com.double2and9.media.dto.request.InitiateMultipartUploadRequestDTO;
 import com.double2and9.media.dto.InitiateMultipartUploadResponseDTO;
-import com.double2and9.media.dto.CompleteMultipartUploadRequestDTO;
+import com.double2and9.media.dto.request.CompleteMultipartUploadRequestDTO;
 import com.double2and9.media.dto.CompleteMultipartUploadResponseDTO;
 
 /**
@@ -20,7 +20,12 @@ public interface MediaUploadService {
      */
     InitiateMultipartUploadResponseDTO initiateMultipartUpload(
             InitiateMultipartUploadRequestDTO initiateMultipartUploadRequestDTO);
-
+    /**
+     * 获取分片上传预签名URL
+     *
+     * @param request 获取预签名URL请求参数
+     * @return 预签名URL响应信息
+     */
     GetPresignedUrlResponseDTO getPresignedUrl(GetPresignedUrlRequestDTO request);
 
     /**

@@ -2,12 +2,16 @@ package com.double2and9.media.dto;
 
 import lombok.Data;
 import lombok.Builder;
+import lombok.NoArgsConstructor;
+import lombok.AllArgsConstructor;
 
 /**
  * 初始化分片上传响应DTO
  */
 @Data
 @Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class InitiateMultipartUploadResponseDTO {
     
     /**
@@ -39,4 +43,9 @@ public class InitiateMultipartUploadResponseDTO {
      * 建议的分片数量
      */
     private Integer totalChunks;
+    
+    /**
+     * 添加这个字段
+     */
+    private String s3UploadId;
 } 
