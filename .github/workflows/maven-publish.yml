@@ -107,3 +107,7 @@ jobs:
     # 构建和测试media模块
     - name: Build and Test Media Module
       run: mvn clean verify -pl media -Dspring.profiles.active=test
+      
+    # 构建和测试auth_service模块
+    - name: Build and Test Auth Service Module
+      run: mvn clean verify -pl auth_service -Dspring.profiles.active=test

@@ -628,3 +628,227 @@ Backend Service->>DB: 更新 MediaFile, MediaProcessHistory 记录
 *   **理解验证:**  仔细阅读更新后的流程图，确认新的流程是否准确地反映了包含 SHA-256 校验的文件上传流程。
 
 **完成第一步后，请告诉我，我们就可以开始进行第二步，修改 `MultipartUploadRecord.java` 实体类了。**
+
+I. 总体开发计划
+
+该计划首先专注于构建一个最小可行产品（MVP），强调核心功能和微服务原则。然后概述了后续阶段的增强和优化。
+
+A. MVP 阶段（重点：功能性转码流水线）
+
+目标： 创建一个可工作的转码流水线，能够处理视频上传，将它们分片成基于时间的片段，使用 FFmpeg 转码这些片段，并存储结果。确保基本的容错性和幂等性。
+
+关键特性：
+
+视频上传处理（基本 - 对于 MVP，可以只是手动上传到 MinIO）。
+
+使用 FFmpeg 进行基于时间的分片。
+
+使用 Spring Cloud Stream 进行消息队列（RabbitMQ 或 Kafka 绑定器）。
+
+转码服务消费消息并使用 FFmpeg。
+
+本地消息表（transcoding_tasks）用于事务性和幂等性。
+
+基本错误处理（使用 Spring Retry 进行重试）。
+
+在 MinIO 中存储原始和转码后的视频块。
+
+基本日志记录。
+
+健康检查（Spring Boot Actuator）。
+
+技术栈：
+
+Java（使用 Spring Boot）
+
+Spring Cloud（Stream、Config，可能还有 Gateway 和 Service Discovery）
+
+MinIO（使用 Java 客户端）
+
+FFmpeg
+
+数据库（PostgreSQL、MySQL 或类似数据库）
+
+消息代理（RabbitMQ 或 Kafka - 通过 Spring Cloud Stream 绑定器选择）
+
+B. 第 2 阶段（增强和可扩展性）
+
+目标： 提高性能、可扩展性和弹性。添加更复杂的功能。
+
+关键特性：
+
+单独的上传服务： 将视频上传和元数据提取与转码服务解耦。
+
+消息发布服务（可选）： 用于处理从本地消息表发布消息的专用服务。
+
+优化的 FFmpeg 配置： 微调 FFmpeg 参数以获得速度、质量和文件大小。
+
+高级分片（可选）： 探索基于场景或关键帧的分片。
+
+死信队列（DLQ）处理： 实现对重试后失败的消息的正确处理。
+
+全面监控： 与 Prometheus 和 Grafana 集成，以获得详细的指标和警报。
+
+改进的日志记录： 增强日志记录以进行更好的诊断和故障排除。
+
+水平扩展： 测试和优化以运行转码服务的多个实例。
+
+API 网关： 实现 API 网关以获得统一的入口点。
+
+C. 第 3 阶段（高级特性和优化）
+
+目标： 添加高级特性，进一步优化性能，并探索新功能。
+
+关键特性：
+
+支持多种输出格式： 转码为不同的分辨率、编解码器和容器。
+
+自适应比特率流（ABS）： 生成 HLS 或 DASH 清单以进行自适应流式传输。
+
+水印： 向转码后的视频添加水印。
+
+缩略图生成： 从视频创建缩略图。
+
+内容分发网络（CDN）集成： 与 CDN 集成以实现更快的视频交付。
+
+高级错误分析： 实现更复杂的错误分析和报告。
+
+自动化测试： 开发一套全面的自动化测试（单元测试、集成测试、性能测试）。
+
+II. 开发流程（逐步）
+
+这概述了 MVP 的推荐开发步骤顺序：
+
+项目设置和依赖项：
+
+创建一个新的 Spring Boot 项目。
+
+添加 Spring Cloud Stream、MinIO 客户端、数据库驱动程序、Spring Retry、Spring Boot Actuator、Lombok（可选，但推荐）和测试框架（JUnit、Mockito）的依赖项。
+
+配置基本项目设置（应用程序名称、端口等）。
+
+数据库模式：
+
+在您选择的数据库中设计并创建 transcoding_tasks 表。包括 video_id、chunk_id、status、message_id、created_at、updated_at、retry_count、input_path、output_path 和 transcoding_parameters 等列。
+
+MinIO 设置：
+
+设置 MinIO 实例（本地或云端）。
+
+创建用于存储原始和转码视频的存储桶。
+
+在您的应用程序属性中配置 MinIO 凭据（或使用 Spring Cloud Config）。
+
+FFmpeg 安装：
+
+确保在您的开发和部署环境中安装并可访问 FFmpeg。
+
+消息代理设置：
+
+设置 RabbitMQ 或 Kafka 实例（本地或云端）。
+
+配置 Spring Cloud Stream 绑定器以连接到您选择的消息代理。
+
+核心转码服务（消费者）：
+
+创建一个 Spring Cloud Stream 消费者（使用 @StreamListener）。
+
+定义您的转码任务的消息负载（POJO）。
+
+实现核心转码逻辑：
+
+接收消息。
+
+查询 transcoding_tasks 表（检查幂等性，处理现有记录）。
+
+如果需要，插入/更新 transcoding_tasks 表（使用 @Transactional 和条件更新）。
+
+构建 FFmpeg 命令（使用来自消息和元数据的信息）。
+
+执行 FFmpeg 命令（使用 ProcessBuilder 或类似工具）。
+
+处理 FFmpeg 输出和退出代码。
+
+将转码后的块存储在 MinIO 中。
+
+更新 transcoding_tasks 表（为 COMPLETED 或 FAILED）。
+
+确认消息。
+
+对转码失败实施 Spring Retry 进行重试。
+
+使用线程池（ExecutorService）来处理多个任务。
+
+消息发布者（生产者 - 用于测试）：
+
+对于 MVP，您可以最初将消息发布逻辑组合到转码服务本身中（使用调度任务 - @Scheduled）。稍后，您可以将其分离到一个专用服务中。
+
+发布者（或调度任务）应：
+
+定期查询 transcoding_tasks 表中 status = 'PENDING' 的记录。
+
+对于每个待处理记录，构建并向队列发送消息（使用 Spring Cloud Stream）。
+
+发布后更新状态。
+
+基本分片（基于时间）：
+
+创建一个实用程序类或方法，该类或方法使用 FFmpeg：
+
+获取视频元数据（持续时间）。
+
+根据所需的段长度计算块的开始/结束时间。
+
+生成 FFmpeg 命令以提取这些块（使用 -ss 和 -to 选项）。
+
+“上传器”（为 MVP 简化）：
+
+对于初始测试，您可以手动：
+
+将测试视频上传到 MinIO。
+
+使用您的分片实用程序在本地创建块。
+
+手动将记录插入到 transcoding_tasks 表中，其中包含适当的信息（路径、块 ID 等）。
+
+将第一个块的消息发送到 MQ 以开始。
+
+测试：
+
+为您的分片逻辑和 FFmpeg 命令生成编写单元测试。
+
+为您的 Spring Cloud Stream 消费者编写集成测试（您可以使用嵌入式消息代理进行测试）。
+
+使用示例视频手动端到端测试整个流水线。
+
+健康检查：
+
+配置 Spring Boot Actuator 以公开健康端点。
+
+验证您的数据库、MinIO 连接和消息代理连接的健康状况。
+
+日志记录：
+
+为关键步骤和错误处理添加适当的日志记录语句。
+
+部署：
+
+将您的应用程序打包为 JAR 或 Docker 镜像。
+
+部署到您选择的环境（本地机器、云等）。
+
+III. 关键原则和提醒
+
+迭代开发： 以小的、增量的步骤进行构建和测试。不要试图一次实现所有功能。
+
+微服务原则： 保持您的服务专注、独立和可部署。
+
+最终一致性： 理解并接受最终一致性。本地消息表确保转码最终会发生，即使存在临时故障。
+
+幂等性： 始终将您的消息消费者设计为幂等的。
+
+监控和警报： 尽早设置监控和警报以快速检测问题。
+
+配置管理： 使用 Spring Cloud Config 进行外部化配置。
+
+尽早并经常测试：

@@ -1,0 +1,14 @@
+-- 更新权限表结构
+ALTER TABLE permissions
+    MODIFY name VARCHAR(100) NOT NULL,
+    MODIFY description VARCHAR(200),
+    ADD COLUMN resource VARCHAR(100) NOT NULL,
+    ADD COLUMN action VARCHAR(50) NOT NULL,
+    ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP;
+
+-- 更新现有权限数据
+UPDATE permissions 
+SET resource = SUBSTRING_INDEX(name, '_', 1),
+    action = LOWER(SUBSTRING_INDEX(name, '_', -1))
+WHERE resource IS NULL; 
