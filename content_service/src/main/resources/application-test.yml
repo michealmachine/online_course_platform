@@ -7,6 +7,14 @@ spring:
           ttl: 30
       host: localhost
       port: 8500
+    openfeign:
+      client:
+        config:
+          default:
+            connectTimeout: 5000
+            readTimeout: 5000
+      circuitbreaker:
+        enabled: true
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: jdbc:mysql://localhost:3306/online_course?serverTimezone=Asia/Shanghai
