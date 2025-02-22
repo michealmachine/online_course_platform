@@ -49,6 +49,7 @@ public enum AuthErrorCode {
     PARAMETER_MISSING(300502, "缺少必要参数"),
     PARAMETER_TYPE_MISMATCH(300503, "参数类型不匹配"),
     INVALID_REQUEST(300504, "无效的请求参数"),
+    TOKEN_REVOKED(300510, "令牌已被撤销"),
 
     // 用户管理相关错误 3006xx
     USER_UPDATE_FAILED(300601, "用户信息更新失败"),

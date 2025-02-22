@@ -16,6 +16,8 @@ import org.springframework.security.oauth2.server.authorization.client.Registere
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.double2and9.auth_service.utils.JsonUtils;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.security.SecureRandom;
 import java.util.Base64;
@@ -38,47 +40,51 @@ public class AuthorizationConsentService {
 
     @Transactional
     public AuthorizationConsentResponse consent(AuthorizationConsentRequest request, Authentication authentication) {
-        // 验证用户是否已登录
-        if (authentication == null || !authentication.isAuthenticated()) {
-            throw new AuthException(AuthErrorCode.AUTHENTICATION_FAILED);
+        // 验证用户是否已认证
+        if (!authentication.isAuthenticated()) {
+            throw new AuthException(AuthErrorCode.UNAUTHORIZED);
         }
 
-        // 从Redis获取待处理的授权请求
-        String redisKey = REDIS_KEY_PREFIX + request.getAuthorizationId();
-        AuthorizationResponse authorizationResponse = (AuthorizationResponse) redisTemplate.opsForValue().get(redisKey);
+        // 从 Redis 获取授权请求
+        String authorizationRequestKey = REDIS_KEY_PREFIX + request.getAuthorizationId();
+        AuthorizationResponse authorizationResponse = (AuthorizationResponse) redisTemplate.opsForValue().get(authorizationRequestKey);
         if (authorizationResponse == null) {
             throw new AuthException(AuthErrorCode.AUTHORIZATION_REQUEST_NOT_FOUND);
         }
 
-        // 验证授权范围
+        // 验证客户端
         RegisteredClient client = clientRepository.findByClientId(authorizationResponse.getClientId());
+        if (client == null) {
+            throw new AuthException(AuthErrorCode.CLIENT_NOT_FOUND);
+        }
+
+        // 验证授权范围
         if (!client.getScopes().containsAll(request.getApprovedScopes())) {
             throw new AuthException(AuthErrorCode.INVALID_APPROVED_SCOPES);
         }
 
         try {
             // 生成授权码
-            String authorizationCode = authorizationCodeService.createAuthorizationCode(
+            String code = authorizationCodeService.createAuthorizationCode(
                 authorizationResponse.getClientId(),
                 authentication.getName(),
                 authorizationResponse.getRedirectUri(),
                 String.join(" ", request.getApprovedScopes()),
-                null,  // codeChallenge 暂时为空
-                null   // codeChallengeMethod 暂时为空
+                request.getCodeChallenge(),
+                request.getCodeChallengeMethod()
             );
 
             // 创建授权响应
             AuthorizationConsentResponse response = new AuthorizationConsentResponse();
-            response.setAuthorizationCode(authorizationCode);
+            response.setAuthorizationCode(code);
             response.setState(authorizationResponse.getState());
             response.setRedirectUri(authorizationResponse.getRedirectUri());
-
+            
             // 从Redis删除待处理的授权请求
-            redisTemplate.delete(redisKey);
-
-            // TODO: 保存授权码和相关信息到数据库
-
+            redisTemplate.delete(authorizationRequestKey);
+            
             return response;
+
         } catch (Exception e) {
             throw new AuthException(AuthErrorCode.AUTHORIZATION_CODE_GENERATE_ERROR);
         }

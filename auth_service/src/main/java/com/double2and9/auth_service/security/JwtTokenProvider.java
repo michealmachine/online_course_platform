@@ -3,6 +3,7 @@ package com.double2and9.auth_service.security;
 import com.double2and9.auth_service.exception.AuthException;
 import com.double2and9.base.enums.AuthErrorCode;
 import io.jsonwebtoken.*;
+import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -17,14 +18,83 @@ import java.util.Map;
 @Component
 public class JwtTokenProvider {
 
-    @Value("${jwt.secret:defaultSecretKeydefaultSecretKeydefaultSecretKey}")
+    @Value("${jwt.secret}")
     private String jwtSecret;
 
     @Value("${jwt.expiration:86400000}")
     private int jwtExpirationMs;
 
+    /**
+     * 生成令牌
+     */
+    public String generateToken(Map<String, Object> claims, long expirationSeconds) {
+        Date now = new Date();
+        Date expiration = new Date(now.getTime() + expirationSeconds * 1000);
+
+        return Jwts.builder()
+                .setClaims(claims)
+                .setIssuedAt(now)
+                .setExpiration(expiration)
+                .signWith(getSigningKey(), SignatureAlgorithm.HS512)
+                .compact();
+    }
+
+    /**
+     * 验证令牌
+     */
+    public Claims validateToken(String token) {
+        log.debug("Validating token in JwtTokenProvider: {}", token);
+        try {
+            Claims claims = Jwts.parserBuilder()
+                .setSigningKey(getSigningKey())
+                .build()
+                .parseClaimsJws(token)
+                .getBody();
+            log.debug("Token validation successful, claims: {}", claims);
+            return claims;
+        } catch (ExpiredJwtException e) {
+            log.debug("Token expired");
+            throw new AuthException(AuthErrorCode.TOKEN_EXPIRED);
+        } catch (SignatureException e) {
+            log.debug("Invalid token signature");
+            throw new AuthException(AuthErrorCode.TOKEN_SIGNATURE_INVALID);
+        } catch (UnsupportedJwtException e) {
+            log.debug("Unsupported token format");
+            throw new AuthException(AuthErrorCode.TOKEN_UNSUPPORTED);
+        } catch (Exception e) {
+            log.error("Token validation failed: {}", e.getMessage(), e);
+            throw new AuthException(AuthErrorCode.TOKEN_INVALID);
+        }
+    }
+
+    /**
+     * 解析令牌
+     */
+    public Claims parseToken(String token) {
+        if (token == null || token.trim().isEmpty()) {
+            throw new AuthException(AuthErrorCode.TOKEN_INVALID);
+        }
+
+        try {
+            return Jwts.parserBuilder()
+                .setSigningKey(getSigningKey())
+                .build()
+                .parseClaimsJws(token)
+                .getBody();
+        } catch (ExpiredJwtException e) {
+            throw new AuthException(AuthErrorCode.TOKEN_EXPIRED);
+        } catch (SignatureException e) {
+            throw new AuthException(AuthErrorCode.TOKEN_SIGNATURE_INVALID);
+        } catch (UnsupportedJwtException e) {
+            throw new AuthException(AuthErrorCode.TOKEN_UNSUPPORTED);
+        } catch (Exception e) {
+            throw new AuthException(AuthErrorCode.TOKEN_INVALID);
+        }
+    }
+
     private Key getSigningKey() {
-        return Keys.hmacShaKeyFor(jwtSecret.getBytes());
+        byte[] keyBytes = Decoders.BASE64URL.decode(jwtSecret);
+        return Keys.hmacShaKeyFor(keyBytes);
     }
 
     /**
@@ -36,54 +106,11 @@ public class JwtTokenProvider {
     }
 
     /**
-     * 生成自定义令牌
-     */
-    public String generateToken(Map<String, Object> claims, long expirationSeconds) {
-        Date now = new Date();
-        Date expiryDate = new Date(now.getTime() + expirationSeconds * 1000);
-
-        return Jwts.builder()
-                .setClaims(claims)
-                .setIssuedAt(now)
-                .setExpiration(expiryDate)
-                .signWith(getSigningKey())
-                .compact();
-    }
-
-    /**
      * 从令牌中获取用户名
      */
     public String getUsernameFromToken(String token) {
         Claims claims = validateToken(token);
         return claims.getSubject();
-    }
-
-    /**
-     * 验证令牌并返回声明
-     */
-    public Claims validateToken(String token) {
-        try {
-            return Jwts.parserBuilder()
-                    .setSigningKey(getSigningKey())
-                    .build()
-                    .parseClaimsJws(token)
-                    .getBody();
-        } catch (SecurityException ex) {
-            log.error("Invalid JWT signature");
-            throw new AuthException(AuthErrorCode.TOKEN_SIGNATURE_INVALID);
-        } catch (MalformedJwtException ex) {
-            log.error("Invalid JWT token");
-            throw new AuthException(AuthErrorCode.TOKEN_INVALID);
-        } catch (ExpiredJwtException ex) {
-            log.error("Expired JWT token");
-            throw new AuthException(AuthErrorCode.TOKEN_EXPIRED);
-        } catch (UnsupportedJwtException ex) {
-            log.error("Unsupported JWT token");
-            throw new AuthException(AuthErrorCode.TOKEN_UNSUPPORTED);
-        } catch (IllegalArgumentException ex) {
-            log.error("JWT claims string is empty");
-            throw new AuthException(AuthErrorCode.TOKEN_CLAIMS_EMPTY);
-        }
     }
 
     /**

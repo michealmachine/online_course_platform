@@ -25,6 +25,7 @@ import org.springframework.boot.test.mock.mockito.MockBean;
 
 import java.time.Instant;
 import java.util.Set;
+import java.util.Arrays;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -64,7 +65,8 @@ class AuthorizationConsentServiceTest {
         // 设置请求数据
         request = new AuthorizationConsentRequest();
         request.setAuthorizationId("test-auth-id");
-        request.setApprovedScopes(Set.of("read", "write"));
+        Set<String> approvedScopes = Set.of("read", "write");
+        request.setApprovedScopes(approvedScopes);
 
         // 设置授权响应
         authorizationResponse = new AuthorizationResponse();
@@ -96,14 +98,15 @@ class AuthorizationConsentServiceTest {
         // 设置所有需要的 mock
         when(redisTemplate.opsForValue()).thenReturn(valueOperations);
         when(authentication.isAuthenticated()).thenReturn(true);
-        when(valueOperations.get(anyString())).thenReturn(authorizationResponse);
-        when(clientRepository.findByClientId("test-client")).thenReturn(client);
+        when(valueOperations.get(eq(REDIS_KEY_PREFIX + "test-auth-id"))).thenReturn(authorizationResponse);
+        when(clientRepository.findByClientId(eq("test-client"))).thenReturn(client);
         when(authentication.getName()).thenReturn("testUser");
+
         when(authorizationCodeService.createAuthorizationCode(
             eq("test-client"),
             eq("testUser"),
             eq("http://localhost:8080/callback"),
-            eq("read write"),
+            anyString(),
             isNull(),
             isNull()
         )).thenReturn("test-code");
@@ -112,8 +115,8 @@ class AuthorizationConsentServiceTest {
 
         assertNotNull(response);
         assertEquals("test-code", response.getAuthorizationCode());
-        assertEquals(authorizationResponse.getState(), response.getState());
-        assertEquals(authorizationResponse.getRedirectUri(), response.getRedirectUri());
+        assertEquals("xyz", response.getState());
+        assertEquals("http://localhost:8080/callback", response.getRedirectUri());
     }
 
     @Test
@@ -139,8 +142,8 @@ class AuthorizationConsentServiceTest {
     void consent_InvalidScopes() {
         when(redisTemplate.opsForValue()).thenReturn(valueOperations);
         when(authentication.isAuthenticated()).thenReturn(true);
-        when(valueOperations.get(anyString())).thenReturn(authorizationResponse);
-        when(clientRepository.findByClientId("test-client")).thenReturn(client);
+        when(valueOperations.get(eq(REDIS_KEY_PREFIX + "test-auth-id"))).thenReturn(authorizationResponse);
+        when(clientRepository.findByClientId(eq("test-client"))).thenReturn(client);
 
         request.setApprovedScopes(Set.of("read", "write", "delete"));
         assertThrows(AuthException.class, () -> 

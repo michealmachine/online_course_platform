@@ -1,6 +1,8 @@
 package com.double2and9.auth_service.service;
 
+import com.double2and9.auth_service.exception.AuthException;
 import com.double2and9.auth_service.security.JwtTokenProvider;
+import com.double2and9.base.enums.AuthErrorCode;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import org.junit.jupiter.api.BeforeEach;
@@ -10,18 +12,22 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class JwtServiceTest {
 
     @Mock
     private JwtTokenProvider jwtTokenProvider;
+
+    @Mock
+    private TokenBlacklistService tokenBlacklistService;
 
     @InjectMocks
     private JwtService jwtService;
@@ -144,5 +150,47 @@ class JwtServiceTest {
         String scope = jwtService.getScopeFromToken(TEST_TOKEN);
 
         assertEquals("read write", scope);
+    }
+
+    @Test
+    void revokeToken_Success() {
+        // 准备测试数据
+        String token = TEST_TOKEN;
+        Claims claims = Jwts.claims();
+        claims.setExpiration(new Date(System.currentTimeMillis() + 3600000)); // 1小时后过期
+
+        // Mock JWT验证
+        when(jwtTokenProvider.validateToken(token)).thenReturn(claims);
+
+        // 执行测试
+        jwtService.revokeToken(token);
+
+        // 验证结果
+        verify(tokenBlacklistService).addToBlacklist(eq(token), anyLong());
+    }
+
+    @Test
+    void revokeToken_InvalidToken() {
+        // 准备测试数据
+        String token = "invalid.token";
+
+        // Mock JWT验证失败
+        when(jwtTokenProvider.validateToken(token)).thenThrow(new RuntimeException());
+
+        // 执行测试并验证结果
+        assertThrows(AuthException.class, () -> jwtService.revokeToken(token));
+    }
+
+    @Test
+    void parseToken_RevokedToken() {
+        // 准备测试数据
+        String token = TEST_TOKEN;
+
+        // Mock 令牌已被撤销
+        when(tokenBlacklistService.isBlacklisted(token)).thenReturn(true);
+
+        // 执行测试并验证结果
+        AuthException exception = assertThrows(AuthException.class, () -> jwtService.parseToken(token));
+        assertEquals(AuthErrorCode.TOKEN_REVOKED, exception.getErrorCode());
     }
 } 

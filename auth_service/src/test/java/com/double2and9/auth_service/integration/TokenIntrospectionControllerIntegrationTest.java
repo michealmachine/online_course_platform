@@ -1,0 +1,222 @@
+package com.double2and9.auth_service.integration;
+
+import com.double2and9.auth_service.dto.request.TokenIntrospectionRequest;
+import com.double2and9.auth_service.dto.request.TokenRequest;
+import com.double2and9.auth_service.dto.response.TokenResponse;
+import com.double2and9.auth_service.entity.AuthorizationCode;
+import com.double2and9.auth_service.repository.AuthorizationCodeRepository;
+import com.double2and9.auth_service.repository.CustomJdbcRegisteredClientRepository;
+import com.double2and9.auth_service.service.TokenBlacklistService;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.extern.slf4j.Slf4j;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.http.MediaType;
+import org.springframework.security.oauth2.core.AuthorizationGrantType;
+import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
+import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.test.annotation.DirtiesContext;
+import org.springframework.test.annotation.DirtiesContext.ClassMode;
+
+import java.time.LocalDateTime;
+import java.util.Map;
+import java.util.Objects;
+
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+
+@SpringBootTest
+@AutoConfigureMockMvc
+@Transactional
+@Slf4j
+@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_EACH_TEST_METHOD)
+class TokenIntrospectionControllerIntegrationTest {
+
+    @Autowired
+    private MockMvc mockMvc;
+
+    @Autowired
+    private ObjectMapper objectMapper;
+
+    @Autowired
+    private CustomJdbcRegisteredClientRepository clientRepository;
+
+    @Autowired
+    private AuthorizationCodeRepository authorizationCodeRepository;
+
+    @Autowired
+    private TokenBlacklistService tokenBlacklistService;
+
+    @Autowired
+    private RedisTemplate<String, Object> redisTemplate;
+
+    private String validToken;
+    private String validRefreshToken;
+
+    @BeforeEach
+    void setUp() throws Exception {
+        // 清理 Redis 数据
+        Objects.requireNonNull(redisTemplate.getConnectionFactory()).getConnection().flushAll();
+
+        // 创建测试客户端
+        RegisteredClient client = RegisteredClient.withId("1")
+            .clientId("test_client")
+            .clientSecret("test_secret")
+            .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
+            .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
+            .redirectUri("http://localhost:8080/callback")
+            .scope("read")
+            .scope("write")
+            .build();
+        clientRepository.save(client);
+
+        // 创建授权码
+        AuthorizationCode authCode = new AuthorizationCode();
+        authCode.setCode("test_code");
+        authCode.setClientId("test_client");
+        authCode.setUserId("test_user");
+        authCode.setRedirectUri("http://localhost:8080/callback");
+        authCode.setScope("read write");
+        authCode.setExpiresAt(LocalDateTime.now().plusMinutes(10));
+        authCode.setUsed(false);
+        authorizationCodeRepository.save(authCode);
+
+        // 获取有效的令牌
+        TokenRequest tokenRequest = new TokenRequest();
+        tokenRequest.setGrantType("authorization_code");
+        tokenRequest.setCode("test_code");
+        tokenRequest.setRedirectUri("http://localhost:8080/callback");
+        tokenRequest.setClientId("test_client");
+        tokenRequest.setClientSecret("test_secret");
+
+        String response = mockMvc.perform(post("/api/oauth2/token")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(tokenRequest)))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        TokenResponse tokenResponse = objectMapper.readValue(response, TokenResponse.class);
+        validToken = tokenResponse.getAccessToken();
+        validRefreshToken = tokenResponse.getRefreshToken();
+
+        // 验证获取到的令牌
+        assertNotNull(validToken, "Access token should not be null");
+        assertNotNull(validRefreshToken, "Refresh token should not be null");
+    }
+
+    @AfterEach
+    void tearDown() {
+        // 清理 Redis 数据
+        Objects.requireNonNull(redisTemplate.getConnectionFactory()).getConnection().flushAll();
+    }
+
+    @Test
+    void introspect_ValidAccessToken() throws Exception {
+        TokenIntrospectionRequest request = new TokenIntrospectionRequest();
+        request.setToken(validToken);
+        request.setTokenTypeHint("access_token");
+
+        // 打印令牌信息用于调试
+        log.debug("Testing token introspection with token: {}", validToken);
+
+        mockMvc.perform(post("/api/oauth2/introspect")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.active").value(true))
+                .andExpect(jsonPath("$.clientId").value("test_client"))
+                .andExpect(jsonPath("$.userId").value("test_user"))
+                .andExpect(jsonPath("$.scope").value("read write"))
+                .andExpect(jsonPath("$.tokenType").value("access_token"))
+                .andExpect(jsonPath("$.exp").isNumber())
+                .andExpect(jsonPath("$.iat").isNumber())
+                .andDo(result -> {
+                    // 打印响应内容用于调试
+                    log.debug("Introspection response: {}", result.getResponse().getContentAsString());
+                });
+    }
+
+    @Test
+    void introspect_ValidRefreshToken() throws Exception {
+        TokenIntrospectionRequest request = new TokenIntrospectionRequest();
+        request.setToken(validRefreshToken);
+        request.setTokenTypeHint("refresh_token");
+
+        mockMvc.perform(post("/api/oauth2/introspect")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.active").value(true))
+                .andExpect(jsonPath("$.clientId").value("test_client"))
+                .andExpect(jsonPath("$.userId").value("test_user"))
+                .andExpect(jsonPath("$.scope").value("read write"))
+                .andExpect(jsonPath("$.tokenType").value("refresh_token"));
+    }
+
+    @Test
+    void introspect_InvalidToken() throws Exception {
+        TokenIntrospectionRequest request = new TokenIntrospectionRequest();
+        request.setToken("invalid.jwt.token");
+
+        mockMvc.perform(post("/api/oauth2/introspect")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.active").value(false));
+    }
+
+    @Test
+    void introspect_EmptyToken() throws Exception {
+        TokenIntrospectionRequest request = new TokenIntrospectionRequest();
+        request.setToken("");
+
+        mockMvc.perform(post("/api/oauth2/introspect")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void introspect_RevokedToken() throws Exception {
+        // 先撤销令牌
+        mockMvc.perform(post("/api/oauth2/revoke")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of("token", validToken))))
+                .andExpect(status().isOk());
+
+        // 然后尝试内省
+        TokenIntrospectionRequest request = new TokenIntrospectionRequest();
+        request.setToken(validToken);
+
+        mockMvc.perform(post("/api/oauth2/introspect")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.active").value(false));
+    }
+
+    @Test
+    void introspect_ExpiredToken() throws Exception {
+        // 等待令牌过期（这里我们使用一个已经过期的令牌）
+        String expiredToken = "eyJhbGciOiJIUzUxMiJ9.eyJleHAiOjE2NDA5OTUyMDAsImlhdCI6MTY0MDk5MTYwMH0.expired_token";
+        
+        TokenIntrospectionRequest request = new TokenIntrospectionRequest();
+        request.setToken(expiredToken);
+
+        mockMvc.perform(post("/api/oauth2/introspect")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.active").value(false));
+    }
+} 

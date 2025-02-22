@@ -1,5 +1,6 @@
 package com.double2and9.auth_service.service;
 
+import com.double2and9.auth_service.dto.response.TokenIntrospectionResponse;
 import com.double2and9.auth_service.exception.AuthException;
 import com.double2and9.auth_service.security.JwtTokenProvider;
 import com.double2and9.base.enums.AuthErrorCode;
@@ -9,6 +10,8 @@ import io.jsonwebtoken.UnsupportedJwtException;
 import io.jsonwebtoken.ExpiredJwtException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -18,6 +21,8 @@ import java.util.Map;
 public class JwtService {
     
     private final JwtTokenProvider jwtTokenProvider;
+    private final TokenBlacklistService tokenBlacklistService;
+    private static final Logger log = LoggerFactory.getLogger(JwtService.class);
     
     private static final long ACCESS_TOKEN_EXPIRES_IN = 3600L;  // 1小时
     private static final long REFRESH_TOKEN_EXPIRES_IN = 2592000L;  // 30天
@@ -103,19 +108,96 @@ public class JwtService {
     }
 
     /**
+     * 撤销令牌
+     */
+    public void revokeToken(String token) {
+        try {
+            Claims claims = jwtTokenProvider.validateToken(token);
+            // 获取令牌过期时间
+            long expirationTime = claims.getExpiration().getTime() / 1000 - System.currentTimeMillis() / 1000;
+            if (expirationTime > 0) {
+                tokenBlacklistService.addToBlacklist(token, expirationTime);
+            }
+        } catch (Exception e) {
+            throw new AuthException(AuthErrorCode.TOKEN_INVALID);
+        }
+    }
+
+    /**
      * 解析令牌
      */
     public Claims parseToken(String token) {
         try {
-            return jwtTokenProvider.validateToken(token);
+            // 先验证令牌格式
+            log.debug("Validating token");
+            Claims claims = jwtTokenProvider.validateToken(token);
+            
+            // 检查令牌是否被撤销
+            if (tokenBlacklistService.isBlacklisted(token)) {
+                log.debug("Token is blacklisted");
+                throw new AuthException(AuthErrorCode.TOKEN_REVOKED);
+            }
+            log.debug("Token validation successful");
+            return claims;
         } catch (ExpiredJwtException e) {
+            log.debug("Token expired");
             throw new AuthException(AuthErrorCode.TOKEN_EXPIRED);
         } catch (SignatureException e) {
+            log.debug("Invalid token signature");
             throw new AuthException(AuthErrorCode.TOKEN_SIGNATURE_INVALID);
         } catch (UnsupportedJwtException e) {
+            log.debug("Unsupported token format");
             throw new AuthException(AuthErrorCode.TOKEN_UNSUPPORTED);
+        } catch (AuthException e) {
+            // 直接抛出 AuthException，不做转换
+            log.debug("Auth exception while parsing token: {}", e.getMessage());
+            throw e;
         } catch (Exception e) {
+            log.debug("Unexpected error while parsing token: {}", e.getMessage());
             throw new AuthException(AuthErrorCode.TOKEN_INVALID);
+        }
+    }
+
+    /**
+     * 内省令牌
+     */
+    public TokenIntrospectionResponse introspectToken(String token) {
+        log.debug("Introspecting token: {}", token);
+        try {
+            // 检查令牌是否在黑名单中
+            if (tokenBlacklistService.isBlacklisted(token)) {
+                log.debug("Token is blacklisted");
+                return TokenIntrospectionResponse.builder()
+                    .active(false)
+                    .build();
+            }
+
+            // 验证并解析令牌
+            log.debug("Attempting to parse token");
+            Claims claims = jwtTokenProvider.validateToken(token);
+            log.debug("Token parsed successfully. Claims: {}", claims);
+            
+            // 只有当令牌完全有效时才返回 active=true
+            return TokenIntrospectionResponse.builder()
+                .active(true)
+                .clientId(claims.get("clientId", String.class))
+                .userId(claims.get("userId", String.class))
+                .scope(claims.get("scope", String.class))
+                .exp(claims.getExpiration().getTime() / 1000)
+                .iat(claims.getIssuedAt().getTime() / 1000)
+                .tokenType(claims.get("type", String.class))
+                .build();
+
+        } catch (AuthException e) {
+            log.debug("Token introspection failed with AuthException: {}", e.getMessage(), e);
+            return TokenIntrospectionResponse.builder()
+                .active(false)
+                .build();
+        } catch (Exception e) {
+            log.error("Token introspection failed with unexpected error: {}", e.getMessage(), e);
+            return TokenIntrospectionResponse.builder()
+                .active(false)
+                .build();
         }
     }
 } 
