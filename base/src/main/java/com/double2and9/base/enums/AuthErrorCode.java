@@ -56,8 +56,39 @@ public enum AuthErrorCode {
     USER_NOT_AUTHORIZED(300603, "无权操作此用户"),
 
     // 系统错误 3999xx
-    SYSTEM_ERROR(399999, "系统内部错误");
+    SYSTEM_ERROR(399999, "系统内部错误"),
 
+    // 客户端相关错误 3007xx
+    CLIENT_ID_EXISTS(300701, "客户端ID已存在"),
+    CLIENT_NOT_FOUND(300702, "客户端不存在"),
+    CLIENT_SECRET_INVALID(300703, "客户端密钥无效"),
+    CLIENT_DISABLED(300704, "客户端已被禁用"),
+    CLIENT_SCOPE_INVALID(300705, "无效的授权范围"),
+    CLIENT_REDIRECT_URI_INVALID(300706, "无效的重定向URI"),
+    CLIENT_AUTH_METHOD_INVALID(300707, "不支持的客户端认证方式"),
+    CLIENT_GRANT_TYPE_INVALID(300708, "不支持的授权类型"),
+    INVALID_CLIENT(300709, "无效的客户端"),
+
+    RESPONSE_TYPE_INVALID(300004, "响应类型必须是 code"),
+
+    // OAuth2 授权相关错误码 3008xx
+    AUTHORIZATION_REQUEST_NOT_FOUND(300801, "授权请求不存在或已过期"),
+    INVALID_APPROVED_SCOPES(300802, "无效的授权范围"),
+    AUTHORIZATION_CODE_GENERATE_ERROR(300803, "授权码生成失败"),
+
+    // 授权码相关错误码 3009xx
+    INVALID_AUTHORIZATION_CODE(300901, "无效的授权码"),
+    AUTHORIZATION_CODE_EXPIRED(300902, "授权码已过期"),
+    AUTHORIZATION_CODE_USED(300903, "授权码已被使用"),
+
+    // 令牌相关错误码 3010xx
+    INVALID_GRANT_TYPE(301001, "不支持的授权类型"),
+    INVALID_CLIENT_CREDENTIALS(301002, "无效的客户端凭证"),
+    INVALID_CODE_VERIFIER(301003, "无效的验证码"),
+    TOKEN_GENERATE_ERROR(301004, "令牌生成失败"),
+    INVALID_REFRESH_TOKEN(301005, "无效的刷新令牌");
+
+    
     private final int code;
     private final String message;
 

@@ -28,7 +28,53 @@ public class GlobalExceptionHandler {
             ex.getErrorCode().getMessage(),
             null
         );
-        HttpStatus status = ex.getStatus() != null ? ex.getStatus() : HttpStatus.BAD_REQUEST;
+        
+        // 根据错误码确定 HTTP 状态码
+        HttpStatus status = switch (ex.getErrorCode()) {
+            // 404 - Not Found
+            case USER_NOT_FOUND, ROLE_NOT_EXISTS, PERMISSION_NOT_FOUND, 
+                 CLIENT_NOT_FOUND, AUTHORIZATION_REQUEST_NOT_FOUND -> HttpStatus.NOT_FOUND;
+            
+            // 400 - Bad Request
+            case USERNAME_ALREADY_EXISTS,
+                 EMAIL_ALREADY_EXISTS,
+                 ROLE_ALREADY_EXISTS,
+                 PERMISSION_ALREADY_EXISTS,
+                 PERMISSION_IN_USE,
+                 ROLE_IN_USE,
+                 INVALID_ROLE,
+                 CLIENT_ID_EXISTS,
+                 PARAMETER_VALIDATION_FAILED,
+                 INVALID_APPROVED_SCOPES,
+                 CLIENT_REDIRECT_URI_INVALID,
+                 CLIENT_SCOPE_INVALID,
+                 RESPONSE_TYPE_INVALID,
+                 INVALID_GRANT_TYPE,
+                 INVALID_AUTHORIZATION_CODE,
+                 AUTHORIZATION_CODE_GENERATE_ERROR,
+                 // 账户状态相关错误
+                 ACCOUNT_DISABLED,
+                 ACCOUNT_LOCKED,
+                 ACCOUNT_EXPIRED,
+                 CREDENTIALS_EXPIRED -> HttpStatus.BAD_REQUEST;
+            
+            // 401 - Unauthorized
+            case PASSWORD_ERROR,
+                 TOKEN_EXPIRED,
+                 TOKEN_INVALID,
+                 TOKEN_SIGNATURE_INVALID,
+                 TOKEN_UNSUPPORTED,
+                 TOKEN_CLAIMS_EMPTY,
+                 INVALID_CLIENT_CREDENTIALS,
+                 AUTHENTICATION_FAILED -> HttpStatus.UNAUTHORIZED;
+            
+            // 403 - Forbidden
+            case PERMISSION_DENIED -> HttpStatus.FORBIDDEN;
+            
+            // 500 - Internal Server Error
+            default -> HttpStatus.INTERNAL_SERVER_ERROR;
+        };
+        
         return ResponseEntity.status(status).body(response);
     }
 
