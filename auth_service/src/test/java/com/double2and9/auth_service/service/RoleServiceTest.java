@@ -1,5 +1,6 @@
 package com.double2and9.auth_service.service;
 
+import com.double2and9.auth_service.cache.PermissionCacheManager;
 import com.double2and9.auth_service.dto.request.AssignPermissionRequest;
 import com.double2and9.auth_service.dto.response.PermissionResponse;
 import com.double2and9.auth_service.dto.response.RolePermissionResponse;
@@ -35,6 +36,9 @@ class RoleServiceTest {
 
     @Mock
     private PermissionMapper permissionMapper;
+
+    @Mock
+    private PermissionCacheManager cacheManager;
 
     @Test
     void assignPermissions_Success() {

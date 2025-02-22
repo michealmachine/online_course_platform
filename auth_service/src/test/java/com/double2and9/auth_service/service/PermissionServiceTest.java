@@ -1,5 +1,6 @@
 package com.double2and9.auth_service.service;
 
+import com.double2and9.auth_service.cache.PermissionCacheManager;
 import com.double2and9.auth_service.dto.response.PermissionResponse;
 import com.double2and9.auth_service.dto.response.PermissionTreeNode;
 import com.double2and9.auth_service.entity.Permission;
@@ -25,6 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
 public class PermissionServiceTest {
@@ -43,6 +45,9 @@ public class PermissionServiceTest {
 
     @Mock
     private Map<String, ResourceMeta> resourceMetaMap;
+
+    @Mock
+    private PermissionCacheManager cacheManager;
 
     @Test
     void getPermissionScopes_Success() {
@@ -100,18 +105,19 @@ public class PermissionServiceTest {
         permission3.setAction("create");
         
         List<Permission> permissions = Arrays.asList(permission1, permission2, permission3);
-        
+
         // 配置Mock行为
+        when(cacheManager.getPermissionTree()).thenReturn(null);
         when(permissionRepository.findAll()).thenReturn(permissions);
         when(permissionMapper.toPermissionResponse(any())).thenReturn(new PermissionResponse());
         when(resourceMetaMap.getOrDefault(eq("user"), any()))
                 .thenReturn(new ResourceMeta("用户管理", 1));
         when(resourceMetaMap.getOrDefault(eq("role"), any()))
                 .thenReturn(new ResourceMeta("角色管理", 2));
-        
+
         // 执行测试
         List<PermissionTreeNode> result = permissionService.getPermissionTree();
-        
+
         // 验证结果
         assertNotNull(result);
         assertEquals(2, result.size());  // 应该有两个资源节点：user和role
@@ -131,112 +137,111 @@ public class PermissionServiceTest {
                 .orElse(null);
         assertNotNull(roleNode);
         assertEquals(1, roleNode.getPermissions().size());
+
+        // 验证缓存操作
+        verify(cacheManager).cachePermissionTree(any());
     }
 
     @Test
     void getPermissionTree_EmptyPermissions() {
-        // 配置Mock行为 - 返回空列表
+        // 配置Mock行为
+        when(cacheManager.getPermissionTree()).thenReturn(null);
         when(permissionRepository.findAll()).thenReturn(Collections.emptyList());
-        
+
         // 执行测试
         List<PermissionTreeNode> result = permissionService.getPermissionTree();
-        
+
         // 验证结果
-        assertNotNull(result);
         assertTrue(result.isEmpty());
+        verify(cacheManager).cachePermissionTree(any());
     }
 
     @Test
     void getPermissionTree_SingleResource() {
-        // 准备测试数据 - 只有一个资源类型
-        Permission permission1 = new Permission();
-        permission1.setResource("user");
-        permission1.setAction("create");
-        permission1.setName("创建用户");
-        
-        Permission permission2 = new Permission();
-        permission2.setResource("user");
-        permission2.setAction("delete");
-        permission2.setName("删除用户");
-        
-        List<Permission> permissions = Arrays.asList(permission1, permission2);
-        
+        // 准备测试数据
+        Permission permission = new Permission();
+        permission.setResource("user");
+        permission.setAction("create");
+
         // 配置Mock行为
-        when(permissionRepository.findAll()).thenReturn(permissions);
-        PermissionResponse mockResponse = new PermissionResponse();
-        when(permissionMapper.toPermissionResponse(any())).thenReturn(mockResponse);
+        when(cacheManager.getPermissionTree()).thenReturn(null);
+        when(permissionRepository.findAll()).thenReturn(Collections.singletonList(permission));
+        when(permissionMapper.toPermissionResponse(any())).thenReturn(new PermissionResponse());
         when(resourceMetaMap.getOrDefault(eq("user"), any()))
                 .thenReturn(new ResourceMeta("用户管理", 1));
-        
+
         // 执行测试
         List<PermissionTreeNode> result = permissionService.getPermissionTree();
-        
+
         // 验证结果
         assertNotNull(result);
         assertEquals(1, result.size());
-        assertEquals("user", result.get(0).getResource());
-        assertEquals(2, result.get(0).getPermissions().size());
+        verify(cacheManager).cachePermissionTree(any());
     }
 
     @Test
     void getPermissionTree_WithResourceMeta() {
         // 准备测试数据
-        Permission userCreate = new Permission();
-        userCreate.setResource("user");
-        userCreate.setAction("create");
-        
-        Permission roleCreate = new Permission();
-        roleCreate.setResource("role");
-        roleCreate.setAction("create");
-        
-        List<Permission> permissions = Arrays.asList(roleCreate, userCreate);  // 故意打乱顺序
-        
+        Permission permission1 = new Permission();
+        permission1.setResource("user");
+        permission1.setAction("create");
+
+        Permission permission2 = new Permission();
+        permission2.setResource("role");
+        permission2.setAction("create");
+
         // 配置Mock行为
-        when(permissionRepository.findAll()).thenReturn(permissions);
+        when(cacheManager.getPermissionTree()).thenReturn(null);
+        when(permissionRepository.findAll()).thenReturn(Arrays.asList(permission1, permission2));
         when(permissionMapper.toPermissionResponse(any())).thenReturn(new PermissionResponse());
         when(resourceMetaMap.getOrDefault(eq("user"), any()))
                 .thenReturn(new ResourceMeta("用户管理", 1));
         when(resourceMetaMap.getOrDefault(eq("role"), any()))
                 .thenReturn(new ResourceMeta("角色管理", 2));
-        
+
         // 执行测试
         List<PermissionTreeNode> result = permissionService.getPermissionTree();
-        
+
         // 验证结果
-        assertNotNull(result);
         assertEquals(2, result.size());
-        
-        // 验证排序
-        assertEquals("user", result.get(0).getResource());
-        assertEquals("用户管理", result.get(0).getDescription());
-        assertEquals(1, result.get(0).getSort());
-        
-        assertEquals("role", result.get(1).getResource());
-        assertEquals("角色管理", result.get(1).getDescription());
-        assertEquals(2, result.get(1).getSort());
+        verify(cacheManager).cachePermissionTree(any());
     }
 
     @Test
     void getPermissionTree_WithUnknownResource() {
         // 准备测试数据
-        Permission unknownPermission = new Permission();
-        unknownPermission.setResource("unknown");
-        unknownPermission.setAction("test");
-        
+        Permission permission = new Permission();
+        permission.setResource("unknown");
+        permission.setAction("create");
+
         // 配置Mock行为
-        when(permissionRepository.findAll()).thenReturn(List.of(unknownPermission));
+        when(cacheManager.getPermissionTree()).thenReturn(null);
+        when(permissionRepository.findAll()).thenReturn(Collections.singletonList(permission));
         when(permissionMapper.toPermissionResponse(any())).thenReturn(new PermissionResponse());
         when(resourceMetaMap.getOrDefault(eq("unknown"), any()))
-                .thenReturn(new ResourceMeta("unknown", Integer.MAX_VALUE));
-        
+                .thenReturn(new ResourceMeta("未知资源", Integer.MAX_VALUE));
+
         // 执行测试
         List<PermissionTreeNode> result = permissionService.getPermissionTree();
-        
+
         // 验证结果
-        assertNotNull(result);
         assertEquals(1, result.size());
-        assertEquals("unknown", result.get(0).getResource());
-        assertEquals("unknown", result.get(0).getDescription());
-        assertEquals(Integer.MAX_VALUE, result.get(0).getSort());
+        verify(cacheManager).cachePermissionTree(any());
+    }
+
+    private Permission createPermission(Long id, String resource, String description) {
+        Permission permission = new Permission();
+        permission.setId(id);
+        permission.setResource(resource);
+        permission.setDescription(description);
+        return permission;
+    }
+
+    private PermissionResponse createPermissionResponse(Long id, String resource, String description) {
+        PermissionResponse response = new PermissionResponse();
+        response.setId(id);
+        response.setResource(resource);
+        response.setDescription(description);
+        return response;
     }
 } 

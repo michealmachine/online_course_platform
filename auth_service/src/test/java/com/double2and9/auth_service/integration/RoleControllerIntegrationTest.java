@@ -16,12 +16,14 @@ import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
+import com.double2and9.auth_service.cache.PermissionCacheManager;
 
 import java.util.HashSet;
 import java.util.List;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -39,6 +41,9 @@ class RoleControllerIntegrationTest {
 
     @Autowired
     private PermissionRepository permissionRepository;
+
+    @Autowired
+    private PermissionCacheManager cacheManager;
 
     private Role testRole;
     private Permission testPermission;
@@ -118,5 +123,25 @@ class RoleControllerIntegrationTest {
         mockMvc.perform(delete("/api/roles/{roleId}/permissions/{permissionId}",
                 testRole.getId(), testPermission.getId()))
                 .andExpect(status().isNoContent());
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void assignPermissions_ShouldClearCache() throws Exception {
+        // 先获取权限树并缓存
+        mockMvc.perform(get("/api/permissions/tree"))
+                .andExpect(status().isOk());
+
+        // 分配权限
+        AssignPermissionRequest request = new AssignPermissionRequest();
+        request.setPermissionIds(List.of(testPermission.getId()));
+
+        mockMvc.perform(post("/api/roles/{roleId}/permissions", testRole.getId())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isCreated());
+
+        // 验证缓存已被清除
+        assertNull(cacheManager.getPermissionTree());
     }
 } 

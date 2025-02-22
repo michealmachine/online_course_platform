@@ -525,3 +525,60 @@ private List<PermissionTreeNode> children; // 子节点
 3. 实现基于注解的权限控制
 4. 使用JPA进行数据访问
 5. 集成Swagger/OpenAPI文档
+
+## 权限树功能实现
+
+### 1. 数据结构
+- PermissionTreeNode：权限树节点
+  - resource: 资源类型
+  - description: 资源描述
+  - permissions: 该资源下的权限列表
+  - sort: 资源排序码
+
+### 2. 配置管理
+- ResourceMetaConfig：资源元数据配置
+  - 系统权限 (sort: 0)
+  - 用户管理 (sort: 1)
+  - 角色管理 (sort: 2)
+  - 权限管理 (sort: 3)
+  - 用户档案 (sort: 4)
+  - 测试资源 (sort: 99)
+
+### 3. 功能特点
+- 资源分组：按资源类型对权限进行分组
+- 排序支持：
+  - 资源级别排序（通过sort字段）
+  - 权限级别排序（按action字段）
+- 资源描述：支持自定义资源描述
+- 默认处理：未配置的资源使用默认值
+
+### 4. API接口
+http
+GET /api/permissions/tree
+响应示例：
+json
+[
+{
+"resource": "user",
+"description": "用户管理",
+"sort": 1,
+"permissions": [
+{
+"id": 1,
+"name": "user:create",
+"description": "创建用户",
+"action": "create"
+}
+]
+}
+]
+### 5. 后续优化方向
+1. 权限缓存
+   - 实现用户权限缓存
+   - 实现角色权限缓存
+   - 缓存更新策略
+
+2. 权限树扩展
+   - 支持多级权限树
+   - 动态资源配置
+   - 权限组功能

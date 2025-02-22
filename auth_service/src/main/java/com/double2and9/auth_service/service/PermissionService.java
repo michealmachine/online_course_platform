@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Comparator;
 import com.double2and9.auth_service.dto.response.ResourceMeta;
+import com.double2and9.auth_service.cache.PermissionCacheManager;
 
 @Service
 @RequiredArgsConstructor
@@ -32,6 +33,7 @@ public class PermissionService {
     private final PermissionRepository permissionRepository;
     private final PermissionMapper permissionMapper;
     private final UserRepository userRepository;
+    private final PermissionCacheManager cacheManager;
     private final Map<String, ResourceMeta> resourceMetaMap;
 
     /**
@@ -49,6 +51,10 @@ public class PermissionService {
 
         Permission permission = permissionMapper.toEntity(request);
         permission = permissionRepository.save(permission);
+        
+        // 清除权限树缓存
+        cacheManager.clearPermissionTree();
+        
         return permissionMapper.toPermissionResponse(permission);
     }
 
@@ -96,6 +102,9 @@ public class PermissionService {
         }
         
         permissionRepository.delete(permission);
+        
+        // 清除相关缓存
+        cacheManager.clearPermissionTree();
     }
 
     /**
@@ -134,6 +143,23 @@ public class PermissionService {
      * @return 权限树列表
      */
     public List<PermissionTreeNode> getPermissionTree() {
+        // 先尝试从缓存获取
+        List<PermissionTreeNode> cachedTree = cacheManager.getPermissionTree();
+        if (cachedTree != null) {
+            return cachedTree;
+        }
+
+        // 缓存未命中，从数据库获取并构建树
+        List<PermissionTreeNode> tree = buildPermissionTree();
+        
+        // 存入缓存
+        cacheManager.cachePermissionTree(tree);
+        
+        return tree;
+    }
+
+    // 将原来的树构建逻辑抽取为私有方法
+    private List<PermissionTreeNode> buildPermissionTree() {
         List<Permission> allPermissions = permissionRepository.findAll();
         Map<String, List<Permission>> groupedPermissions = allPermissions.stream()
                 .collect(Collectors.groupingBy(Permission::getResource));

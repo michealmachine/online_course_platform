@@ -1,5 +1,6 @@
 package com.double2and9.auth_service.service;
 
+import com.double2and9.auth_service.cache.PermissionCacheManager;
 import com.double2and9.auth_service.dto.request.AssignPermissionRequest;
 import com.double2and9.auth_service.dto.response.RolePermissionResponse;
 import com.double2and9.auth_service.entity.Permission;
@@ -25,6 +26,7 @@ public class RoleService {
     private final RoleRepository roleRepository;
     private final PermissionRepository permissionRepository;
     private final PermissionMapper permissionMapper;
+    private final PermissionCacheManager cacheManager;
 
     /**
      * 为角色分配权限
@@ -49,6 +51,10 @@ public class RoleService {
         Set<Permission> permissionSet = new HashSet<>(permissions);
         role.setPermissions(permissionSet);
         roleRepository.save(role);
+        
+        // 清除相关缓存
+        cacheManager.clearRolePermissions(roleId);
+        cacheManager.clearPermissionTree();
     }
 
     /**
@@ -75,6 +81,10 @@ public class RoleService {
         }
         role.setPermissions(permissions);
         roleRepository.save(role);
+        
+        // 清除相关缓存
+        cacheManager.clearRolePermissions(roleId);
+        cacheManager.clearPermissionTree();
     }
 
     /**

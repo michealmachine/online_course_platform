@@ -108,10 +108,11 @@ jobs:
     - name: Build and Test Media Module
       run: mvn clean verify -pl media -Dspring.profiles.active=test
       
-    # 在构建auth_service之前添加Flyway repair
-    - name: Repair Flyway Schema History
+    # 在构建auth_service之前添加Flyway clean和repair
+    - name: Clean and Repair Flyway Schema
       run: |
-        mvn -pl auth_service flyway:repair -Dflyway.url=jdbc:mysql://localhost:3306/online_course \
+        mvn -pl auth_service flyway:clean flyway:repair \
+        -Dflyway.url=jdbc:mysql://localhost:3306/online_course \
         -Dflyway.user=root -Dflyway.password=root
         
     # 构建和测试auth_service模块
