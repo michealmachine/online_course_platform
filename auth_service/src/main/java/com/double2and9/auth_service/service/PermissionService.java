@@ -143,14 +143,19 @@ public class PermissionService {
      * @return 权限树列表
      */
     public List<PermissionTreeNode> getPermissionTree() {
+        System.out.println("=== getPermissionTree start ===");
+        
         // 先尝试从缓存获取
         List<PermissionTreeNode> cachedTree = cacheManager.getPermissionTree();
+        System.out.println("Cached tree: " + (cachedTree != null ? "found" : "not found"));
+        
         if (cachedTree != null) {
             return cachedTree;
         }
 
         // 缓存未命中，从数据库获取并构建树
         List<PermissionTreeNode> tree = buildPermissionTree();
+        System.out.println("Built tree size: " + tree.size());
         
         // 存入缓存
         cacheManager.cachePermissionTree(tree);
@@ -160,19 +165,36 @@ public class PermissionService {
 
     // 将原来的树构建逻辑抽取为私有方法
     private List<PermissionTreeNode> buildPermissionTree() {
+        System.out.println("=== buildPermissionTree start ===");
+        
         List<Permission> allPermissions = permissionRepository.findAll();
+        System.out.println("All permissions size: " + allPermissions.size());
+        System.out.println("All permissions: " + allPermissions.stream()
+            .map(p -> p.getResource() + ":" + p.getAction())
+            .collect(Collectors.joining(", ")));
+        
         Map<String, List<Permission>> groupedPermissions = allPermissions.stream()
                 .collect(Collectors.groupingBy(Permission::getResource));
+        System.out.println("Grouped resources: " + String.join(", ", groupedPermissions.keySet()));
+        
+        System.out.println("ResourceMetaMap contents:");
+        resourceMetaMap.forEach((key, value) -> 
+            System.out.println("  " + key + " -> description: " + value.getDescription() + 
+                              ", sort: " + value.getSort()));
         
         return groupedPermissions.entrySet().stream()
                 .map(entry -> {
-                    PermissionTreeNode node = new PermissionTreeNode();
                     String resource = entry.getKey();
+                    System.out.println("Processing resource: " + resource);
+                    
+                    PermissionTreeNode node = new PermissionTreeNode();
                     node.setResource(resource);
                     
                     // 设置资源元数据
                     ResourceMeta meta = resourceMetaMap.getOrDefault(resource, 
                             new ResourceMeta(resource, Integer.MAX_VALUE));
+                    System.out.println("Resource: " + resource + ", Meta: " + meta);
+                    
                     node.setDescription(meta.getDescription());
                     node.setSort(meta.getSort());
                     
@@ -181,9 +203,13 @@ public class PermissionService {
                             .sorted(Comparator.comparing(Permission::getAction))
                             .map(permissionMapper::toPermissionResponse)
                             .collect(Collectors.toList()));
+                    System.out.println("Resource " + resource + " has " + node.getPermissions().size() + " permissions");
+                    
                     return node;
                 })
                 .sorted(Comparator.comparing(PermissionTreeNode::getSort))  // 按配置的顺序排序
+                .peek(node -> System.out.println("Sorted node: " + node.getResource() + 
+                    "(" + node.getPermissions().size() + " permissions)"))
                 .collect(Collectors.toList());
     }
 } 

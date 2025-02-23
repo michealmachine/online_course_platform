@@ -18,6 +18,7 @@ import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 import org.junit.jupiter.api.Disabled;
+import com.double2and9.auth_service.cache.PermissionCacheManager;
 
 import java.util.HashSet;
 import java.util.stream.Collectors;
@@ -44,6 +45,9 @@ class PermissionControllerIntegrationTest {
     @Autowired
     private RoleRepository roleRepository;
 
+    @Autowired
+    private PermissionCacheManager permissionCacheManager;
+
     private Permission testPermission;
 
     @BeforeEach
@@ -51,6 +55,9 @@ class PermissionControllerIntegrationTest {
         // 清理所有权限数据
         permissionRepository.deleteAll();
         roleRepository.deleteAll();  // 由于外键关系，先删除角色
+        
+        // 清除缓存
+        permissionCacheManager.clearPermissionTree();
 
         // 创建测试权限数据
         testPermission = new Permission();
@@ -201,7 +208,6 @@ class PermissionControllerIntegrationTest {
 
     @Test
     @WithMockUser(roles = "ADMIN")
-    @Disabled("权限树测试在 Maven 环境中不稳定，暂时禁用")
     void getPermissionTree_Success() throws Exception {
         mockMvc.perform(get("/api/permissions/tree")
                 .contentType(MediaType.APPLICATION_JSON))

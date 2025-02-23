@@ -47,9 +47,12 @@ class RoleControllerIntegrationTest {
 
     private Role testRole;
     private Permission testPermission;
+    @Autowired
+    private PermissionCacheManager permissionCacheManager;
 
     @BeforeEach
     void setUp() {
+        permissionCacheManager.clearPermissionTree();
         // 创建测试角色
         testRole = new Role();
         testRole.setName("ROLE_TEST");
