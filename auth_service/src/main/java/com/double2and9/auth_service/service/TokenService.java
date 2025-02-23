@@ -5,6 +5,7 @@ import com.double2and9.auth_service.dto.response.TokenResponse;
 import com.double2and9.auth_service.entity.AuthorizationCode;
 import com.double2and9.auth_service.exception.AuthException;
 import com.double2and9.auth_service.repository.CustomJdbcRegisteredClientRepository;
+import com.double2and9.auth_service.utils.PKCEUtils;
 import com.double2and9.base.enums.AuthErrorCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
@@ -52,6 +53,23 @@ public class TokenService {
             request.getClientId(),
             request.getRedirectUri()
         );
+
+        // 验证PKCE
+        if (authCode.getCodeChallenge() != null) {
+            if (request.getCodeVerifier() == null) {
+                throw new AuthException(AuthErrorCode.CODE_VERIFIER_REQUIRED);
+            }
+
+            boolean isValidVerifier = PKCEUtils.verifyCodeChallenge(
+                request.getCodeVerifier(),
+                authCode.getCodeChallenge(),
+                authCode.getCodeChallengeMethod()
+            );
+
+            if (!isValidVerifier) {
+                throw new AuthException(AuthErrorCode.INVALID_CODE_VERIFIER);
+            }
+        }
 
         try {
             // 生成访问令牌

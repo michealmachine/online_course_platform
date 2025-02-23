@@ -4,6 +4,7 @@ import com.double2and9.auth_service.dto.request.AuthorizationRequest;
 import com.double2and9.auth_service.dto.response.AuthorizationResponse;
 import com.double2and9.auth_service.exception.AuthException;
 import com.double2and9.auth_service.repository.CustomJdbcRegisteredClientRepository;
+import com.double2and9.base.enums.AuthErrorCode;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -65,6 +66,10 @@ class AuthorizationServiceTest {
 
     @Test
     void createAuthorizationRequest_Success() {
+        // 添加PKCE参数
+        request.setCodeChallenge("E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM");
+        request.setCodeChallengeMethod("S256");
+
         when(authentication.isAuthenticated()).thenReturn(true);
         when(clientRepository.findByClientId("test-client")).thenReturn(client);
 
@@ -76,6 +81,8 @@ class AuthorizationServiceTest {
         assertEquals(Set.of("read", "write"), response.getRequestedScopes());
         assertEquals(request.getState(), response.getState());
         assertNotNull(response.getAuthorizationId());
+        assertEquals(request.getCodeChallenge(), response.getCodeChallenge());
+        assertEquals(request.getCodeChallengeMethod(), response.getCodeChallengeMethod());
     }
 
     @Test
@@ -122,5 +129,51 @@ class AuthorizationServiceTest {
 
         assertThrows(AuthException.class, () -> 
             authorizationService.createAuthorizationRequest(request, authentication));
+    }
+
+    @Test
+    void createAuthorizationRequest_WithValidPKCE_Success() {
+        // 准备测试数据
+        request.setCodeChallenge("E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM");
+        request.setCodeChallengeMethod("S256");
+        
+        when(authentication.isAuthenticated()).thenReturn(true);
+        when(clientRepository.findByClientId("test-client")).thenReturn(client);
+
+        // 执行测试
+        AuthorizationResponse response = authorizationService.createAuthorizationRequest(request, authentication);
+
+        // 验证结果
+        assertNotNull(response);
+        assertEquals(request.getCodeChallenge(), response.getCodeChallenge());
+        assertEquals(request.getCodeChallengeMethod(), response.getCodeChallengeMethod());
+    }
+
+    @Test
+    void createAuthorizationRequest_WithoutPKCE_ThrowsException() {
+        when(authentication.isAuthenticated()).thenReturn(true);
+        when(clientRepository.findByClientId("test-client")).thenReturn(client);
+
+        // 执行测试并验证异常
+        AuthException exception = assertThrows(AuthException.class, () -> 
+            authorizationService.createAuthorizationRequest(request, authentication));
+        
+        assertEquals(AuthErrorCode.PKCE_REQUIRED, exception.getErrorCode());
+    }
+
+    @Test
+    void createAuthorizationRequest_WithInvalidMethod_ThrowsException() {
+        // 准备测试数据
+        request.setCodeChallenge("test-challenge");
+        request.setCodeChallengeMethod("invalid-method");
+        
+        when(authentication.isAuthenticated()).thenReturn(true);
+        when(clientRepository.findByClientId("test-client")).thenReturn(client);
+
+        // 执行测试并验证异常
+        AuthException exception = assertThrows(AuthException.class, () -> 
+            authorizationService.createAuthorizationRequest(request, authentication));
+        
+        assertEquals(AuthErrorCode.INVALID_CODE_CHALLENGE_METHOD, exception.getErrorCode());
     }
 } 

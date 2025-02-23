@@ -53,6 +53,17 @@ public class AuthorizationService {
             throw new AuthException(AuthErrorCode.CLIENT_SCOPE_INVALID);
         }
 
+        // 验证PKCE参数
+        if (request.getCodeChallenge() == null || request.getCodeChallengeMethod() == null) {
+            throw new AuthException(AuthErrorCode.PKCE_REQUIRED);
+        }
+
+        // 验证code_challenge_method
+        if (!("plain".equals(request.getCodeChallengeMethod()) || 
+              "S256".equals(request.getCodeChallengeMethod()))) {
+            throw new AuthException(AuthErrorCode.INVALID_CODE_CHALLENGE_METHOD);
+        }
+
         // 创建授权响应
         AuthorizationResponse response = new AuthorizationResponse();
         response.setClientId(client.getClientId());
@@ -61,6 +72,10 @@ public class AuthorizationService {
         response.setState(request.getState());
         response.setAuthorizationId(UUID.randomUUID().toString());
         response.setRedirectUri(request.getRedirectUri());
+        
+        // 保存PKCE参数到Redis中的授权请求
+        response.setCodeChallenge(request.getCodeChallenge());
+        response.setCodeChallengeMethod(request.getCodeChallengeMethod());
 
         // 保存授权请求
         authorizationConsentService.savePendingAuthorization(response.getAuthorizationId(), response);

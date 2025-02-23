@@ -5,6 +5,7 @@ import com.double2and9.auth_service.dto.response.TokenResponse;
 import com.double2and9.auth_service.entity.AuthorizationCode;
 import com.double2and9.auth_service.exception.AuthException;
 import com.double2and9.auth_service.repository.CustomJdbcRegisteredClientRepository;
+import com.double2and9.base.enums.AuthErrorCode;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -147,5 +148,73 @@ class TokenServiceTest {
         when(clientRepository.findByClientId("test_client")).thenReturn(client);
 
         assertThrows(AuthException.class, () -> tokenService.createToken(request));
+    }
+
+    @Test
+    void createTokenByAuthorizationCode_WithValidPKCE_Success() {
+        // 准备测试数据
+        request.setCodeVerifier("dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk");
+        authCode.setCodeChallenge("E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM");
+        authCode.setCodeChallengeMethod("S256");
+
+        when(clientRepository.findByClientId("test_client")).thenReturn(client);
+        when(authorizationCodeService.validateAndConsume(
+            eq("test_code"), 
+            eq("test_client"), 
+            eq("http://localhost:8080/callback")
+        )).thenReturn(authCode);
+        when(jwtService.generateAccessToken(anyString(), anyString(), anyString()))
+            .thenReturn("access_token");
+        when(jwtService.generateRefreshToken(anyString(), anyString(), anyString()))
+            .thenReturn("refresh_token");
+
+        // 执行测试
+        TokenResponse response = tokenService.createToken(request);
+
+        // 验证结果
+        assertNotNull(response);
+        assertEquals("access_token", response.getAccessToken());
+        assertEquals("refresh_token", response.getRefreshToken());
+    }
+
+    @Test
+    void createTokenByAuthorizationCode_WithoutRequiredCodeVerifier_ThrowsException() {
+        // 准备测试数据
+        authCode.setCodeChallenge("E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM");
+        authCode.setCodeChallengeMethod("S256");
+
+        when(clientRepository.findByClientId("test_client")).thenReturn(client);
+        when(authorizationCodeService.validateAndConsume(
+            eq("test_code"), 
+            eq("test_client"), 
+            eq("http://localhost:8080/callback")
+        )).thenReturn(authCode);
+
+        // 执行测试并验证异常
+        AuthException exception = assertThrows(AuthException.class, () -> 
+            tokenService.createToken(request));
+        
+        assertEquals(AuthErrorCode.CODE_VERIFIER_REQUIRED, exception.getErrorCode());
+    }
+
+    @Test
+    void createTokenByAuthorizationCode_WithInvalidCodeVerifier_ThrowsException() {
+        // 准备测试数据
+        request.setCodeVerifier("invalid-verifier");
+        authCode.setCodeChallenge("E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM");
+        authCode.setCodeChallengeMethod("S256");
+
+        when(clientRepository.findByClientId("test_client")).thenReturn(client);
+        when(authorizationCodeService.validateAndConsume(
+            eq("test_code"), 
+            eq("test_client"), 
+            eq("http://localhost:8080/callback")
+        )).thenReturn(authCode);
+
+        // 执行测试并验证异常
+        AuthException exception = assertThrows(AuthException.class, () -> 
+            tokenService.createToken(request));
+        
+        assertEquals(AuthErrorCode.INVALID_CODE_VERIFIER, exception.getErrorCode());
     }
 } 

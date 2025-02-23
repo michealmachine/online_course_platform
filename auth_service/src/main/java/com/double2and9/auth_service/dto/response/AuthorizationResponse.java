@@ -12,4 +12,8 @@ public class AuthorizationResponse {
     private String state;  // 原样返回state
     private String authorizationId;  // 用于标识本次授权请求
     private String redirectUri;  // 重定向URI
+    
+    // 添加PKCE相关字段
+    private String codeChallenge;  // PKCE挑战码
+    private String codeChallengeMethod;  // PKCE挑战方法
 } 

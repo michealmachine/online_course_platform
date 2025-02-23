@@ -55,21 +55,29 @@ class AuthorizationConsentControllerIntegrationTest {
         authRequest.setRedirectUri("http://localhost:8080/callback");
         authRequest.setScope("read write");
         authRequest.setState("xyz");
+        authRequest.setCodeChallenge("E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM");
+        authRequest.setCodeChallengeMethod("S256");
 
         consentRequest = new AuthorizationConsentRequest();
         consentRequest.setApprovedScopes(Set.of("read", "write"));
     }
 
     @Test
-    @WithMockUser(roles = {"ADMIN", "USER"})
+    @WithMockUser(roles = "ADMIN")
     void consent_Success() throws Exception {
-        // 创建客户端
+        // 先创建客户端
         mockMvc.perform(post("/api/clients")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(clientRequest)))
                 .andExpect(status().isCreated());
 
-        // 发起授权请求
+        // 需要先进行授权请求
+        mockMvc.perform(post("/api/oauth2/authorize")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(authRequest)))
+                .andExpect(status().isOk());  // 这里失败了，因为缺少PKCE参数
+
+        // 获取授权ID并设置重定向URI
         String response = mockMvc.perform(post("/api/oauth2/authorize")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(authRequest)))

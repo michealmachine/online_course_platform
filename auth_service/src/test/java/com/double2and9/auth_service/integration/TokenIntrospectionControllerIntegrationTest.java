@@ -7,6 +7,7 @@ import com.double2and9.auth_service.entity.AuthorizationCode;
 import com.double2and9.auth_service.repository.AuthorizationCodeRepository;
 import com.double2and9.auth_service.repository.CustomJdbcRegisteredClientRepository;
 import com.double2and9.auth_service.service.TokenBlacklistService;
+import com.double2and9.base.enums.AuthErrorCode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.AfterEach;
@@ -218,5 +219,60 @@ class TokenIntrospectionControllerIntegrationTest {
                 .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.active").value(false));
+    }
+
+    @Test
+    void introspect_MalformedToken() throws Exception {
+        TokenIntrospectionRequest request = new TokenIntrospectionRequest();
+        request.setToken("malformed.token.structure");
+        request.setTokenTypeHint("access_token");
+
+        mockMvc.perform(post("/api/oauth2/introspect")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.active").value(false));
+    }
+
+    @Test
+    void introspect_WrongTokenTypeHint() throws Exception {
+        TokenIntrospectionRequest request = new TokenIntrospectionRequest();
+        request.setToken(validToken);
+        request.setTokenTypeHint("wrong_type");
+
+        mockMvc.perform(post("/api/oauth2/introspect")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.active").value(true))
+                .andExpect(jsonPath("$.tokenType").exists());
+    }
+
+    @Test
+    void introspect_NoTokenTypeHint() throws Exception {
+        TokenIntrospectionRequest request = new TokenIntrospectionRequest();
+        request.setToken(validToken);
+        // 不设置 tokenTypeHint
+
+        mockMvc.perform(post("/api/oauth2/introspect")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.active").value(true))
+                .andExpect(jsonPath("$.tokenType").exists());
+    }
+
+    @Test
+    void introspect_RefreshTokenWithAccessTokenHint() throws Exception {
+        TokenIntrospectionRequest request = new TokenIntrospectionRequest();
+        request.setToken(validRefreshToken);
+        request.setTokenTypeHint("access_token");
+
+        mockMvc.perform(post("/api/oauth2/introspect")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.active").value(true))
+                .andExpect(jsonPath("$.tokenType").value("refresh_token"));
     }
 } 

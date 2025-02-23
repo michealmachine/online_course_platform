@@ -55,6 +55,10 @@ public enum AuthErrorCode {
     USER_UPDATE_FAILED(300601, "用户信息更新失败"),
     USER_QUERY_FAILED(300602, "用户查询失败"),
     USER_NOT_AUTHORIZED(300603, "无权操作此用户"),
+    PKCE_REQUIRED(300601, "PKCE参数缺失"),
+    INVALID_CODE_CHALLENGE_METHOD(300602, "无效的code_challenge_method"),
+    CODE_VERIFIER_REQUIRED(300603, "code_verifier不能为空"),
+    INVALID_CODE_VERIFIER(300604, "无效的code_verifier"),
 
     // 系统错误 3999xx
     SYSTEM_ERROR(399999, "系统内部错误"),
@@ -85,18 +89,16 @@ public enum AuthErrorCode {
     // 令牌相关错误码 3010xx
     INVALID_GRANT_TYPE(301001, "不支持的授权类型"),
     INVALID_CLIENT_CREDENTIALS(301002, "客户端认证失败"),
-    INVALID_CODE_VERIFIER(301003, "无效的验证码"),
     TOKEN_GENERATE_ERROR(301004, "令牌生成失败"),
     INVALID_REFRESH_TOKEN(301005, "无效的刷新令牌"),
 
     // PKCE 相关错误码
-    PKCE_REQUIRED(301101, "必须使用 PKCE"),
     INVALID_CODE_CHALLENGE(301102, "无效的 code_challenge"),
-    INVALID_CODE_CHALLENGE_METHOD(301103, "无效的 code_challenge_method"),
-    CODE_VERIFIER_REQUIRED(301104, "code_verifier 不能为空"),
-    CODE_VERIFIER_MISMATCH(301105, "code_verifier 不匹配");
+    CODE_VERIFIER_MISMATCH(301105, "code_verifier 不匹配"),
 
-    
+
+    INVALID_CODE(301003, "无效的授权码"); // 添加这个
+
     private final int code;
     private final String message;
 

@@ -64,6 +64,10 @@ class AuthorizationControllerIntegrationTest {
                 .content(objectMapper.writeValueAsString(clientRequest)))
                 .andExpect(status().isCreated());
 
+        // 设置PKCE参数
+        authRequest.setCodeChallenge("E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM");
+        authRequest.setCodeChallengeMethod("S256");
+
         // 测试授权请求
         mockMvc.perform(post("/api/oauth2/authorize")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -73,7 +77,9 @@ class AuthorizationControllerIntegrationTest {
                 .andExpect(jsonPath("$.clientName").value(clientRequest.getClientName()))
                 .andExpect(jsonPath("$.requestedScopes", containsInAnyOrder("read", "write")))
                 .andExpect(jsonPath("$.state").value(authRequest.getState()))
-                .andExpect(jsonPath("$.authorizationId").isNotEmpty());
+                .andExpect(jsonPath("$.authorizationId").isNotEmpty())
+                .andExpect(jsonPath("$.codeChallenge").value(authRequest.getCodeChallenge()))
+                .andExpect(jsonPath("$.codeChallengeMethod").value(authRequest.getCodeChallengeMethod()));
     }
 
     @Test
@@ -110,5 +116,26 @@ class AuthorizationControllerIntegrationTest {
                 .content(objectMapper.writeValueAsString(authRequest)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value(AuthErrorCode.CLIENT_REDIRECT_URI_INVALID.getCode()));
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void authorize_WithoutPKCE_Fails() throws Exception {
+        // 先创建客户端
+        mockMvc.perform(post("/api/clients")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(clientRequest)))
+                .andExpect(status().isCreated());
+
+        // 不设置PKCE参数
+        authRequest.setCodeChallenge(null);
+        authRequest.setCodeChallengeMethod(null);
+
+        // 测试授权请求
+        mockMvc.perform(post("/api/oauth2/authorize")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(authRequest)))
+                .andExpect(status().isBadRequest())  // 改为400错误
+                .andExpect(jsonPath("$.code").value(AuthErrorCode.PKCE_REQUIRED.getCode()));
     }
 } 

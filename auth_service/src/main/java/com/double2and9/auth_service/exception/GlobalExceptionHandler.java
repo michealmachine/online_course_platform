@@ -55,6 +55,9 @@ public class GlobalExceptionHandler {
                  INVALID_GRANT_TYPE,
                  INVALID_AUTHORIZATION_CODE,
                  AUTHORIZATION_CODE_GENERATE_ERROR,
+                 // PKCE相关错误
+                 PKCE_REQUIRED,
+                 INVALID_CODE_CHALLENGE_METHOD,
                  // 账户状态相关错误
                  ACCOUNT_DISABLED,
                  ACCOUNT_LOCKED,
