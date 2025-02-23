@@ -30,7 +30,7 @@ spring:
 
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://localhost:3306/media?serverTimezone=Asia/Shanghai&characterEncoding=utf-8
+    url: jdbc:mysql://localhost:3306/media?characterEncoding=utf8&useSSL=false&serverTimezone=UTC
     username: root
     password: root
 
