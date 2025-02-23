@@ -22,7 +22,7 @@ public class TokenController {
     
     private final TokenService tokenService;
 
-    @Operation(summary = "获取令牌", description = "使用授权码获取访问令牌")
+    @Operation(summary = "获取或刷新令牌", description = "支持授权码模式获取令牌和刷新令牌")
     @ApiResponse(responseCode = "200", description = "成功返回令牌")
     @ApiResponse(responseCode = "400", description = "请求参数错误")
     @ApiResponse(responseCode = "401", description = "客户端认证失败")

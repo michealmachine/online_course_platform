@@ -1,6 +1,7 @@
 package com.double2and9.auth_service.dto.request;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import lombok.Data;
 
 @Data
@@ -19,7 +20,10 @@ public class AuthorizationRequest {
 
     private String state;  // 可选，用于防止CSRF攻击
 
-    private String codeChallenge;  // PKCE挑战码，可选
+    // PKCE 相关字段
+    @Pattern(regexp = "^[A-Za-z0-9-._~]{43,128}$", message = "code_challenge 格式不正确")
+    private String codeChallenge;
     
-    private String codeChallengeMethod;  // PKCE挑战方法，可选，支持"S256"和"plain"
+    @Pattern(regexp = "^(plain|S256)$", message = "code_challenge_method 必须是 plain 或 S256")
+    private String codeChallengeMethod = "S256"; // 默认使用 S256
 } 

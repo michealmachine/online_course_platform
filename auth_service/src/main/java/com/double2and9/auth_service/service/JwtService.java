@@ -1,6 +1,7 @@
 package com.double2and9.auth_service.service;
 
 import com.double2and9.auth_service.dto.response.TokenIntrospectionResponse;
+import com.double2and9.auth_service.dto.response.TokenResponse;
 import com.double2and9.auth_service.exception.AuthException;
 import com.double2and9.auth_service.security.JwtTokenProvider;
 import com.double2and9.base.enums.AuthErrorCode;
@@ -24,8 +25,8 @@ public class JwtService {
     private final TokenBlacklistService tokenBlacklistService;
     private static final Logger log = LoggerFactory.getLogger(JwtService.class);
     
-    private static final long ACCESS_TOKEN_EXPIRES_IN = 3600L;  // 1小时
-    private static final long REFRESH_TOKEN_EXPIRES_IN = 2592000L;  // 30天
+    private static final int ACCESS_TOKEN_EXPIRES_IN = 3600;  // 1小时
+    private static final int REFRESH_TOKEN_EXPIRES_IN = 2592000;  // 30天
 
     /**
      * 生成访问令牌
@@ -37,7 +38,7 @@ public class JwtService {
         claims.put("scope", scope);
         claims.put("type", "access_token");
 
-        return jwtTokenProvider.generateToken(claims, ACCESS_TOKEN_EXPIRES_IN);
+        return jwtTokenProvider.generateToken(claims, (long) ACCESS_TOKEN_EXPIRES_IN);
     }
 
     /**
@@ -50,7 +51,7 @@ public class JwtService {
         claims.put("scope", scope);
         claims.put("type", "refresh_token");
 
-        return jwtTokenProvider.generateToken(claims, REFRESH_TOKEN_EXPIRES_IN);
+        return jwtTokenProvider.generateToken(claims, (long) REFRESH_TOKEN_EXPIRES_IN);
     }
 
     /**
@@ -69,17 +70,20 @@ public class JwtService {
     }
 
     /**
-     * 验证刷新令牌
+     * 验证并解析刷新令牌
+     * @param refreshToken 刷新令牌
+     * @return 令牌中的声明
+     * @throws AuthException 如果令牌无效或已过期
      */
-    public Claims validateRefreshToken(String token) {
-        Claims claims = jwtTokenProvider.validateToken(token);
+    public Claims validateRefreshToken(String refreshToken) {
+        Claims claims = parseToken(refreshToken);
         
         // 验证令牌类型
-        String type = claims.get("type", String.class);
-        if (!"refresh_token".equals(type)) {
-            throw new IllegalArgumentException("Invalid token type");
+        String tokenType = claims.get("type", String.class);
+        if (!"refresh_token".equals(tokenType)) {
+            throw new AuthException(AuthErrorCode.TOKEN_INVALID);
         }
-
+        
         return claims;
     }
 
@@ -199,5 +203,31 @@ public class JwtService {
                 .active(false)
                 .build();
         }
+    }
+
+    /**
+     * 使用刷新令牌生成新的访问令牌和刷新令牌
+     * @param refreshToken 原刷新令牌
+     * @return 新的令牌对
+     */
+    public TokenResponse refreshTokens(String refreshToken) {
+        Claims claims = validateRefreshToken(refreshToken);
+        
+        String userId = claims.get("userId", String.class);
+        String clientId = claims.get("clientId", String.class);
+        String scope = claims.get("scope", String.class);
+
+        // 生成新的访问令牌和刷新令牌
+        String newAccessToken = generateAccessToken(userId, clientId, scope);
+        String newRefreshToken = generateRefreshToken(userId, clientId, scope);
+
+        TokenResponse response = new TokenResponse();
+        response.setAccessToken(newAccessToken);
+        response.setRefreshToken(newRefreshToken);
+        response.setTokenType("Bearer");
+        response.setExpiresIn(ACCESS_TOKEN_EXPIRES_IN);
+        response.setScope(scope);
+
+        return response;
     }
 } 

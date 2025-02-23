@@ -37,6 +37,7 @@ public enum AuthErrorCode {
     TOKEN_SIGNATURE_INVALID(300303, "Token签名无效"),
     TOKEN_UNSUPPORTED(300304, "不支持的Token格式"),
     TOKEN_CLAIMS_EMPTY(300305, "Token信息为空"),
+    TOKEN_REVOKED(300510, "Token已被撤销"),
 
     // 认证相关错误 3004xx
     AUTHENTICATION_FAILED(300401, "认证失败"),
@@ -49,7 +50,6 @@ public enum AuthErrorCode {
     PARAMETER_MISSING(300502, "缺少必要参数"),
     PARAMETER_TYPE_MISMATCH(300503, "参数类型不匹配"),
     INVALID_REQUEST(300504, "无效的请求参数"),
-    TOKEN_REVOKED(300510, "令牌已被撤销"),
 
     // 用户管理相关错误 3006xx
     USER_UPDATE_FAILED(300601, "用户信息更新失败"),
@@ -84,10 +84,17 @@ public enum AuthErrorCode {
 
     // 令牌相关错误码 3010xx
     INVALID_GRANT_TYPE(301001, "不支持的授权类型"),
-    INVALID_CLIENT_CREDENTIALS(301002, "无效的客户端凭证"),
+    INVALID_CLIENT_CREDENTIALS(301002, "客户端认证失败"),
     INVALID_CODE_VERIFIER(301003, "无效的验证码"),
     TOKEN_GENERATE_ERROR(301004, "令牌生成失败"),
-    INVALID_REFRESH_TOKEN(301005, "无效的刷新令牌");
+    INVALID_REFRESH_TOKEN(301005, "无效的刷新令牌"),
+
+    // PKCE 相关错误码
+    PKCE_REQUIRED(301101, "必须使用 PKCE"),
+    INVALID_CODE_CHALLENGE(301102, "无效的 code_challenge"),
+    INVALID_CODE_CHALLENGE_METHOD(301103, "无效的 code_challenge_method"),
+    CODE_VERIFIER_REQUIRED(301104, "code_verifier 不能为空"),
+    CODE_VERIFIER_MISMATCH(301105, "code_verifier 不匹配");
 
     
     private final int code;

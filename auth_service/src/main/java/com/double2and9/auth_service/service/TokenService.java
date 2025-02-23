@@ -114,6 +114,11 @@ public class TokenService {
 
             return response;
         } catch (Exception e) {
+            // 如果是 AuthException，直接抛出
+            if (e instanceof AuthException) {
+                throw (AuthException) e;
+            }
+            // 其他异常转换为 TOKEN_INVALID
             throw new AuthException(AuthErrorCode.TOKEN_INVALID);
         }
     }

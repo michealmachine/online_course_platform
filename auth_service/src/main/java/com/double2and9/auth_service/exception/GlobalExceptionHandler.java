@@ -68,6 +68,7 @@ public class GlobalExceptionHandler {
                  TOKEN_SIGNATURE_INVALID,
                  TOKEN_UNSUPPORTED,
                  TOKEN_CLAIMS_EMPTY,
+                 TOKEN_REVOKED,
                  INVALID_CLIENT_CREDENTIALS,
                  AUTHENTICATION_FAILED -> HttpStatus.UNAUTHORIZED;
             

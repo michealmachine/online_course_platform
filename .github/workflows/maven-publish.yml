@@ -17,7 +17,7 @@ jobs:
         image: mysql:8.0
         env:
           MYSQL_ROOT_PASSWORD: root
-          MYSQL_DATABASE: online_course
+          MYSQL_DATABASE: auth
         ports:
           - 3306:3306
         options: >-
@@ -93,12 +93,16 @@ jobs:
     - name: Build and Install Base Module
       run: mvn clean install -pl base
       
-    # 等待MySQL启动
-    - name: Wait for MySQL
+    # 等待MySQL启动并创建其他数据库
+    - name: Initialize MySQL databases
       run: |
         while ! mysqladmin ping -h"127.0.0.1" --silent; do
           sleep 1
         done
+        mysql -h 127.0.0.1 -uroot -proot -e "
+          CREATE DATABASE IF NOT EXISTS media;
+          CREATE DATABASE IF NOT EXISTS content;
+        "
     
     # 构建和测试content_service模块
     - name: Build and Test Content Service Module
@@ -108,11 +112,10 @@ jobs:
     - name: Build and Test Media Module
       run: mvn clean verify -pl media -Dspring.profiles.active=test
       
-    # 在构建auth_service之前添加Flyway clean和repair
-    - name: Clean and Repair Flyway Schema
+    # 在构建auth_service之前添加Flyway repair
+    - name: Repair Flyway Schema History
       run: |
-        mvn -pl auth_service flyway:clean flyway:repair \
-        -Dflyway.url=jdbc:mysql://localhost:3306/online_course \
+        mvn -pl auth_service flyway:repair -Dflyway.url=jdbc:mysql://localhost:3306/auth \
         -Dflyway.user=root -Dflyway.password=root
         
     # 构建和测试auth_service模块

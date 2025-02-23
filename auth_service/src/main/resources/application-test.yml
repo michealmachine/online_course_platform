@@ -18,7 +18,7 @@ spring:
     name: auth-service
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://localhost:3306/online_course?serverTimezone=Asia/Shanghai
+    url: jdbc:mysql://localhost:3306/auth?serverTimezone=Asia/Shanghai
     username: root
     password: root
   jpa:

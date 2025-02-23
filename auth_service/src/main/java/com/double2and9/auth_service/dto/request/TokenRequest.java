@@ -20,10 +20,12 @@ public class TokenRequest {
     @NotBlank(message = "客户端密钥不能为空")
     private String clientSecret;  // 客户端密钥
 
+    @NotBlank(message = "刷新令牌不能为空", groups = RefreshTokenValidation.class)
     private String refreshToken;  // 刷新令牌，refresh_token 模式必需
 
     private String codeVerifier;  // PKCE验证码，可选
 
     // 分组接口
     public interface AuthorizationCodeValidation {}
+    public interface RefreshTokenValidation {}
 } 

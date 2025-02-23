@@ -1,5 +1,6 @@
 package com.double2and9.auth_service.service;
 
+import com.double2and9.auth_service.dto.response.TokenResponse;
 import com.double2and9.auth_service.exception.AuthException;
 import com.double2and9.auth_service.security.JwtTokenProvider;
 import com.double2and9.base.enums.AuthErrorCode;
@@ -49,6 +50,7 @@ class JwtServiceTest {
         refreshTokenClaims = Jwts.claims();
         refreshTokenClaims.put("userId", "testUser");
         refreshTokenClaims.put("clientId", "testClient");
+        refreshTokenClaims.put("scope", "read write");
         refreshTokenClaims.put("type", "refresh_token");
     }
 
@@ -106,23 +108,31 @@ class JwtServiceTest {
     }
 
     @Test
-    void validateRefreshToken_Success() {
+    void validateRefreshToken_Success() throws Exception {
+        // Mock JwtTokenProvider 的行为
         when(jwtTokenProvider.validateToken(TEST_TOKEN)).thenReturn(refreshTokenClaims);
+        when(tokenBlacklistService.isBlacklisted(TEST_TOKEN)).thenReturn(false);
 
-        Claims claims = jwtService.validateRefreshToken(TEST_TOKEN);
+        // 执行测试
+        Claims result = jwtService.validateRefreshToken(TEST_TOKEN);
 
-        assertEquals(refreshTokenClaims, claims);
+        // 验证结果
+        assertNotNull(result);
+        assertEquals("testUser", result.get("userId"));
+        assertEquals("testClient", result.get("clientId"));
+        assertEquals("refresh_token", result.get("type"));
     }
 
     @Test
-    void validateRefreshToken_InvalidType() {
-        Claims claims = Jwts.claims();
-        claims.put("userId", "testUser");
-        claims.put("clientId", "testClient");
-        when(jwtTokenProvider.validateToken(TEST_TOKEN)).thenReturn(claims);
+    void validateRefreshToken_WrongTokenType() {
+        // Mock JwtTokenProvider 的行为 - 返回访问令牌的claims
+        when(jwtTokenProvider.validateToken(TEST_TOKEN)).thenReturn(accessTokenClaims);
+        when(tokenBlacklistService.isBlacklisted(TEST_TOKEN)).thenReturn(false);
 
-        assertThrows(IllegalArgumentException.class, () -> 
-            jwtService.validateRefreshToken(TEST_TOKEN));
+        // 执行测试并验证异常
+        AuthException exception = assertThrows(AuthException.class,
+            () -> jwtService.validateRefreshToken(TEST_TOKEN));
+        assertEquals(AuthErrorCode.TOKEN_INVALID, exception.getErrorCode());
     }
 
     @Test
@@ -192,5 +202,28 @@ class JwtServiceTest {
         // 执行测试并验证结果
         AuthException exception = assertThrows(AuthException.class, () -> jwtService.parseToken(token));
         assertEquals(AuthErrorCode.TOKEN_REVOKED, exception.getErrorCode());
+    }
+
+    @Test
+    void refreshTokens_Success() {
+        // Mock JwtTokenProvider 的行为
+        when(jwtTokenProvider.validateToken(TEST_TOKEN)).thenReturn(refreshTokenClaims);
+        when(tokenBlacklistService.isBlacklisted(TEST_TOKEN)).thenReturn(false);
+        
+        // Mock 生成新令牌
+        when(jwtTokenProvider.generateToken(any(), anyLong())).thenReturn(TEST_TOKEN);
+
+        // 执行测试
+        TokenResponse response = jwtService.refreshTokens(TEST_TOKEN);
+
+        // 验证结果
+        assertNotNull(response.getAccessToken());
+        assertNotNull(response.getRefreshToken());
+        assertEquals("Bearer", response.getTokenType());
+        assertEquals(3600, response.getExpiresIn());
+        assertEquals("read write", response.getScope());
+        
+        // 验证方法调用
+        verify(jwtTokenProvider, times(2)).generateToken(any(), anyLong());
     }
 } 
