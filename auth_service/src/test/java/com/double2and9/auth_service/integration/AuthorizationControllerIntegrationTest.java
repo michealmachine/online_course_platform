@@ -17,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.Set;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 import static org.hamcrest.Matchers.*;
 
@@ -136,6 +137,99 @@ class AuthorizationControllerIntegrationTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(authRequest)))
                 .andExpect(status().isBadRequest())  // 改为400错误
+                .andExpect(jsonPath("$.code").value(AuthErrorCode.PKCE_REQUIRED.getCode()));
+    }
+    
+    // 新增测试方法：使用GET方法进行授权请求
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void authorizeGet_Success() throws Exception {
+        // 先创建客户端
+        mockMvc.perform(post("/api/clients")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(clientRequest)))
+                .andExpect(status().isCreated());
+
+        // 测试GET方法授权请求
+        mockMvc.perform(get("/api/oauth2/authorize")
+                .param("response_type", authRequest.getResponseType())
+                .param("client_id", authRequest.getClientId())
+                .param("redirect_uri", authRequest.getRedirectUri())
+                .param("scope", authRequest.getScope())
+                .param("state", authRequest.getState())
+                .param("code_challenge", "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM")
+                .param("code_challenge_method", "S256"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.clientId").value(authRequest.getClientId()))
+                .andExpect(jsonPath("$.clientName").value(clientRequest.getClientName()))
+                .andExpect(jsonPath("$.requestedScopes", containsInAnyOrder("read", "write")))
+                .andExpect(jsonPath("$.state").value(authRequest.getState()))
+                .andExpect(jsonPath("$.authorizationId").isNotEmpty())
+                .andExpect(jsonPath("$.codeChallenge").value("E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM"))
+                .andExpect(jsonPath("$.codeChallengeMethod").value("S256"));
+    }
+    
+    @Test
+    void authorizeGet_Unauthorized() throws Exception {
+        mockMvc.perform(get("/api/oauth2/authorize")
+                .param("response_type", authRequest.getResponseType())
+                .param("client_id", authRequest.getClientId())
+                .param("redirect_uri", authRequest.getRedirectUri())
+                .param("scope", authRequest.getScope())
+                .param("state", authRequest.getState()))
+                .andExpect(status().isUnauthorized());
+    }
+    
+    @Test
+    @WithMockUser(username = "user")
+    void authorizeGet_ClientNotFound() throws Exception {
+        mockMvc.perform(get("/api/oauth2/authorize")
+                .param("response_type", authRequest.getResponseType())
+                .param("client_id", authRequest.getClientId())
+                .param("redirect_uri", authRequest.getRedirectUri())
+                .param("scope", authRequest.getScope())
+                .param("state", authRequest.getState()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value(AuthErrorCode.CLIENT_NOT_FOUND.getCode()));
+    }
+    
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void authorizeGet_InvalidRedirectUri() throws Exception {
+        // 先创建客户端
+        mockMvc.perform(post("/api/clients")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(clientRequest)))
+                .andExpect(status().isCreated());
+
+        // 使用无效的重定向URI
+        mockMvc.perform(get("/api/oauth2/authorize")
+                .param("response_type", authRequest.getResponseType())
+                .param("client_id", authRequest.getClientId())
+                .param("redirect_uri", "http://evil.com")
+                .param("scope", authRequest.getScope())
+                .param("state", authRequest.getState()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(AuthErrorCode.CLIENT_REDIRECT_URI_INVALID.getCode()));
+    }
+    
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void authorizeGet_WithoutPKCE_Fails() throws Exception {
+        // 先创建客户端
+        mockMvc.perform(post("/api/clients")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(clientRequest)))
+                .andExpect(status().isCreated());
+
+        // 测试不带PKCE参数的请求
+        mockMvc.perform(get("/api/oauth2/authorize")
+                .param("response_type", authRequest.getResponseType())
+                .param("client_id", authRequest.getClientId())
+                .param("redirect_uri", authRequest.getRedirectUri())
+                .param("scope", authRequest.getScope())
+                .param("state", authRequest.getState()))
+                .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value(AuthErrorCode.PKCE_REQUIRED.getCode()));
     }
 } 

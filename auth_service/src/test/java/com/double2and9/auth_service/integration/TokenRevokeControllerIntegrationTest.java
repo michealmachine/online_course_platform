@@ -2,6 +2,7 @@ package com.double2and9.auth_service.integration;
 
 import com.double2and9.auth_service.dto.request.TokenRevokeRequest;
 import com.double2and9.auth_service.dto.request.TokenRequest;
+import com.double2and9.auth_service.dto.request.TokenIntrospectionRequest;
 import com.double2and9.auth_service.dto.response.TokenResponse;
 import com.double2and9.base.enums.AuthErrorCode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -13,6 +14,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.transaction.annotation.Transactional;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -26,8 +28,10 @@ import com.double2and9.auth_service.security.JwtTokenProvider;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
 import java.time.LocalDateTime;
+import java.util.Base64;
 import java.util.HashMap;
 import java.util.Map;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -78,16 +82,16 @@ class TokenRevokeControllerIntegrationTest {
         authCode.setUsed(false);
         authorizationCodeRepository.save(authCode);
 
-        // 先获取一个有效的令牌
+        // 先获取一个有效的令牌，使用HTTP Basic认证
         TokenRequest tokenRequest = new TokenRequest();
         tokenRequest.setGrantType("authorization_code");
         tokenRequest.setCode("test_code");
         tokenRequest.setRedirectUri("http://localhost:8080/callback");
-        tokenRequest.setClientId("test_client");
-        tokenRequest.setClientSecret("test_secret");
+        // 不再设置clientId和clientSecret，使用HTTP Basic认证头
 
         String response = mockMvc.perform(post("/api/oauth2/token")
                 .contentType(MediaType.APPLICATION_JSON)
+                .header("Authorization", "Basic " + Base64.getEncoder().encodeToString("test_client:test_secret".getBytes()))
                 .content(objectMapper.writeValueAsString(tokenRequest)))
                 .andExpect(status().isOk())
                 .andReturn()
@@ -105,10 +109,45 @@ class TokenRevokeControllerIntegrationTest {
 
     @Test
     void revokeToken_Success() throws Exception {
+        // 创建新的授权码用于此测试
+        AuthorizationCode newAuthCode = new AuthorizationCode();
+        newAuthCode.setCode("revoke_test_code");
+        newAuthCode.setClientId("test_client");
+        newAuthCode.setUserId("test_user");
+        newAuthCode.setRedirectUri("http://localhost:8080/callback");
+        newAuthCode.setScope("read write");
+        newAuthCode.setExpiresAt(LocalDateTime.now().plusMinutes(10));
+        newAuthCode.setUsed(false);
+        authorizationCodeRepository.save(newAuthCode);
+
+        // 为撤销操作获取令牌
+        TokenRequest tokenRequest = new TokenRequest();
+        tokenRequest.setGrantType("authorization_code");
+        tokenRequest.setCode("revoke_test_code");
+        tokenRequest.setRedirectUri("http://localhost:8080/callback");
+
+        MvcResult result = mockMvc.perform(post("/api/oauth2/token")
+                .contentType(MediaType.APPLICATION_JSON)
+                .header("Authorization", "Basic " + Base64.getEncoder().encodeToString("test_client:test_secret".getBytes()))
+                .content(objectMapper.writeValueAsString(tokenRequest)))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        TokenResponse tokenResponse = objectMapper.readValue(result.getResponse().getContentAsString(), TokenResponse.class);
+        String accessToken = tokenResponse.getAccessToken();
+
+        // 确保获取到了有效令牌
+        assertNotNull(accessToken, "Access token should not be null");
+
+        // 然后测试撤销这个令牌
         mockMvc.perform(post("/api/oauth2/revoke")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
+                .header("Authorization", "Basic " + Base64.getEncoder().encodeToString("test_client:test_secret".getBytes()))
+                .content(objectMapper.writeValueAsString(Map.of("token", accessToken))))
                 .andExpect(status().isOk());
+
+        // 验证令牌已被撤销（可选）
+        // 这里可以添加额外的验证逻辑，比如检查令牌是否在黑名单中
     }
 
     @Test
@@ -144,16 +183,15 @@ class TokenRevokeControllerIntegrationTest {
         newAuthCode.setUsed(false);
         authorizationCodeRepository.save(newAuthCode);
 
-        // 获取新的令牌
+        // 获取新的令牌，使用HTTP Basic认证头
         TokenRequest tokenRequest = new TokenRequest();
         tokenRequest.setGrantType("authorization_code");
         tokenRequest.setCode("test_code_2");  // 使用新的授权码
         tokenRequest.setRedirectUri("http://localhost:8080/callback");
-        tokenRequest.setClientId("test_client");
-        tokenRequest.setClientSecret("test_secret");
 
         String response = mockMvc.perform(post("/api/oauth2/token")
                 .contentType(MediaType.APPLICATION_JSON)
+                .header("Authorization", "Basic " + Base64.getEncoder().encodeToString("test_client:test_secret".getBytes()))
                 .content(objectMapper.writeValueAsString(tokenRequest)))
                 .andExpect(status().isOk())
                 .andReturn()
@@ -176,12 +214,11 @@ class TokenRevokeControllerIntegrationTest {
         // 尝试使用已撤销的刷新令牌获取新的访问令牌
         TokenRequest refreshRequest = new TokenRequest();
         refreshRequest.setGrantType("refresh_token");
-        refreshRequest.setClientId("test_client");
-        refreshRequest.setClientSecret("test_secret");
         refreshRequest.setRefreshToken(refreshToken);
 
         mockMvc.perform(post("/api/oauth2/token")
                 .contentType(MediaType.APPLICATION_JSON)
+                .header("Authorization", "Basic " + Base64.getEncoder().encodeToString("test_client:test_secret".getBytes()))
                 .content(objectMapper.writeValueAsString(refreshRequest)))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value(AuthErrorCode.TOKEN_REVOKED.getCode()))

@@ -16,17 +16,20 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.MediaType;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.annotation.DirtiesContext.ClassMode;
 
 import java.time.LocalDateTime;
+import java.util.Base64;
 import java.util.Map;
 import java.util.Objects;
 
@@ -59,13 +62,16 @@ class TokenIntrospectionControllerIntegrationTest {
     @Autowired
     private RedisTemplate<String, Object> redisTemplate;
 
+    @Autowired
+    private RedisConnectionFactory redisConnectionFactory;
+
     private String validToken;
     private String validRefreshToken;
 
     @BeforeEach
     void setUp() throws Exception {
-        // 清理 Redis 数据
-        Objects.requireNonNull(redisTemplate.getConnectionFactory()).getConnection().flushAll();
+        // 清除Redis数据
+        redisConnectionFactory.getConnection().serverCommands().flushDb();
 
         // 创建测试客户端
         RegisteredClient client = RegisteredClient.withId("1")
@@ -95,18 +101,15 @@ class TokenIntrospectionControllerIntegrationTest {
         tokenRequest.setGrantType("authorization_code");
         tokenRequest.setCode("test_code");
         tokenRequest.setRedirectUri("http://localhost:8080/callback");
-        tokenRequest.setClientId("test_client");
-        tokenRequest.setClientSecret("test_secret");
 
-        String response = mockMvc.perform(post("/api/oauth2/token")
+        MvcResult result = mockMvc.perform(post("/api/oauth2/token")
                 .contentType(MediaType.APPLICATION_JSON)
+                .header("Authorization", "Basic " + Base64.getEncoder().encodeToString("test_client:test_secret".getBytes()))
                 .content(objectMapper.writeValueAsString(tokenRequest)))
                 .andExpect(status().isOk())
-                .andReturn()
-                .getResponse()
-                .getContentAsString();
+                .andReturn();
 
-        TokenResponse tokenResponse = objectMapper.readValue(response, TokenResponse.class);
+        TokenResponse tokenResponse = objectMapper.readValue(result.getResponse().getContentAsString(), TokenResponse.class);
         validToken = tokenResponse.getAccessToken();
         validRefreshToken = tokenResponse.getRefreshToken();
 
@@ -117,8 +120,8 @@ class TokenIntrospectionControllerIntegrationTest {
 
     @AfterEach
     void tearDown() {
-        // 清理 Redis 数据
-        Objects.requireNonNull(redisTemplate.getConnectionFactory()).getConnection().flushAll();
+        // 清除Redis数据
+        redisConnectionFactory.getConnection().serverCommands().flushDb();
     }
 
     @Test

@@ -38,6 +38,35 @@ public class AuthorizationConsentService {
     private static final String REDIS_KEY_PREFIX = "oauth2:auth:request:";
     private static final long AUTHORIZATION_REQUEST_TIMEOUT = 10; // 10分钟过期
 
+    /**
+     * 获取授权请求信息，用于显示同意页面
+     *
+     * @param authorizationId 授权请求ID
+     * @param authentication 当前用户认证信息
+     * @return 授权请求信息
+     */
+    public AuthorizationResponse getAuthorizationRequest(String authorizationId, Authentication authentication) {
+        // 验证用户是否已认证
+        if (!authentication.isAuthenticated()) {
+            throw new AuthException(AuthErrorCode.UNAUTHORIZED);
+        }
+
+        // 从Redis获取授权请求
+        String authorizationRequestKey = REDIS_KEY_PREFIX + authorizationId;
+        AuthorizationResponse authorizationResponse = (AuthorizationResponse) redisTemplate.opsForValue().get(authorizationRequestKey);
+        if (authorizationResponse == null) {
+            throw new AuthException(AuthErrorCode.AUTHORIZATION_REQUEST_NOT_FOUND);
+        }
+
+        // 验证客户端
+        RegisteredClient client = clientRepository.findByClientId(authorizationResponse.getClientId());
+        if (client == null) {
+            throw new AuthException(AuthErrorCode.CLIENT_NOT_FOUND);
+        }
+
+        return authorizationResponse;
+    }
+
     @Transactional
     public AuthorizationConsentResponse consent(AuthorizationConsentRequest request, Authentication authentication) {
         // 验证用户是否已认证

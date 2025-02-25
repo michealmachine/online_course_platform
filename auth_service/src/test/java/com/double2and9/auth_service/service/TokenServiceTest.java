@@ -49,8 +49,6 @@ class TokenServiceTest {
         request.setGrantType("authorization_code");
         request.setCode("test_code");
         request.setRedirectUri("http://localhost:8080/callback");
-        request.setClientId("test_client");
-        request.setClientSecret("test_secret");
 
         // 设置客户端
         client = RegisteredClient.withId("1")
@@ -81,7 +79,7 @@ class TokenServiceTest {
         when(jwtService.generateRefreshToken("test_user", "test_client", "read write"))
             .thenReturn("refresh_token");
 
-        TokenResponse response = tokenService.createToken(request);
+        TokenResponse response = tokenService.createToken("test_client", "test_secret", request);
 
         assertNotNull(response);
         assertEquals("access_token", response.getAccessToken());
@@ -111,7 +109,7 @@ class TokenServiceTest {
         when(jwtService.generateRefreshToken("test_user", "test_client", "read write"))
             .thenReturn("new_refresh_token");
 
-        TokenResponse response = tokenService.createToken(request);
+        TokenResponse response = tokenService.createToken("test_client", "test_secret", request);
 
         assertNotNull(response);
         assertEquals("new_access_token", response.getAccessToken());
@@ -130,24 +128,22 @@ class TokenServiceTest {
         when(clientRepository.findByClientId("test_client")).thenReturn(client);
         when(jwtService.parseToken("invalid_token")).thenThrow(new RuntimeException());
 
-        assertThrows(AuthException.class, () -> tokenService.createToken(request));
+        assertThrows(AuthException.class, () -> tokenService.createToken("test_client", "test_secret", request));
     }
 
     @Test
     void createToken_InvalidGrantType() {
         request.setGrantType("invalid_grant_type");
 
-        assertThrows(AuthException.class, () -> tokenService.createToken(request));
+        assertThrows(AuthException.class, () -> tokenService.createToken("test_client", "test_secret", request));
     }
 
     @Test
     void createToken_InvalidClientCredentials() {
-        // 修改请求使用错误的客户端密钥
-        request.setClientSecret("wrong_secret");
-        
+        // 使用错误的客户端密钥
         when(clientRepository.findByClientId("test_client")).thenReturn(client);
 
-        assertThrows(AuthException.class, () -> tokenService.createToken(request));
+        assertThrows(AuthException.class, () -> tokenService.createToken("test_client", "wrong_secret", request));
     }
 
     @Test
@@ -168,10 +164,8 @@ class TokenServiceTest {
         when(jwtService.generateRefreshToken(anyString(), anyString(), anyString()))
             .thenReturn("refresh_token");
 
-        // 执行测试
-        TokenResponse response = tokenService.createToken(request);
+        TokenResponse response = tokenService.createToken("test_client", "test_secret", request);
 
-        // 验证结果
         assertNotNull(response);
         assertEquals("access_token", response.getAccessToken());
         assertEquals("refresh_token", response.getRefreshToken());
@@ -190,9 +184,8 @@ class TokenServiceTest {
             eq("http://localhost:8080/callback")
         )).thenReturn(authCode);
 
-        // 执行测试并验证异常
         AuthException exception = assertThrows(AuthException.class, () -> 
-            tokenService.createToken(request));
+            tokenService.createToken("test_client", "test_secret", request));
         
         assertEquals(AuthErrorCode.CODE_VERIFIER_REQUIRED, exception.getErrorCode());
     }
@@ -211,9 +204,8 @@ class TokenServiceTest {
             eq("http://localhost:8080/callback")
         )).thenReturn(authCode);
 
-        // 执行测试并验证异常
         AuthException exception = assertThrows(AuthException.class, () -> 
-            tokenService.createToken(request));
+            tokenService.createToken("test_client", "test_secret", request));
         
         assertEquals(AuthErrorCode.INVALID_CODE_VERIFIER, exception.getErrorCode());
     }

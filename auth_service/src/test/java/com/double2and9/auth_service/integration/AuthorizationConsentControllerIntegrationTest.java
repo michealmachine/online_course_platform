@@ -13,10 +13,12 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Set;
 
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 import static org.hamcrest.Matchers.*;
@@ -118,6 +120,53 @@ class AuthorizationConsentControllerIntegrationTest {
         mockMvc.perform(post("/api/oauth2/consent")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(consentRequest)))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value(AuthErrorCode.AUTHORIZATION_REQUEST_NOT_FOUND.getCode()));
+    }
+    
+    // 新增测试方法：测试获取同意页面
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void getConsentPage_Success() throws Exception {
+        // 先创建客户端
+        mockMvc.perform(post("/api/clients")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(clientRequest)))
+                .andExpect(status().isCreated());
+
+        // 发起授权请求以获取授权ID
+        MvcResult result = mockMvc.perform(post("/api/oauth2/authorize")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(authRequest)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.authorizationId").exists())
+                .andReturn();
+
+        var responseObj = objectMapper.readTree(result.getResponse().getContentAsString());
+        String authId = responseObj.get("authorizationId").asText();
+
+        // 测试获取同意页面
+        mockMvc.perform(get("/api/oauth2/consent")
+                .param("authorization_id", authId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.clientId").value(authRequest.getClientId()))
+                .andExpect(jsonPath("$.clientName").value(clientRequest.getClientName()))
+                .andExpect(jsonPath("$.requestedScopes", containsInAnyOrder("read", "write")))
+                .andExpect(jsonPath("$.authorizationId").value(authId));
+    }
+    
+    @Test
+    void getConsentPage_Unauthorized() throws Exception {
+        mockMvc.perform(get("/api/oauth2/consent")
+                .param("authorization_id", "test-auth-id"))
+                .andExpect(status().isUnauthorized());
+    }
+    
+    @Test
+    @WithMockUser(username = "user")
+    void getConsentPage_RequestNotFound() throws Exception {
+        mockMvc.perform(get("/api/oauth2/consent")
+                .param("authorization_id", "non-existent"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value(AuthErrorCode.AUTHORIZATION_REQUEST_NOT_FOUND.getCode()));
     }

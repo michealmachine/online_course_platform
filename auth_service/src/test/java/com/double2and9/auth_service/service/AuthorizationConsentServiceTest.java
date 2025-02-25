@@ -149,4 +149,52 @@ class AuthorizationConsentServiceTest {
         assertThrows(AuthException.class, () -> 
             authorizationConsentService.consent(request, authentication));
     }
+    
+    // 新增测试方法：测试获取授权请求信息
+    @Test
+    void getAuthorizationRequest_Success() {
+        // 设置mock
+        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+        when(authentication.isAuthenticated()).thenReturn(true);
+        when(valueOperations.get(eq(REDIS_KEY_PREFIX + "test-auth-id"))).thenReturn(authorizationResponse);
+        when(clientRepository.findByClientId(eq("test-client"))).thenReturn(client);
+        
+        // 调用方法
+        AuthorizationResponse response = authorizationConsentService.getAuthorizationRequest("test-auth-id", authentication);
+        
+        // 验证结果
+        assertNotNull(response);
+        assertEquals("test-client", response.getClientId());
+        assertEquals("xyz", response.getState());
+        assertEquals("http://localhost:8080/callback", response.getRedirectUri());
+    }
+    
+    @Test
+    void getAuthorizationRequest_Unauthorized() {
+        when(authentication.isAuthenticated()).thenReturn(false);
+        
+        assertThrows(AuthException.class, () -> 
+            authorizationConsentService.getAuthorizationRequest("test-auth-id", authentication));
+    }
+    
+    @Test
+    void getAuthorizationRequest_NotFound() {
+        when(authentication.isAuthenticated()).thenReturn(true);
+        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+        when(valueOperations.get(anyString())).thenReturn(null);
+        
+        assertThrows(AuthException.class, () -> 
+            authorizationConsentService.getAuthorizationRequest("non-existent", authentication));
+    }
+    
+    @Test
+    void getAuthorizationRequest_ClientNotFound() {
+        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+        when(authentication.isAuthenticated()).thenReturn(true);
+        when(valueOperations.get(eq(REDIS_KEY_PREFIX + "test-auth-id"))).thenReturn(authorizationResponse);
+        when(clientRepository.findByClientId(eq("test-client"))).thenReturn(null);
+        
+        assertThrows(AuthException.class, () -> 
+            authorizationConsentService.getAuthorizationRequest("test-auth-id", authentication));
+    }
 } 

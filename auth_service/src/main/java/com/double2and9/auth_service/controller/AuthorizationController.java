@@ -29,4 +29,33 @@ public class AuthorizationController {
             Authentication authentication) {
         return authorizationService.createAuthorizationRequest(request, authentication);
     }
+    
+    @Operation(summary = "授权请求(GET)", description = "使用GET方法处理客户端的授权请求，返回授权信息供用户确认")
+    @ApiResponse(responseCode = "200", description = "成功返回授权信息")
+    @ApiResponse(responseCode = "400", description = "请求参数错误")
+    @ApiResponse(responseCode = "401", description = "用户未登录")
+    @GetMapping("/authorize")
+    @ResponseStatus(HttpStatus.OK)
+    public AuthorizationResponse authorizeGet(
+            @RequestParam("response_type") String responseType,
+            @RequestParam("client_id") String clientId,
+            @RequestParam("redirect_uri") String redirectUri,
+            @RequestParam("scope") String scope,
+            @RequestParam(value = "state", required = false) String state,
+            @RequestParam(value = "code_challenge", required = false) String codeChallenge,
+            @RequestParam(value = "code_challenge_method", required = false) String codeChallengeMethod,
+            Authentication authentication) {
+        
+        // 将查询参数转换为AuthorizationRequest对象
+        AuthorizationRequest request = new AuthorizationRequest();
+        request.setResponseType(responseType);
+        request.setClientId(clientId);
+        request.setRedirectUri(redirectUri);
+        request.setScope(scope);
+        request.setState(state);
+        request.setCodeChallenge(codeChallenge);
+        request.setCodeChallengeMethod(codeChallengeMethod);
+        
+        return authorizationService.createAuthorizationRequest(request, authentication);
+    }
 } 
