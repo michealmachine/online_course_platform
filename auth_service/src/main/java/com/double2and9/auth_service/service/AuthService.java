@@ -7,7 +7,7 @@ import com.double2and9.auth_service.entity.Role;
 import com.double2and9.auth_service.entity.User;
 import com.double2and9.auth_service.repository.RoleRepository;
 import com.double2and9.auth_service.repository.UserRepository;
-import com.double2and9.auth_service.security.JwtTokenProvider;
+import com.double2and9.auth_service.security.AuthJwtTokenProvider;
 import com.double2and9.base.enums.AuthErrorCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -37,7 +37,7 @@ public class AuthService {
     private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
     private final AuthenticationManager authenticationManager;
-    private final JwtTokenProvider tokenProvider;
+    private final AuthJwtTokenProvider tokenProvider;
 
     @Transactional
     public AuthResponse register(RegisterRequest request) {

@@ -3,7 +3,7 @@ package com.double2and9.auth_service.service;
 import com.double2and9.auth_service.dto.response.TokenIntrospectionResponse;
 import com.double2and9.auth_service.dto.response.TokenResponse;
 import com.double2and9.auth_service.exception.AuthException;
-import com.double2and9.auth_service.security.JwtTokenProvider;
+import com.double2and9.auth_service.security.AuthJwtTokenProvider;
 import com.double2and9.base.enums.AuthErrorCode;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.security.SignatureException;
@@ -21,7 +21,7 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class JwtService {
     
-    private final JwtTokenProvider jwtTokenProvider;
+    private final AuthJwtTokenProvider jwtTokenProvider;
     private final TokenBlacklistService tokenBlacklistService;
     private static final Logger log = LoggerFactory.getLogger(JwtService.class);
     

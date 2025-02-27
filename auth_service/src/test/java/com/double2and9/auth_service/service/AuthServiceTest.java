@@ -8,7 +8,7 @@ import com.double2and9.auth_service.entity.User;
 import com.double2and9.auth_service.exception.AuthException;
 import com.double2and9.auth_service.repository.RoleRepository;
 import com.double2and9.auth_service.repository.UserRepository;
-import com.double2and9.auth_service.security.JwtTokenProvider;
+import com.double2and9.auth_service.security.AuthJwtTokenProvider;
 import com.double2and9.auth_service.security.SecurityUser;
 import com.double2and9.base.enums.AuthErrorCode;
 import org.junit.jupiter.api.BeforeEach;
@@ -49,7 +49,7 @@ class AuthServiceTest {
     private AuthenticationManager authenticationManager;
     
     @Mock
-    private JwtTokenProvider tokenProvider;
+    private AuthJwtTokenProvider tokenProvider;
 
     @InjectMocks
     private AuthService authService;

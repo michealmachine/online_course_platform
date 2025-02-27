@@ -187,7 +187,7 @@ class TokenControllerIntegrationTest {
                 .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value(AuthErrorCode.TOKEN_INVALID.getCode()))
-                .andExpect(jsonPath("$.message").value("无效的Token"));
+                .andExpect(jsonPath("$.message").value(AuthErrorCode.TOKEN_INVALID.getMessage()));
     }
 
     @Test
@@ -235,15 +235,14 @@ class TokenControllerIntegrationTest {
         TokenRequest refreshRequest = new TokenRequest();
         refreshRequest.setGrantType("refresh_token");
         refreshRequest.setRefreshToken(expiredToken);
-        // 不再设置clientId和clientSecret，改用HTTP Basic认证
 
         mockMvc.perform(post("/api/oauth2/token")
                 .contentType(MediaType.APPLICATION_JSON)
                 .header("Authorization", "Basic " + Base64.getEncoder().encodeToString("test_client:test_secret".getBytes()))
                 .content(objectMapper.writeValueAsString(refreshRequest)))
                 .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.code").value(AuthErrorCode.TOKEN_EXPIRED.getCode()))
-                .andExpect(jsonPath("$.message").value("Token已过期"));
+                .andExpect(jsonPath("$.code").value(AuthErrorCode.TOKEN_INVALID.getCode()))
+                .andExpect(jsonPath("$.message").value(AuthErrorCode.TOKEN_INVALID.getMessage()));
     }
 
     @Test

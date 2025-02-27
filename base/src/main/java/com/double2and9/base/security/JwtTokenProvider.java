@@ -1,33 +1,30 @@
-package com.double2and9.auth_service.security;
+package com.double2and9.base.security;
 
-import com.double2and9.auth_service.exception.AuthException;
+import com.double2and9.base.config.JwtProperties;
 import com.double2and9.base.enums.AuthErrorCode;
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
+import io.jsonwebtoken.security.SignatureException;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.Authentication;
-import org.springframework.stereotype.Component;
 
 import java.security.Key;
 import java.util.Date;
 import java.util.Map;
 
 @Slf4j
-@Component
 public class JwtTokenProvider {
 
-    @Value("${jwt.secret}")
-    private String jwtSecret;
-
-    @Value("${jwt.expiration:86400000}")
-    private int jwtExpirationMs;
+    @Autowired
+    private JwtProperties jwtProperties;
 
     /**
      * 生成令牌
      */
     public String generateToken(Map<String, Object> claims, long expirationSeconds) {
+        log.debug("Generating token with claims: {} and expiration: {}", claims, expirationSeconds);
         Date now = new Date();
         Date expiration = new Date(now.getTime() + expirationSeconds * 1000);
 
@@ -43,7 +40,7 @@ public class JwtTokenProvider {
      * 验证令牌
      */
     public Claims validateToken(String token) {
-        log.debug("Validating token in JwtTokenProvider: {}", token);
+        log.debug("Validating token: {}", token);
         try {
             Claims claims = Jwts.parserBuilder()
                 .setSigningKey(getSigningKey())
@@ -54,16 +51,16 @@ public class JwtTokenProvider {
             return claims;
         } catch (ExpiredJwtException e) {
             log.debug("Token expired");
-            throw new AuthException(AuthErrorCode.TOKEN_EXPIRED);
+            throw new RuntimeException(AuthErrorCode.TOKEN_EXPIRED.getMessage());
         } catch (SignatureException e) {
             log.debug("Invalid token signature");
-            throw new AuthException(AuthErrorCode.TOKEN_SIGNATURE_INVALID);
+            throw new RuntimeException(AuthErrorCode.TOKEN_SIGNATURE_INVALID.getMessage());
         } catch (UnsupportedJwtException e) {
             log.debug("Unsupported token format");
-            throw new AuthException(AuthErrorCode.TOKEN_UNSUPPORTED);
+            throw new RuntimeException(AuthErrorCode.TOKEN_UNSUPPORTED.getMessage());
         } catch (Exception e) {
             log.error("Token validation failed: {}", e.getMessage(), e);
-            throw new AuthException(AuthErrorCode.TOKEN_INVALID);
+            throw new RuntimeException(AuthErrorCode.TOKEN_INVALID.getMessage());
         }
     }
 
@@ -72,7 +69,7 @@ public class JwtTokenProvider {
      */
     public Claims parseToken(String token) {
         if (token == null || token.trim().isEmpty()) {
-            throw new AuthException(AuthErrorCode.TOKEN_INVALID);
+            throw new RuntimeException(AuthErrorCode.TOKEN_INVALID.getMessage());
         }
 
         try {
@@ -82,27 +79,14 @@ public class JwtTokenProvider {
                 .parseClaimsJws(token)
                 .getBody();
         } catch (ExpiredJwtException e) {
-            throw new AuthException(AuthErrorCode.TOKEN_EXPIRED);
+            throw new RuntimeException(AuthErrorCode.TOKEN_EXPIRED.getMessage());
         } catch (SignatureException e) {
-            throw new AuthException(AuthErrorCode.TOKEN_SIGNATURE_INVALID);
+            throw new RuntimeException(AuthErrorCode.TOKEN_SIGNATURE_INVALID.getMessage());
         } catch (UnsupportedJwtException e) {
-            throw new AuthException(AuthErrorCode.TOKEN_UNSUPPORTED);
+            throw new RuntimeException(AuthErrorCode.TOKEN_UNSUPPORTED.getMessage());
         } catch (Exception e) {
-            throw new AuthException(AuthErrorCode.TOKEN_INVALID);
+            throw new RuntimeException(AuthErrorCode.TOKEN_INVALID.getMessage());
         }
-    }
-
-    private Key getSigningKey() {
-        byte[] keyBytes = Decoders.BASE64URL.decode(jwtSecret);
-        return Keys.hmacShaKeyFor(keyBytes);
-    }
-
-    /**
-     * 生成用户认证令牌
-     */
-    public String generateToken(Authentication authentication) {
-        SecurityUser userPrincipal = (SecurityUser) authentication.getPrincipal();
-        return generateToken(Map.of("sub", userPrincipal.getUsername()), jwtExpirationMs / 1000L);
     }
 
     /**
@@ -114,13 +98,35 @@ public class JwtTokenProvider {
     }
 
     /**
+     * 生成用户认证令牌
+     */
+    public String generateToken(Authentication authentication) {
+        throw new UnsupportedOperationException("This method should be implemented by subclasses");
+    }
+
+    /**
+     * 获取签名密钥
+     */
+    protected Key getSigningKey() {
+        byte[] keyBytes = Decoders.BASE64URL.decode(jwtProperties.getSecret());
+        return Keys.hmacShaKeyFor(keyBytes);
+    }
+
+    /**
+     * 获取JWT配置
+     */
+    protected JwtProperties getJwtProperties() {
+        return jwtProperties;
+    }
+
+    /**
      * 验证令牌是否有效（不抛出异常）
      */
     public boolean isTokenValid(String token) {
         try {
             validateToken(token);
             return true;
-        } catch (AuthException e) {
+        } catch (RuntimeException e) {
             return false;
         }
     }
