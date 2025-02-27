@@ -6,8 +6,8 @@ import io.jsonwebtoken.*;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
 import io.jsonwebtoken.security.SignatureException;
+import io.jsonwebtoken.security.WeakKeyException;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.Authentication;
 
 import java.security.Key;
@@ -17,8 +17,35 @@ import java.util.Map;
 @Slf4j
 public class JwtTokenProvider {
 
-    @Autowired
-    private JwtProperties jwtProperties;
+    private final JwtProperties jwtProperties;
+    private final Key signingKey;
+
+    public JwtTokenProvider(JwtProperties jwtProperties) {
+        this.jwtProperties = jwtProperties;
+        this.signingKey = initializeSigningKey();
+    }
+
+    private Key initializeSigningKey() {
+        try {
+            String secret = jwtProperties.getSecret();
+            if (secret == null || secret.trim().isEmpty()) {
+                log.info("No JWT secret configured, generating a secure key");
+                return Keys.secretKeyFor(SignatureAlgorithm.HS512);
+            }
+
+            byte[] keyBytes = Decoders.BASE64URL.decode(secret);
+            Key key = Keys.hmacShaKeyFor(keyBytes);
+            // 验证密钥是否足够安全
+            SignatureAlgorithm.HS512.assertValidSigningKey(key);
+            return key;
+        } catch (WeakKeyException e) {
+            log.warn("Configured JWT secret key is not secure enough for HS512, generating a secure key");
+            return Keys.secretKeyFor(SignatureAlgorithm.HS512);
+        } catch (Exception e) {
+            log.error("Error initializing JWT signing key, falling back to generating a secure key", e);
+            return Keys.secretKeyFor(SignatureAlgorithm.HS512);
+        }
+    }
 
     /**
      * 生成令牌
@@ -32,7 +59,7 @@ public class JwtTokenProvider {
                 .setClaims(claims)
                 .setIssuedAt(now)
                 .setExpiration(expiration)
-                .signWith(getSigningKey(), SignatureAlgorithm.HS512)
+                .signWith(signingKey, SignatureAlgorithm.HS512)
                 .compact();
     }
 
@@ -43,7 +70,7 @@ public class JwtTokenProvider {
         log.debug("Validating token: {}", token);
         try {
             Claims claims = Jwts.parserBuilder()
-                .setSigningKey(getSigningKey())
+                .setSigningKey(signingKey)
                 .build()
                 .parseClaimsJws(token)
                 .getBody();
@@ -74,7 +101,7 @@ public class JwtTokenProvider {
 
         try {
             return Jwts.parserBuilder()
-                .setSigningKey(getSigningKey())
+                .setSigningKey(signingKey)
                 .build()
                 .parseClaimsJws(token)
                 .getBody();
@@ -108,8 +135,7 @@ public class JwtTokenProvider {
      * 获取签名密钥
      */
     protected Key getSigningKey() {
-        byte[] keyBytes = Decoders.BASE64URL.decode(jwtProperties.getSecret());
-        return Keys.hmacShaKeyFor(keyBytes);
+        return signingKey;
     }
 
     /**
@@ -130,4 +156,4 @@ public class JwtTokenProvider {
             return false;
         }
     }
-} 
+}

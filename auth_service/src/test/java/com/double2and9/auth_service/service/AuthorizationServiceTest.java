@@ -176,4 +176,69 @@ class AuthorizationServiceTest {
         
         assertEquals(AuthErrorCode.INVALID_CODE_CHALLENGE_METHOD, exception.getErrorCode());
     }
+
+    @Test
+    void createAuthorizationRequest_WithOpenIdScope_Success() {
+        // 准备测试数据
+        request.setScope("openid profile email");
+        request.setCodeChallenge("E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM");
+        request.setCodeChallengeMethod("S256");
+
+        RegisteredClient oidcClient = RegisteredClient.withId("1")
+                .clientId("test-client")
+                .clientName("Test Client")
+                .clientIdIssuedAt(Instant.now())
+                .redirectUri("http://localhost:8080/callback")
+                .scope("openid")
+                .scope("profile")
+                .scope("email")
+                .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
+                .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
+                .build();
+
+        when(authentication.isAuthenticated()).thenReturn(true);
+        when(clientRepository.findByClientId("test-client")).thenReturn(oidcClient);
+
+        // 执行测试
+        AuthorizationResponse response = authorizationService.createAuthorizationRequest(request, authentication);
+
+        // 验证结果
+        assertNotNull(response);
+        assertEquals("test-client", response.getClientId());
+        assertEquals("Test Client", response.getClientName());
+        assertTrue(response.getRequestedScopes().containsAll(Set.of("openid", "profile", "email")));
+        assertEquals("xyz", response.getState());
+        assertNotNull(response.getAuthorizationId());
+        assertEquals("E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM", response.getCodeChallenge());
+        assertEquals("S256", response.getCodeChallengeMethod());
+    }
+
+    @Test
+    void createAuthorizationRequest_WithInvalidOpenIdScope_ThrowsException() {
+        // 准备测试数据
+        request.setScope("openid profile email");
+        request.setCodeChallenge("E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM");
+        request.setCodeChallengeMethod("S256");
+
+        // 创建一个不支持openid scope的客户端
+        RegisteredClient client = RegisteredClient.withId("1")
+                .clientId("test-client")
+                .clientName("Test Client")
+                .clientIdIssuedAt(Instant.now())
+                .redirectUri("http://localhost:8080/callback")
+                .scope("profile")
+                .scope("email")
+                .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
+                .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
+                .build();
+
+        when(authentication.isAuthenticated()).thenReturn(true);
+        when(clientRepository.findByClientId(eq("test-client"))).thenReturn(client);
+
+        // 执行测试并验证异常
+        AuthException exception = assertThrows(AuthException.class, () ->
+            authorizationService.createAuthorizationRequest(request, authentication));
+
+        assertEquals(AuthErrorCode.CLIENT_SCOPE_INVALID, exception.getErrorCode());
+    }
 } 

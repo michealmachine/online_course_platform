@@ -9,22 +9,34 @@ import com.double2and9.auth_service.repository.AuthorizationCodeRepository;
 import com.double2and9.auth_service.exception.AuthException;
 import com.double2and9.base.enums.AuthErrorCode;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.oauth2.core.AuthorizationGrantType;
+import org.springframework.security.oauth2.server.authorization.OAuth2Authorization;
+import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationCode;
+import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationConsent;
+import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationConsentService;
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationService;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
+import org.springframework.security.oauth2.server.authorization.token.DefaultOAuth2TokenContext;
+import org.springframework.security.oauth2.server.authorization.token.OAuth2TokenContext;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.double2and9.auth_service.utils.JsonUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import java.security.Principal;
 import java.security.SecureRandom;
+import java.time.Instant;
 import java.util.Base64;
 import java.util.concurrent.TimeUnit;
 import java.util.UUID;
 import java.time.LocalDateTime;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class AuthorizationConsentService {
@@ -34,6 +46,8 @@ public class AuthorizationConsentService {
     private final RedisTemplate<String, Object> redisTemplate;
     private final AuthorizationCodeService authorizationCodeService;
     private final AuthorizationCodeRepository authorizationCodeRepository;
+    private final OAuth2AuthorizationConsentService authorizationConsentService;
+    private final OAuth2AuthorizationService authorizationService;
     
     private static final String REDIS_KEY_PREFIX = "oauth2:auth:request:";
     private static final long AUTHORIZATION_REQUEST_TIMEOUT = 10; // 10分钟过期
@@ -136,34 +150,56 @@ public class AuthorizationConsentService {
         return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
     }
 
+    @Transactional
     public String consent(ConsentRequest request) {
         try {
             // 验证客户端
-            RegisteredClient client = clientRepository.findByClientId(request.getClientId());
-            if (client == null) {
-                throw new AuthException(AuthErrorCode.INVALID_CLIENT_CREDENTIALS);
+            RegisteredClient registeredClient = clientRepository.findByClientId(request.getClientId());
+            if (registeredClient == null) {
+                throw new AuthException(AuthErrorCode.CLIENT_NOT_FOUND);
             }
 
-            // 生成授权码前的验证
-            if (request.getUserId() == null || request.getScope() == null) {
-                throw new AuthException(AuthErrorCode.PARAMETER_VALIDATION_FAILED);
+            // 创建授权同意
+            OAuth2AuthorizationConsent.Builder consentBuilder = OAuth2AuthorizationConsent.withId(
+                request.getClientId(),
+                request.getUserId()
+            );
+            
+            // 添加授权范围
+            for (String scope : request.getScopes()) {
+                consentBuilder.scope(scope);
             }
+
+            // 保存授权同意
+            OAuth2AuthorizationConsent consent = consentBuilder.build();
+            authorizationConsentService.save(consent);
+
+            // 创建授权
+            OAuth2Authorization.Builder authorizationBuilder = OAuth2Authorization.withRegisteredClient(registeredClient)
+                .principalName(request.getUserId())
+                .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE);
+
+            // 设置授权范围
+            authorizationBuilder.authorizedScopes(request.getScopes());
 
             // 生成授权码
-            AuthorizationCode authCode = new AuthorizationCode();
-            authCode.setCode(generateAuthorizationCode());  // 使用已存在的方法
-            authCode.setClientId(request.getClientId());
-            authCode.setUserId(request.getUserId());
-            authCode.setRedirectUri(request.getRedirectUri());
-            authCode.setScope(request.getScope());
-            authCode.setExpiresAt(LocalDateTime.now().plusMinutes(10));
-            authCode.setUsed(false);
-            
-            authorizationCodeRepository.save(authCode);
-            
-            return authCode.getCode();
+            String code = authorizationCodeService.createAuthorizationCode(
+                request.getClientId(),
+                request.getUserId(),
+                request.getRedirectUri(),
+                String.join(" ", request.getScopes()),
+                null,
+                null
+            );
+
+            // 保存授权信息
+            OAuth2Authorization authorization = authorizationBuilder.build();
+            authorizationService.save(authorization);
+
+            return code;
         } catch (Exception e) {
-            throw new AuthException(AuthErrorCode.AUTHORIZATION_CODE_GENERATE_ERROR);
+            log.error("Failed to generate authorization code", e);
+            throw new AuthException(AuthErrorCode.AUTHORIZATION_CODE_GENERATION_FAILED);
         }
     }
 } 

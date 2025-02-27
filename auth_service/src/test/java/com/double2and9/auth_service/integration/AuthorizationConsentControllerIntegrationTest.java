@@ -170,4 +170,80 @@ class AuthorizationConsentControllerIntegrationTest {
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value(AuthErrorCode.AUTHORIZATION_REQUEST_NOT_FOUND.getCode()));
     }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void consent_WithOpenIdScope_Success() throws Exception {
+        // 更新客户端配置以支持OIDC
+        clientRequest.setScopes(Set.of("openid", "profile", "email"));
+        mockMvc.perform(post("/api/clients")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(clientRequest)))
+                .andExpect(status().isCreated());
+
+        // 更新授权请求以包含OIDC scope
+        authRequest.setScope("openid profile email");
+        authRequest.setCodeChallenge("E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM");
+        authRequest.setCodeChallengeMethod("S256");
+
+        // 获取授权ID
+        MvcResult result = mockMvc.perform(post("/api/oauth2/authorize")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(authRequest)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.authorizationId").exists())
+                .andReturn();
+
+        var responseObj = objectMapper.readTree(result.getResponse().getContentAsString());
+        String authorizationId = responseObj.get("authorizationId").asText();
+
+        // 准备同意请求
+        consentRequest.setAuthorizationId(authorizationId);
+        consentRequest.setApprovedScopes(Set.of("openid", "profile", "email"));
+
+        // 确认授权
+        mockMvc.perform(post("/api/oauth2/consent")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(consentRequest)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.authorizationCode").exists())
+                .andExpect(jsonPath("$.state").value("xyz"))
+                .andExpect(jsonPath("$.redirectUri").value("http://localhost:8080/callback"));
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void getConsentPage_WithOpenIdScope_Success() throws Exception {
+        // 更新客户端配置以支持OIDC
+        clientRequest.setScopes(Set.of("openid", "profile", "email"));
+        mockMvc.perform(post("/api/clients")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(clientRequest)))
+                .andExpect(status().isCreated());
+
+        // 更新授权请求以包含OIDC scope
+        authRequest.setScope("openid profile email");
+        authRequest.setCodeChallenge("E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM");
+        authRequest.setCodeChallengeMethod("S256");
+
+        // 发起授权请求以获取授权ID
+        MvcResult result = mockMvc.perform(post("/api/oauth2/authorize")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(authRequest)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.authorizationId").exists())
+                .andReturn();
+
+        var responseObj = objectMapper.readTree(result.getResponse().getContentAsString());
+        String authId = responseObj.get("authorizationId").asText();
+
+        // 测试获取同意页面
+        mockMvc.perform(get("/api/oauth2/consent")
+                .param("authorization_id", authId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.clientId").value(authRequest.getClientId()))
+                .andExpect(jsonPath("$.clientName").value(clientRequest.getClientName()))
+                .andExpect(jsonPath("$.requestedScopes", containsInAnyOrder("openid", "profile", "email")))
+                .andExpect(jsonPath("$.authorizationId").value(authId));
+    }
 } 

@@ -8,6 +8,8 @@ import java.util.Set;
 
 @Data
 public class UpdateClientRequest {
+    private String clientId;  // 添加clientId字段
+    
     @NotBlank(message = "客户端名称不能为空")
     private String clientName;
     

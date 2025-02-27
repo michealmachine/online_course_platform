@@ -232,4 +232,55 @@ class AuthorizationControllerIntegrationTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value(AuthErrorCode.PKCE_REQUIRED.getCode()));
     }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void authorize_WithOpenIdScope_Success() throws Exception {
+        // 先创建客户端
+        clientRequest.setScopes(Set.of("openid", "profile", "email"));
+        mockMvc.perform(post("/api/clients")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(clientRequest)))
+                .andExpect(status().isCreated());
+
+        // 设置PKCE参数和openid scope
+        authRequest.setScope("openid profile email");
+        authRequest.setCodeChallenge("E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM");
+        authRequest.setCodeChallengeMethod("S256");
+
+        // 测试授权请求
+        mockMvc.perform(post("/api/oauth2/authorize")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(authRequest)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.clientId").value(authRequest.getClientId()))
+                .andExpect(jsonPath("$.clientName").value(clientRequest.getClientName()))
+                .andExpect(jsonPath("$.requestedScopes", containsInAnyOrder("openid", "profile", "email")))
+                .andExpect(jsonPath("$.state").value(authRequest.getState()))
+                .andExpect(jsonPath("$.authorizationId").isNotEmpty())
+                .andExpect(jsonPath("$.codeChallenge").value(authRequest.getCodeChallenge()))
+                .andExpect(jsonPath("$.codeChallengeMethod").value(authRequest.getCodeChallengeMethod()));
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void authorize_WithInvalidOpenIdScope_Fails() throws Exception {
+        // 先创建客户端，但不包含openid scope
+        clientRequest.setScopes(Set.of("profile", "email"));
+        mockMvc.perform(post("/api/clients")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(clientRequest)))
+                .andExpect(status().isCreated());
+
+        // 尝试请求openid scope
+        authRequest.setScope("openid profile email");
+        authRequest.setCodeChallenge("E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM");
+        authRequest.setCodeChallengeMethod("S256");
+
+        mockMvc.perform(post("/api/oauth2/authorize")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(authRequest)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(AuthErrorCode.CLIENT_SCOPE_INVALID.getCode()));
+    }
 } 

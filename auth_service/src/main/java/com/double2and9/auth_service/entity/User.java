@@ -2,6 +2,7 @@ package com.double2and9.auth_service.entity;
 
 import jakarta.persistence.*;
 import lombok.Data;
+import lombok.Getter;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
@@ -28,6 +29,7 @@ public class User {
 
     private boolean enabled = true;
 
+    @Getter
     @ManyToMany(fetch = FetchType.EAGER)
     @JoinTable(
         name = "user_roles",
@@ -66,11 +68,52 @@ public class User {
     @Column(name = "last_login_ip", length = 50)
     private String lastLoginIp;
 
-    public Set<Role> getRoles() {
-        return roles;
-    }
+    @Column(name = "organization_id")
+    private Long organizationId;
+
+    @Column(name = "given_name")
+    private String givenName;
+
+    @Column(name = "family_name")
+    private String familyName;
+
+    @Column(name = "middle_name")
+    private String middleName;
+
+    @Column(name = "preferred_username")
+    private String preferredUsername;
+
+    @Column(name = "profile")
+    private String profile;
+
+    @Column(name = "website")
+    private String website;
+
+    @Column(name = "gender")
+    private String gender;
+
+    @Column(name = "birthdate")
+    private String birthdate;
+
+    @Column(name = "zoneinfo")
+    private String zoneinfo;
+
+    @Column(name = "locale")
+    private String locale;
+
+    @Column(name = "email_verified")
+    private Boolean emailVerified = false;
+
+    @Column(name = "phone_verified")
+    private Boolean phoneVerified = false;
 
     public void setRoles(Set<Role> roles) {
         this.roles = roles != null ? new HashSet<>(roles) : new HashSet<>();
+    }
+
+    @Transient
+    public boolean isOrganizationUser() {
+        return roles.stream()
+                .anyMatch(role -> role.getName().equals("ROLE_ORGANIZATION"));
     }
 } 

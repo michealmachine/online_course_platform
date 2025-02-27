@@ -196,6 +196,79 @@ class UserControllerIntegrationTest {
                 .andExpect(jsonPath("$.code").value(AuthErrorCode.INVALID_ROLE.getCode()));
     }
 
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void createUser_WithOidcInfo_Success() throws Exception {
+        CreateUserRequest request = new CreateUserRequest();
+        request.setUsername("oidcuser");
+        request.setPassword("password123");
+        request.setEmail("oidc@example.com");
+        request.setRoles(Set.of("ROLE_USER"));
+        request.setNickname("OIDC User");
+        request.setPhone("13800138000");
+        
+        // 添加OIDC相关信息
+        request.setGivenName("John");
+        request.setFamilyName("Doe");
+        request.setMiddleName("M");
+        request.setPreferredUsername("johndoe");
+        request.setProfile("http://example.com/johndoe");
+        request.setWebsite("http://johndoe.com");
+        request.setGender("male");
+        request.setBirthdate("1990-01-01");
+        request.setZoneinfo("Asia/Shanghai");
+        request.setLocale("zh-CN");
+
+        mockMvc.perform(post("/api/users")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.username").value("oidcuser"))
+                .andExpect(jsonPath("$.email").value("oidc@example.com"))
+                .andExpect(jsonPath("$.givenName").value("John"))
+                .andExpect(jsonPath("$.familyName").value("Doe"))
+                .andExpect(jsonPath("$.middleName").value("M"))
+                .andExpect(jsonPath("$.preferredUsername").value("johndoe"))
+                .andExpect(jsonPath("$.gender").value("male"))
+                .andExpect(jsonPath("$.birthdate").value("1990-01-01"))
+                .andExpect(jsonPath("$.zoneinfo").value("Asia/Shanghai"))
+                .andExpect(jsonPath("$.locale").value("zh-CN"));
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void updateUser_WithOidcInfo_Success() throws Exception {
+        // 先创建一个用户
+        User user = createTestUser("updateoidc", "ROLE_USER");
+
+        UpdateUserRequest request = new UpdateUserRequest();
+        request.setNickname("Updated OIDC User");
+        request.setPhone("13900139000");
+        request.setGivenName("Jane");
+        request.setFamilyName("Smith");
+        request.setMiddleName("A");
+        request.setPreferredUsername("janesmith");
+        request.setGender("female");
+        request.setBirthdate("1992-02-02");
+        request.setZoneinfo("America/New_York");
+        request.setLocale("en-US");
+
+        mockMvc.perform(put("/api/users/{id}", user.getId())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.nickname").value("Updated OIDC User"))
+                .andExpect(jsonPath("$.phone").value("13900139000"))
+                .andExpect(jsonPath("$.givenName").value("Jane"))
+                .andExpect(jsonPath("$.familyName").value("Smith"))
+                .andExpect(jsonPath("$.middleName").value("A"))
+                .andExpect(jsonPath("$.preferredUsername").value("janesmith"))
+                .andExpect(jsonPath("$.gender").value("female"))
+                .andExpect(jsonPath("$.birthdate").value("1992-02-02"))
+                .andExpect(jsonPath("$.zoneinfo").value("America/New_York"))
+                .andExpect(jsonPath("$.locale").value("en-US"));
+    }
+
     private User createTestUser(String username, String roleName) {
         Role role = roleRepository.findByName(roleName)
                 .orElseGet(() -> {

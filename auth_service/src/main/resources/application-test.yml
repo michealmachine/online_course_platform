@@ -47,3 +47,48 @@ spring:
 jwt:
   secret: ZDY1NmE3ZjI0ODdiNGZkZWJmZjk5MjExYjU4MzRlMzE2NzIwZWM0MjJmNmFlOWY5NzM2ZmRkMGM5NTYzYzE3YQ
   expiration: 86400000  # 24 hours
+
+oidc:
+  issuer: http://localhost:8084
+  authorization-endpoint: /oauth2/authorize
+  token-endpoint: /oauth2/token
+  userinfo-endpoint: /oauth2/userinfo
+  jwks-uri: /oauth2/jwks
+  end-session-endpoint: /oauth2/logout
+  scopes-supported:
+    - openid
+    - profile
+    - email
+    - phone
+    - address
+  response-types-supported:
+    - code
+  subject-types-supported:
+    - public
+  id-token-signing-alg-values-supported:
+    - RS256
+  claims-supported:
+    - sub
+    - iss
+    - aud
+    - exp
+    - iat
+    - name
+    - family_name
+    - given_name
+    - middle_name
+    - nickname
+    - preferred_username
+    - profile
+    - picture
+    - website
+    - gender
+    - birthdate
+    - zoneinfo
+    - locale
+    - updated_at
+    - email
+    - email_verified
+    - phone_number
+    - phone_number_verified
+    - organization_id

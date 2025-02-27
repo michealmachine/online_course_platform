@@ -80,6 +80,7 @@ public enum AuthErrorCode {
     AUTHORIZATION_REQUEST_NOT_FOUND(300801, "授权请求不存在或已过期"),
     INVALID_APPROVED_SCOPES(300802, "无效的授权范围"),
     AUTHORIZATION_CODE_GENERATE_ERROR(300803, "授权码生成失败"),
+    AUTHORIZATION_CODE_GENERATION_FAILED(300804, "授权码生成失败"),
 
     // 授权码相关错误码 3009xx
     INVALID_AUTHORIZATION_CODE(300901, "无效的授权码"),
@@ -95,7 +96,6 @@ public enum AuthErrorCode {
     // PKCE 相关错误码
     INVALID_CODE_CHALLENGE(301102, "无效的 code_challenge"),
     CODE_VERIFIER_MISMATCH(301105, "code_verifier 不匹配"),
-
 
     INVALID_CODE(301003, "无效的授权码"); // 添加这个
 

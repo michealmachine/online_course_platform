@@ -194,4 +194,60 @@ class ClientControllerIntegrationTest {
                 .andExpect(jsonPath("$.page").value(1))
                 .andExpect(jsonPath("$.pageSize").value(10));
     }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void createClient_WithOidcScopes_Success() throws Exception {
+        CreateClientRequest request = new CreateClientRequest();
+        request.setClientId("oidc-client");
+        request.setClientSecret("secret");
+        request.setClientName("OIDC Test Client");
+        request.setAuthenticationMethods(Set.of("client_secret_basic"));
+        request.setAuthorizationGrantTypes(Set.of("authorization_code", "refresh_token"));
+        request.setRedirectUris(Set.of("http://localhost:8080/callback"));
+        request.setScopes(Set.of("openid", "profile", "email", "phone", "address"));
+
+        mockMvc.perform(post("/api/clients")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.clientId").value("oidc-client"))
+                .andExpect(jsonPath("$.clientName").value("OIDC Test Client"))
+                .andExpect(jsonPath("$.scopes", hasSize(5)))
+                .andExpect(jsonPath("$.scopes", hasItems("openid", "profile", "email", "phone", "address")));
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void updateClient_WithOidcScopes_Success() throws Exception {
+        // 先创建一个客户端
+        CreateClientRequest createRequest = new CreateClientRequest();
+        createRequest.setClientId("update-oidc-client");
+        createRequest.setClientSecret("secret");
+        createRequest.setClientName("Original OIDC Client");
+        createRequest.setAuthenticationMethods(Set.of("client_secret_basic"));
+        createRequest.setAuthorizationGrantTypes(Set.of("authorization_code"));
+        createRequest.setRedirectUris(Set.of("http://localhost:8080/callback"));
+        createRequest.setScopes(Set.of("openid", "profile"));
+
+        mockMvc.perform(post("/api/clients")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(createRequest)))
+                .andExpect(status().isCreated());
+
+        // 更新客户端
+        UpdateClientRequest updateRequest = new UpdateClientRequest();
+        updateRequest.setClientName("Updated OIDC Client");
+        updateRequest.setAuthenticationMethods(Set.of("client_secret_basic"));
+        updateRequest.setAuthorizationGrantTypes(Set.of("authorization_code", "refresh_token"));
+        updateRequest.setScopes(Set.of("openid", "profile", "email", "phone"));
+
+        mockMvc.perform(put("/api/clients/{clientId}", "update-oidc-client")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(updateRequest)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.clientName").value("Updated OIDC Client"))
+                .andExpect(jsonPath("$.scopes", hasSize(4)))
+                .andExpect(jsonPath("$.scopes", hasItems("openid", "profile", "email", "phone")));
+    }
 } 

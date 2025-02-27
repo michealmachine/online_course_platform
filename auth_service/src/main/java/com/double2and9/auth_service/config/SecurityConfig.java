@@ -50,22 +50,40 @@ public class SecurityConfig {
     }
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         return http
                 .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
+                    // Swagger UI 和 OpenAPI 相关路径
+                    .requestMatchers(
+                        "/swagger-ui.html",
+                        "/swagger-ui/**",
+                        "/swagger-resources",
+                        "/swagger-resources/**",
+                        "/v3/api-docs",
+                        "/v3/api-docs/**",
+                        "/v3/api-docs.yaml",
+                        "/webjars/**",
+                        "/doc.html"
+                    ).permitAll()
+                    // OpenID Connect 发现端点
+                    .requestMatchers(
+                        "/.well-known/openid-configuration",
+                        "/.well-known/jwks.json",
+                        "/oauth2/.well-known/openid-configuration",
+                        "/oauth2/.well-known/jwks.json"
+                    ).permitAll()
+                    // 认证相关端点
                     .requestMatchers(
                         "/api/auth/register",
                         "/api/auth/login",
                         "/api/oauth2/token",
                         "/api/oauth2/revoke",
-                        "/api/oauth2/introspect",
-                        "/swagger-ui/**",
-                        "/swagger-ui.html",
-                        "/swagger-resources/**",
-                        "/v3/api-docs/**",
-                        "/webjars/**"
+                        "/api/oauth2/introspect"
                     ).permitAll()
+                    // UserInfo 端点需要认证
+                    .requestMatchers("/oauth2/userinfo").authenticated()
+                    // 其他请求需要认证
                     .anyRequest().authenticated()
                 )
                 .sessionManagement(session -> session
@@ -75,12 +93,12 @@ public class SecurityConfig {
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
                 .exceptionHandling(ex -> ex
                     .authenticationEntryPoint((request, response, authException) -> {
-                        response.setContentType("application/json;charset=UTF-8");
+                        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
                         response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                         response.getWriter().write("{\"code\":300402,\"message\":\"未授权访问\"}");
                     })
                     .accessDeniedHandler((request, response, accessDeniedException) -> {
-                        response.setContentType("application/json;charset=UTF-8");
+                        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
                         response.setStatus(HttpServletResponse.SC_FORBIDDEN);
                         response.getWriter().write("{\"code\":300202,\"message\":\"没有操作权限\"}");
                     })

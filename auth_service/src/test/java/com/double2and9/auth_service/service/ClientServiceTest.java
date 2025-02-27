@@ -184,4 +184,77 @@ class ClientServiceTest {
         assertEquals(1L, result.getPage());
         assertEquals(10L, result.getPageSize());
     }
+
+    @Test
+    void createClient_WithOidcScopes_Success() {
+        // 准备测试数据
+        CreateClientRequest request = new CreateClientRequest();
+        request.setClientId("oidc-client");
+        request.setClientSecret("secret");
+        request.setClientName("OIDC Test Client");
+        request.setAuthenticationMethods(Set.of("client_secret_basic"));
+        request.setAuthorizationGrantTypes(Set.of("authorization_code", "refresh_token"));
+        request.setRedirectUris(Set.of("http://localhost:8080/callback"));
+        request.setScopes(Set.of("openid", "profile", "email", "phone", "address"));
+
+        doReturn(null).when(clientRepository).findByClientId(request.getClientId());
+        when(passwordEncoder.encode(any())).thenReturn("encoded-secret");
+        
+        // 使用 doAnswer 来模拟 void 方法
+        doAnswer(invocation -> {
+            RegisteredClient client = invocation.getArgument(0);
+            return null;
+        }).when(clientRepository).save(any(RegisteredClient.class));
+        
+        // 执行测试
+        ClientResponse response = clientService.createClient(request);
+        
+        // 验证结果
+        assertNotNull(response);
+        assertEquals("oidc-client", response.getClientId());
+        assertEquals("OIDC Test Client", response.getClientName());
+        assertTrue(response.getScopes().containsAll(Set.of("openid", "profile", "email", "phone", "address")));
+        assertEquals(5, response.getScopes().size());
+    }
+
+    @Test
+    void updateClient_WithOidcScopes_Success() {
+        // 准备测试数据
+        UpdateClientRequest request = new UpdateClientRequest();
+        request.setClientName("Test Client");
+        request.setClientSecret("secret");
+        request.setRedirectUris(Set.of("http://localhost:8080/callback"));
+        request.setScopes(Set.of("openid", "profile"));
+        request.setAuthorizationGrantTypes(Set.of("authorization_code", "refresh_token"));
+        request.setAuthenticationMethods(Set.of("client_secret_basic"));
+        
+        RegisteredClient existingClient = RegisteredClient.withId("1")
+            .clientId("test-client")
+            .clientSecret("old-secret")
+            .clientName("Old Client")
+            .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
+            .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
+            .authorizationGrantType(AuthorizationGrantType.REFRESH_TOKEN)
+            .redirectUri("http://localhost:8080/old-callback")
+            .scope("old-scope")
+            .build();
+
+        when(clientRepository.findByClientId("test-client")).thenReturn(existingClient);
+        doNothing().when(clientRepository).save(any(RegisteredClient.class));
+
+        // 执行测试
+        ClientResponse response = clientService.updateClient("test-client", request);
+
+        // 验证结果
+        assertNotNull(response);
+        assertEquals("test-client", response.getClientId());
+        assertEquals(request.getClientName(), response.getClientName());
+        assertTrue(response.getScopes().containsAll(request.getScopes()));
+        assertTrue(response.getRedirectUris().containsAll(request.getRedirectUris()));
+        assertTrue(response.getAuthenticationMethods().contains("client_secret_basic"));
+        assertTrue(response.getAuthorizationGrantTypes().containsAll(Set.of("authorization_code", "refresh_token")));
+
+        // 验证save方法被调用
+        verify(clientRepository).save(any(RegisteredClient.class));
+    }
 } 

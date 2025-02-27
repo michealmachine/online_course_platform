@@ -22,6 +22,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.junit.jupiter.api.AfterEach;
 import org.mockito.MockitoAnnotations;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationConsentService;
 
 import java.time.Instant;
 import java.util.Set;
@@ -37,9 +38,6 @@ class AuthorizationConsentServiceTest {
 
     @Mock
     private RegisteredClientRepository clientRepository;
-
-    @Mock
-    private OAuth2AuthorizationService oauth2AuthorizationService;
 
     @Mock
     private RedisTemplate<String, Object> redisTemplate;
@@ -62,6 +60,9 @@ class AuthorizationConsentServiceTest {
 
     @BeforeEach
     void setUp() {
+        // 设置Redis mock
+        lenient().when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+
         // 设置请求数据
         request = new AuthorizationConsentRequest();
         request.setAuthorizationId("test-auth-id");
@@ -73,6 +74,7 @@ class AuthorizationConsentServiceTest {
         authorizationResponse.setClientId("test-client");
         authorizationResponse.setState("xyz");
         authorizationResponse.setRedirectUri("http://localhost:8080/callback");
+        authorizationResponse.setRequestedScopes(approvedScopes);
 
         // 设置客户端
         client = RegisteredClient.withId("1")
@@ -87,36 +89,114 @@ class AuthorizationConsentServiceTest {
                 .build();
     }
 
-    @AfterEach
-    void tearDown() {
-        // 清理 Redis 数据
-        redisTemplate.delete(REDIS_KEY_PREFIX + "test-auth-id");
-    }
-
     @Test
     void consent_Success() {
         // 设置所有需要的 mock
-        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
         when(authentication.isAuthenticated()).thenReturn(true);
         when(valueOperations.get(eq(REDIS_KEY_PREFIX + "test-auth-id"))).thenReturn(authorizationResponse);
         when(clientRepository.findByClientId(eq("test-client"))).thenReturn(client);
         when(authentication.getName()).thenReturn("testUser");
 
+        // 确保scope字符串的格式正确
+        String expectedScope = String.join(" ", request.getApprovedScopes());
+        System.out.println("Expected scope: " + expectedScope);
+        System.out.println("Client scopes: " + client.getScopes());
+        System.out.println("Request approved scopes: " + request.getApprovedScopes());
+        System.out.println("Authorization response scopes: " + authorizationResponse.getRequestedScopes());
+
         when(authorizationCodeService.createAuthorizationCode(
             eq("test-client"),
             eq("testUser"),
             eq("http://localhost:8080/callback"),
-            anyString(),
+            eq(expectedScope),
             isNull(),
             isNull()
         )).thenReturn("test-code");
 
+        // 执行测试
         var response = authorizationConsentService.consent(request, authentication);
 
+        // 验证结果
         assertNotNull(response);
         assertEquals("test-code", response.getAuthorizationCode());
         assertEquals("xyz", response.getState());
         assertEquals("http://localhost:8080/callback", response.getRedirectUri());
+
+        // 验证方法调用
+        verify(redisTemplate).delete(REDIS_KEY_PREFIX + request.getAuthorizationId());
+        verify(authorizationCodeService).createAuthorizationCode(
+            eq("test-client"),
+            eq("testUser"),
+            eq("http://localhost:8080/callback"),
+            eq(expectedScope),
+            isNull(),
+            isNull()
+        );
+    }
+
+    @Test
+    void consent_WithOpenIdScope_Success() {
+        // 准备带有OIDC scope的授权响应
+        Set<String> oidcScopes = Set.of("openid", "profile", "email");
+        AuthorizationResponse oidcAuthResponse = new AuthorizationResponse();
+        oidcAuthResponse.setClientId("test-client");
+        oidcAuthResponse.setState("xyz");
+        oidcAuthResponse.setRedirectUri("http://localhost:8080/callback");
+        oidcAuthResponse.setRequestedScopes(oidcScopes);
+
+        // 准备支持OIDC的客户端
+        RegisteredClient oidcClient = RegisteredClient.withId("1")
+                .clientId("test-client")
+                .clientName("Test OIDC Client")
+                .clientIdIssuedAt(Instant.now())
+                .redirectUri("http://localhost:8080/callback")
+                .scope("openid")
+                .scope("profile")
+                .scope("email")
+                .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
+                .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
+                .build();
+
+        // 设置mock
+        when(authentication.isAuthenticated()).thenReturn(true);
+        when(valueOperations.get(eq(REDIS_KEY_PREFIX + "test-auth-id"))).thenReturn(oidcAuthResponse);
+        when(clientRepository.findByClientId(eq("test-client"))).thenReturn(oidcClient);
+        when(authentication.getName()).thenReturn("testUser");
+
+        // 设置授权码生成的mock
+        String expectedScope = String.join(" ", oidcScopes);
+        when(authorizationCodeService.createAuthorizationCode(
+            eq("test-client"),
+            eq("testUser"),
+            eq("http://localhost:8080/callback"),
+            eq(expectedScope),
+            isNull(),
+            isNull()
+        )).thenReturn("test_auth_code");
+
+        // 准备请求
+        request.setAuthorizationId("test-auth-id");
+        request.setApprovedScopes(oidcScopes);
+
+        // 执行测试
+        var response = authorizationConsentService.consent(request, authentication);
+
+        // 验证结果
+        assertNotNull(response);
+        assertEquals("test_auth_code", response.getAuthorizationCode());
+        assertEquals("xyz", response.getState());
+        assertEquals("http://localhost:8080/callback", response.getRedirectUri());
+
+        // 验证调用
+        verify(redisTemplate).delete(REDIS_KEY_PREFIX + request.getAuthorizationId());
+        verify(authorizationCodeService).createAuthorizationCode(
+            eq("test-client"),
+            eq("testUser"),
+            eq("http://localhost:8080/callback"),
+            eq(expectedScope),
+            isNull(),
+            isNull()
+        );
     }
 
     @Test
