@@ -16,6 +16,7 @@ import org.springframework.stereotype.Service;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.double2and9.auth_service.repository.UserRepository;
+import com.double2and9.auth_service.config.OidcConfig;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -28,6 +29,7 @@ public class JwtService {
     private final AuthJwtTokenProvider jwtTokenProvider;
     private final TokenBlacklistService tokenBlacklistService;
     private final UserRepository userRepository;
+    private final OidcConfig oidcConfig;
     private static final Logger log = LoggerFactory.getLogger(JwtService.class);
     
     private static final int ACCESS_TOKEN_EXPIRES_IN = 3600;  // 1小时
@@ -311,8 +313,18 @@ public class JwtService {
 
             // 构建 ID Token claims
             Map<String, Object> claims = new HashMap<>();
-            claims.put("sub", userId);  // 保持一致性，使用传入的userId
-            claims.put("aud", clientId);
+            // 必需的claims
+            claims.put("iss", oidcConfig.getIssuer());  // 从配置中获取发行者URL
+            claims.put("sub", userId);  // 用户唯一标识
+            claims.put("aud", clientId);  // 客户端ID
+            claims.put("auth_time", System.currentTimeMillis() / 1000);  // 用户认证时间
+            
+            // 如果提供了nonce，添加到claims中
+            if (nonce != null && !nonce.isEmpty()) {
+                claims.put("nonce", nonce);
+            }
+
+            // 用户信息claims
             claims.put("name", user.getUsername());
             claims.put("email", user.getEmail());
             claims.put("email_verified", user.getEmailVerified());
@@ -330,22 +342,25 @@ public class JwtService {
             claims.put("locale", user.getLocale());
             claims.put("phone_number", user.getPhone());
             claims.put("phone_number_verified", user.getPhoneVerified());
+            claims.put("updated_at", user.getUpdatedAt() != null ? 
+                user.getUpdatedAt().toEpochSecond(ZoneOffset.UTC) : null);
 
             // 如果是机构用户，添加机构ID
             if (user.getOrganizationId() != null) {
                 claims.put("organization_id", user.getOrganizationId());
             }
 
-            // 如果提供了nonce，添加到claims中
-            if (nonce != null) {
-                claims.put("nonce", nonce);
-            }
-
-            // 生成ID Token
+            // 生成ID Token，有效期1小时
             return generateToken(claims, 3600L);
         } catch (NumberFormatException e) {
             log.error("Invalid user ID format: {}", userId);
             throw new AuthException(AuthErrorCode.USER_NOT_FOUND);
+        } catch (AuthException e) {
+            log.error("Failed to generate ID token: {}", e.getMessage());
+            throw e;
+        } catch (Exception e) {
+            log.error("Failed to generate ID token: {}", e.getMessage());
+            throw new AuthException(AuthErrorCode.TOKEN_GENERATE_ERROR);
         }
     }
 

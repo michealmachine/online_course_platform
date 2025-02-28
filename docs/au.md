@@ -1438,3 +1438,286 @@ mindmap
    - 分布式身份体系
    - 零信任安全架构
    - 自适应认证引擎
+
+## 17. 前端实现要点
+
+### 17.1 完整API对接清单
+
+#### 1. 认证相关 (AuthController)
+```http
+# 用户注册
+POST /api/auth/register
+Content-Type: application/json
+Request: {
+    "username": "string",
+    "password": "string",
+    "email": "string"
+}
+Response: {
+    "token": "string",
+    "refreshToken": "string",
+    "expiresIn": number
+}
+
+# 用户登录
+POST /api/auth/login
+Content-Type: application/json
+Request: {
+    "username": "string",
+    "password": "string"
+}
+Response: {
+    "token": "string",
+    "refreshToken": "string",
+    "expiresIn": number
+}
+```
+
+#### 2. OAuth2授权流程
+##### 2.1 授权请求 (AuthorizationController)
+```http
+# 获取授权信息
+POST /api/oauth2/authorize
+Content-Type: application/json
+Request: {
+    "responseType": "code",
+    "clientId": "string",
+    "redirectUri": "string",
+    "scope": "string",
+    "state": "string",
+    "nonce": "string",
+    "codeChallenge": "string",
+    "codeChallengeMethod": "string"
+}
+
+# GET方式获取授权信息
+GET /api/oauth2/authorize?response_type=code&client_id={clientId}&redirect_uri={redirectUri}&scope={scope}&state={state}&nonce={nonce}&code_challenge={codeChallenge}&code_challenge_method={method}
+```
+
+##### 2.2 授权确认 (AuthorizationConsentController)
+```http
+# 获取授权确认页面信息
+GET /api/oauth2/consent?authorization_id={authorizationId}
+
+# 提交授权确认
+POST /api/oauth2/consent
+Content-Type: application/json
+Request: {
+    "authorizationId": "string",
+    "approved": true,
+    "approvedScopes": ["string"]
+}
+```
+
+#### 3. 令牌管理
+##### 3.1 令牌操作 (TokenController)
+```http
+# 获取/刷新令牌
+POST /api/oauth2/token
+Authorization: Basic {base64(client_id:client_secret)}
+Content-Type: application/json
+Request: {
+    "grantType": "authorization_code",
+    "code": "string",
+    "redirectUri": "string",
+    "refreshToken": "string" // 刷新令牌时使用
+}
+```
+
+##### 3.2 令牌内省 (TokenIntrospectionController)
+```http
+# 验证令牌
+POST /api/oauth2/introspect
+Authorization: Basic {base64(client_id:client_secret)}
+Content-Type: application/json
+Request: {
+    "token": "string",
+    "tokenTypeHint": "string"
+}
+```
+
+##### 3.3 令牌撤销 (TokenRevokeController)
+```http
+# 撤销令牌
+POST /api/oauth2/revoke
+Authorization: Basic {base64(client_id:client_secret)}
+Content-Type: application/json
+Request: {
+    "token": "string"
+}
+```
+
+#### 4. 客户端管理 (ClientController)
+```http
+# 创建客户端
+POST /api/clients
+Authorization: Bearer {adminToken}
+Content-Type: application/json
+Request: {
+    "clientId": "string",
+    "clientSecret": "string",
+    "clientName": "string",
+    "authenticationMethods": ["string"],
+    "authorizationGrantTypes": ["string"],
+    "redirectUris": ["string"],
+    "scopes": ["string"]
+}
+
+# 获取客户端信息
+GET /api/clients/{clientId}
+Authorization: Bearer {adminToken}
+
+# 更新客户端
+PUT /api/clients/{clientId}
+Authorization: Bearer {adminToken}
+Content-Type: application/json
+Request: {
+    // 更新字段
+}
+
+# 删除客户端
+DELETE /api/clients/{clientId}
+Authorization: Bearer {adminToken}
+
+# 获取客户端列表
+GET /api/clients?pageNo={pageNo}&pageSize={pageSize}
+Authorization: Bearer {adminToken}
+```
+
+#### 5. OIDC相关 (OidcController)
+```http
+# 获取用户信息
+GET /oauth2/userinfo
+Authorization: Bearer {accessToken}
+
+# 获取OpenID配置
+GET /oauth2/.well-known/openid-configuration
+
+# 获取JWKS
+GET /oauth2/jwks
+
+# 检查会话状态
+GET /oauth2/check-session?client_id={clientId}&session_state={sessionState}
+
+# 结束会话
+GET /oauth2/end-session?id_token_hint={idToken}&post_logout_redirect_uri={redirectUri}&state={state}
+
+# RP发起登出
+GET /oauth2/session/end?id_token_hint={idToken}&post_logout_redirect_uri={redirectUri}&state={state}
+```
+
+#### 6. 权限管理
+##### 6.1 权限操作 (PermissionController)
+```http
+# 创建权限
+POST /api/permissions
+Authorization: Bearer {adminToken}
+Content-Type: application/json
+Request: {
+    "name": "string",
+    "description": "string",
+    "resource": "string",
+    "action": "string"
+}
+
+# 获取权限列表
+GET /api/permissions?resource={resource}&action={action}&pageNo={pageNo}&pageSize={pageSize}
+Authorization: Bearer {adminToken}
+
+# 获取权限详情
+GET /api/permissions/{id}
+Authorization: Bearer {adminToken}
+
+# 删除权限
+DELETE /api/permissions/{id}
+Authorization: Bearer {adminToken}
+
+# 获取权限树
+GET /api/permissions/tree
+Authorization: Bearer {adminToken}
+```
+
+##### 6.2 角色操作 (RoleController)
+```http
+# 为角色分配权限
+POST /api/roles/{roleId}/permissions
+Authorization: Bearer {adminToken}
+Content-Type: application/json
+Request: {
+    "permissionIds": ["string"]
+}
+
+# 回收角色权限
+DELETE /api/roles/{roleId}/permissions/{permissionId}
+Authorization: Bearer {adminToken}
+
+# 获取角色权限列表
+GET /api/roles/{roleId}/permissions
+Authorization: Bearer {adminToken}
+```
+
+#### 7. 用户管理 (UserController)
+```http
+# 获取用户信息
+GET /api/users/{id}
+Authorization: Bearer {token}
+
+# 更新用户信息
+PUT /api/users/{id}
+Authorization: Bearer {token}
+Content-Type: application/json
+Request: {
+    // 更新字段
+}
+
+# 获取用户列表
+GET /api/users?page={page}&size={size}&username={username}&email={email}
+Authorization: Bearer {adminToken}
+
+# 创建用户
+POST /api/users
+Authorization: Bearer {adminToken}
+Content-Type: application/json
+Request: {
+    "username": "string",
+    "password": "string",
+    "email": "string"
+}
+```
+
+### 17.2 前端实现注意事项
+
+1. **权限控制**
+   - 所有需要管理员权限的接口使用 `adminToken`
+   - 用户相关接口使用普通 `token`
+   - 客户端认证使用 Basic Authentication
+
+2. **错误处理**
+   - 401: 未授权，跳转登录
+   - 403: 权限不足
+   - 400: 参数错误
+   - 500: 服务器错误
+
+3. **Token管理**
+   - 登录后保存 token
+   - 请求拦截器添加 token
+   - token 过期自动刷新
+   - 登出时清除 token
+
+4. **OAuth2流程**
+   - 授权码模式完整流程
+   - PKCE 增强安全性
+   - 处理重定向
+   - 状态管理
+
+5. **OIDC特性**
+   - ID Token 处理
+   - 用户信息获取
+   - 会话管理
+   - 单点登出
+
+6. **安全考虑**
+   - CSRF 防护
+   - XSS 防护
+   - 敏感信息加密
+   - 会话安全

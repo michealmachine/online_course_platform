@@ -36,7 +36,7 @@ jobs:
           --health-timeout=5s
           --health-retries=3
       consul:
-        image: consul:1.15.4
+        image: consul:1.15.3
         ports:
           - 8500:8500
         options: >-

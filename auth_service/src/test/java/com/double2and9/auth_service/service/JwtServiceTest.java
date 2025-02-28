@@ -1,5 +1,6 @@
 package com.double2and9.auth_service.service;
 
+import com.double2and9.auth_service.config.OidcConfig;
 import com.double2and9.auth_service.dto.response.TokenIntrospectionResponse;
 import com.double2and9.auth_service.dto.response.TokenResponse;
 import com.double2and9.auth_service.entity.Role;
@@ -44,6 +45,9 @@ class JwtServiceTest {
     @Mock
     private UserRepository userRepository;
 
+    @Mock
+    private OidcConfig oidcConfig;
+
     @InjectMocks
     private JwtService jwtService;
 
@@ -75,6 +79,7 @@ class JwtServiceTest {
         when(jwtTokenProvider.generateToken(anyMap(), anyLong())).thenReturn(TEST_TOKEN);
         when(tokenBlacklistService.isBlacklisted(TEST_TOKEN)).thenReturn(false);
         when(jwtTokenProvider.validateToken(TEST_TOKEN)).thenReturn(accessTokenClaims);
+        when(oidcConfig.getIssuer()).thenReturn("http://localhost:8084");
 
         testUser = new User();
         testUser.setId(1L);
@@ -436,6 +441,9 @@ class JwtServiceTest {
         idTokenClaims.put("aud", "test_client");  // 客户端ID
         idTokenClaims.put("email", "test@example.com");
         idTokenClaims.put("name", "test_user");
+        idTokenClaims.put("iss", "http://localhost:8084");  // 添加issuer
+        idTokenClaims.put("auth_time", System.currentTimeMillis() / 1000);  // 添加auth_time
+        idTokenClaims.put("updated_at", System.currentTimeMillis() / 1000);  // 添加updated_at
         idTokenClaims.setExpiration(new Date(System.currentTimeMillis() + 3600000));
         idTokenClaims.setIssuedAt(new Date());
 

@@ -1,8 +1,10 @@
 package com.double2and9.auth_service.controller;
 
+import com.double2and9.base.enums.AuthErrorCode;
 import com.double2and9.auth_service.dto.request.AuthorizationConsentRequest;
 import com.double2and9.auth_service.dto.response.AuthorizationConsentResponse;
 import com.double2and9.auth_service.dto.response.AuthorizationResponse;
+import com.double2and9.auth_service.exception.AuthException;
 import com.double2and9.auth_service.service.AuthorizationConsentService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -27,7 +29,13 @@ public class AuthorizationConsentController {
     public AuthorizationResponse getConsentPage(
             @RequestParam("authorization_id") String authorizationId,
             Authentication authentication) {
-        return authorizationConsentService.getAuthorizationRequest(authorizationId, authentication);
+        try {
+            return authorizationConsentService.getAuthorizationRequest(authorizationId, authentication);
+        } catch (AuthException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new AuthException(AuthErrorCode.INVALID_REQUEST);
+        }
     }
 
     @Operation(summary = "确认授权", description = "用户确认授权请求，返回授权码")
@@ -38,6 +46,12 @@ public class AuthorizationConsentController {
     public AuthorizationConsentResponse consent(
             @Valid @RequestBody AuthorizationConsentRequest request,
             Authentication authentication) {
-        return authorizationConsentService.consent(request, authentication);
+        try {
+            return authorizationConsentService.consent(request, authentication);
+        } catch (AuthException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new AuthException(AuthErrorCode.INVALID_REQUEST);
+        }
     }
 } 

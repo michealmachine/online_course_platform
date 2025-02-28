@@ -94,6 +94,7 @@ public enum AuthErrorCode {
     INVALID_REFRESH_TOKEN(301005, "无效的刷新令牌"),
 
     // PKCE 相关错误码
+    INVALID_SCOPE(301101, "无效的授权范围"),
     INVALID_CODE_CHALLENGE(301102, "无效的 code_challenge"),
     CODE_VERIFIER_MISMATCH(301105, "code_verifier 不匹配"),
 

@@ -1,0 +1,141 @@
+### 变量设置
+@host = http://localhost:8084
+
+### 1. 用户认证 ###
+
+### 管理员登录（使用已创建的管理员账号）
+# @name adminLogin
+POST {{host}}/api/auth/login
+Content-Type: application/json
+
+{
+  "username": "admin",
+  "password": "admin123"
+}
+
+> {%
+    client.global.set("admin_token", "Bearer " + response.body.token);
+%}
+
+### 注册普通用户
+# @name userRegister
+POST {{host}}/api/auth/register
+Content-Type: application/json
+
+{
+  "username": "testuser",
+  "password": "password123",
+  "email": "test@example.com"
+}
+
+### 用户登录
+# @name userLogin
+POST {{host}}/api/auth/login
+Content-Type: application/json
+
+{
+  "username": "testuser",
+  "password": "password123"
+}
+
+> {%
+    client.global.set("user_token", "Bearer " + response.body.token);
+%}
+
+### 2. OAuth2客户端管理 ###
+
+### 使用已存在的OAuth2客户端
+> {%
+    // 使用已存在的客户端信息
+    client.global.set("client_id", "test-client");
+    client.global.set("client_secret", "test-secret");
+    client.global.set("basic_auth", "Basic dGVzdC1jbGllbnQ6dGVzdC1zZWNyZXQ=");
+%}
+
+### 3. OAuth2/OIDC 流程测试 ###
+
+### 获取授权码（需要在浏览器中访问此URL）
+# GET {{host}}/api/oauth2/authorize?response_type=code&client_id={{client_id}}&redirect_uri=http://localhost:8080/callback&scope=openid profile email&state=xyz&nonce=test_nonce&code_challenge=E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM&code_challenge_method=S256
+
+### 使用授权码获取令牌
+# @name token
+POST {{host}}/api/oauth2/token
+Content-Type: application/json
+Authorization: {{basic_auth}}
+
+{
+  "grant_type": "authorization_code",
+  "code": "your-authorization-code",
+  "redirect_uri": "http://localhost:8080/callback",
+  "code_verifier": "your-code-verifier",
+  "nonce": "test_nonce"
+}
+
+> {%
+    if (response.status === 200) {
+        client.global.set("access_token", "Bearer " + response.body.access_token);
+        client.global.set("refresh_token", response.body.refresh_token);
+        client.global.set("id_token", response.body.id_token);
+    }
+%}
+
+### 4. 令牌操作测试 ###
+
+### 获取用户信息
+GET {{host}}/oauth2/userinfo
+Authorization: {{access_token}}
+
+### 内省令牌
+POST {{host}}/api/oauth2/introspect
+Content-Type: application/json
+Authorization: {{basic_auth}}
+
+{
+  "token": "{{access_token}}",
+  "token_type_hint": "access_token"
+}
+
+### 刷新令牌
+POST {{host}}/api/oauth2/token
+Content-Type: application/json
+Authorization: {{basic_auth}}
+
+{
+  "grant_type": "refresh_token",
+  "refresh_token": "{{refresh_token}}",
+  "scope": "openid profile email"
+}
+
+### 撤销令牌
+POST {{host}}/api/oauth2/revoke
+Content-Type: application/json
+Authorization: {{basic_auth}}
+
+{
+  "token": "{{access_token}}"
+}
+
+### 5. OIDC 端点测试 ###
+
+### 获取OIDC配置
+GET {{host}}/oauth2/.well-known/openid-configuration
+
+### 获取JWKS
+GET {{host}}/oauth2/jwks
+
+### 检查会话状态
+GET {{host}}/oauth2/check-session?client_id={{client_id}}&session_state=your-session-state
+
+### 结束会话
+GET {{host}}/oauth2/end-session?id_token_hint={{id_token}}&post_logout_redirect_uri=http://localhost:8080/logout&state=xyz
+
+### 使用说明：
+# 1. 首先执行管理员登录请求，系统会自动保存token
+# 2. 使用保存的管理员token创建OAuth2客户端
+# 3. 复制生成的授权码URL到浏览器
+# 4. 获取授权码后，将其填入token请求中
+# 5. 后续请求会自动使用保存的变量
+# 注意：
+# - 变量会在请求成功后自动保存
+# - 请按顺序执行请求
+# - 确保每个请求都执行成功再进行下一步

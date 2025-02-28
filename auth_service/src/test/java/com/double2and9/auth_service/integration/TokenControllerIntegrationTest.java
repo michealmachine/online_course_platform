@@ -602,6 +602,9 @@ class TokenControllerIntegrationTest {
         assertTrue((Boolean) claims.get("email_verified"));
         assertEquals("1234567890", claims.get("phone_number"));
         assertTrue((Boolean) claims.get("phone_number_verified"));
+        assertEquals("http://localhost:8084", claims.get("iss"));  // 验证issuer
+        assertNotNull(claims.get("auth_time"));  // 验证auth_time存在
+        assertNotNull(claims.get("updated_at"));  // 验证updated_at存在
 
         // 验证ID Token的内省结果
         mockMvc.perform(post("/api/oauth2/introspect")

@@ -50,7 +50,7 @@ public class SecurityConfig {
     }
 
     @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         return http
                 .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
@@ -71,7 +71,11 @@ public class SecurityConfig {
                         "/.well-known/openid-configuration",
                         "/.well-known/jwks.json",
                         "/oauth2/.well-known/openid-configuration",
-                        "/oauth2/.well-known/jwks.json"
+                        "/oauth2/.well-known/jwks.json",
+                        "/oauth2/jwks",
+                        "/oauth2/check-session",
+                        "/oauth2/end-session",
+                        "/oauth2/session/end"
                     ).permitAll()
                     // 认证相关端点
                     .requestMatchers(
@@ -105,4 +109,4 @@ public class SecurityConfig {
                 )
                 .build();
     }
-} 
+}

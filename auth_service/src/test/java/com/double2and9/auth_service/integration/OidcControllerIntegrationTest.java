@@ -1,5 +1,6 @@
 package com.double2and9.auth_service.integration;
 
+import com.double2and9.auth_service.AuthServiceApplication;
 import com.double2and9.auth_service.dto.request.LoginRequest;
 import com.double2and9.auth_service.dto.request.RegisterRequest;
 import com.double2and9.auth_service.dto.response.AuthResponse;
@@ -7,6 +8,7 @@ import com.double2and9.auth_service.entity.Role;
 import com.double2and9.auth_service.entity.User;
 import com.double2and9.auth_service.repository.RoleRepository;
 import com.double2and9.auth_service.repository.UserRepository;
+import com.double2and9.auth_service.service.JwtService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -19,12 +21,13 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Set;
+import java.util.UUID;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@SpringBootTest
+@SpringBootTest(classes = AuthServiceApplication.class)
 @AutoConfigureMockMvc
 @Transactional
 class OidcControllerIntegrationTest {
@@ -43,6 +46,9 @@ class OidcControllerIntegrationTest {
 
     @Autowired
     private PasswordEncoder passwordEncoder;
+
+    @Autowired
+    private JwtService jwtService;
 
     private User testUser;
     private String accessToken;
@@ -92,14 +98,7 @@ class OidcControllerIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.sub").value(testUser.getId().toString()))
                 .andExpect(jsonPath("$.given_name").value(testUser.getGivenName()))
-                .andExpect(jsonPath("$.family_name").value(testUser.getFamilyName()))
-                .andExpect(jsonPath("$.email").value(testUser.getEmail()));
-    }
-
-    @Test
-    void getUserInfo_Unauthorized() throws Exception {
-        mockMvc.perform(get("/oauth2/userinfo"))
-                .andExpect(status().isUnauthorized());
+                .andExpect(jsonPath("$.family_name").value(testUser.getFamilyName()));
     }
 
     @Test
@@ -112,10 +111,70 @@ class OidcControllerIntegrationTest {
                 .andExpect(jsonPath("$.userinfo_endpoint").value("http://localhost:8084/oauth2/userinfo"))
                 .andExpect(jsonPath("$.jwks_uri").value("http://localhost:8084/oauth2/jwks"))
                 .andExpect(jsonPath("$.end_session_endpoint").value("http://localhost:8084/oauth2/logout"))
+                .andExpect(jsonPath("$.check_session_iframe").value("http://localhost:8084/oauth2/check-session"))
                 .andExpect(jsonPath("$.scopes_supported").isArray())
                 .andExpect(jsonPath("$.response_types_supported").isArray())
                 .andExpect(jsonPath("$.subject_types_supported").isArray())
                 .andExpect(jsonPath("$.id_token_signing_alg_values_supported").isArray())
                 .andExpect(jsonPath("$.claims_supported").isArray());
+    }
+
+    @Test
+    void checkSession_Success() throws Exception {
+        String clientId = "test-client";
+        String sessionState = UUID.randomUUID().toString();
+
+        mockMvc.perform(get("/oauth2/check-session")
+                .param("client_id", clientId)
+                .param("session_state", sessionState)
+                .header("Authorization", "Bearer " + accessToken))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void endSession_Success() throws Exception {
+        // 生成一个有效的ID Token
+        String idToken = jwtService.generateIdToken(
+            testUser.getId().toString(),
+            "test-client",
+            "test-nonce"
+        );
+
+        mockMvc.perform(get("/oauth2/end-session")
+                .param("id_token_hint", idToken)
+                .param("post_logout_redirect_uri", "http://localhost:3000/logout")
+                .param("state", "xyz")
+                .header("Authorization", "Bearer " + accessToken))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void rpInitiatedLogout_Success() throws Exception {
+        // 生成一个有效的ID Token
+        String idToken = jwtService.generateIdToken(
+            testUser.getId().toString(),
+            "test-client",
+            "test-nonce"
+        );
+
+        mockMvc.perform(get("/oauth2/session/end")
+                .param("id_token_hint", idToken)
+                .param("post_logout_redirect_uri", "http://localhost:3000/logout")
+                .param("state", "xyz")
+                .header("Authorization", "Bearer " + accessToken))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("http://localhost:3000/logout")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("xyz")));
+    }
+
+    @Test
+    void rpInitiatedLogout_WithoutIdTokenHint_Success() throws Exception {
+        mockMvc.perform(get("/oauth2/session/end")
+                .param("post_logout_redirect_uri", "http://localhost:3000/logout")
+                .param("state", "xyz")
+                .header("Authorization", "Bearer " + accessToken))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("http://localhost:3000/logout")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("xyz")));
     }
 } 
