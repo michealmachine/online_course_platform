@@ -1,8 +1,10 @@
 package com.double2and9.auth_service.controller;
 
 import com.double2and9.auth_service.dto.request.LoginRequest;
+import com.double2and9.auth_service.dto.request.OAuth2AuthorizationRequest;
 import com.double2and9.auth_service.dto.response.AuthResponse;
 import com.double2and9.auth_service.service.AuthService;
+import com.double2and9.auth_service.service.AuthorizationRequestService;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -13,6 +15,7 @@ import org.springframework.security.web.savedrequest.RequestCache;
 import org.springframework.security.web.savedrequest.SavedRequest;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
+import org.springframework.util.StringUtils;
 import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -21,7 +24,6 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.io.IOException;
-import java.util.Optional;
 
 /**
  * 处理登录界面的控制器
@@ -32,6 +34,7 @@ import java.util.Optional;
 public class LoginController {
 
     private final AuthService authService;
+    private final AuthorizationRequestService authorizationRequestService;
     private final RequestCache requestCache = new HttpSessionRequestCache();
 
     /**
@@ -42,15 +45,31 @@ public class LoginController {
     public String showLoginPage(
             @RequestParam(required = false) String error,
             @RequestParam(required = false) String success,
+            HttpServletRequest request,
+            HttpServletResponse response,
             Model model
     ) {
+        // 处理错误和成功消息
         if (error != null) {
             model.addAttribute("error", "登录失败：" + error);
         }
         if (success != null) {
             model.addAttribute("success", success);
         }
+        
+        // 准备登录请求对象
         model.addAttribute("loginRequest", new LoginRequest());
+        
+        // 检查是否是从OAuth2授权请求重定向过来的
+        OAuth2AuthorizationRequest authorizationRequest = 
+                authorizationRequestService.extractAuthorizationRequest(request);
+        
+        if (authorizationRequest != null) {
+            // 保存授权请求参数到会话，以便登录成功后恢复授权流程
+            authorizationRequestService.saveAuthorizationRequest(authorizationRequest, request, response);
+            model.addAttribute("continueAuthorization", true);
+        }
+        
         return "auth/login";
     }
     
@@ -90,7 +109,21 @@ public class LoginController {
             if (authResponse != null && authResponse.getToken() != null) {
                 setCookieToken(response, authResponse.getToken(), rememberMe);
                 
-                // 登录成功后，重定向到原始请求URL或默认首页
+                // 检查是否有保存的OAuth2授权请求
+                OAuth2AuthorizationRequest authorizationRequest = 
+                        authorizationRequestService.getAuthorizationRequest(request, response);
+                
+                if (authorizationRequest != null && authorizationRequest.isContinueAuthorization()) {
+                    // 移除已处理的授权请求
+                    authorizationRequestService.removeAuthorizationRequest(request, response);
+                    
+                    // 重定向回OAuth2授权端点，继续授权流程
+                    String redirectUrl = authorizationRequest.buildAuthorizationRequestUrl();
+                    response.sendRedirect(redirectUrl);
+                    return null;
+                }
+                
+                // 如果没有OAuth2授权请求，使用标准的请求缓存机制
                 SavedRequest savedRequest = requestCache.getRequest(request, response);
                 if (savedRequest != null) {
                     String redirectUrl = savedRequest.getRedirectUrl();

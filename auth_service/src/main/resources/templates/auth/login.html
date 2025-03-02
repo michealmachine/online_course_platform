@@ -50,8 +50,16 @@
                         <label for="remember-me">记住我</label>
                     </div>
                     
-                    <!-- 保存原始请求的URL，用于登录成功后跳转 -->
+                    <!-- OAuth2授权参数 -->
+                    <input type="hidden" name="client_id" th:value="${param.client_id}">
+                    <input type="hidden" name="scope" th:value="${param.scope}">
+                    <input type="hidden" name="state" th:value="${param.state}">
                     <input type="hidden" name="redirect_uri" th:value="${param.redirect_uri}">
+                    <input type="hidden" name="response_type" th:value="${param.response_type}">
+                    <input type="hidden" name="code_challenge" th:value="${param.code_challenge}">
+                    <input type="hidden" name="code_challenge_method" th:value="${param.code_challenge_method}">
+                    <input type="hidden" name="nonce" th:value="${param.nonce}">
+                    <input type="hidden" name="continue_authorization" th:value="${continueAuthorization}" th:if="${continueAuthorization != null}">
                     
                     <button type="submit" class="btn btn-primary">登录</button>
                 </form>
