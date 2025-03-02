@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title th:text="${errorTitle} + ' - 认证系统'">错误 - 认证系统</title>
+    <link rel="stylesheet" th:href="@{/css/auth.css}">
+    <link rel="icon" type="image/x-icon" th:href="@{/images/favicon.ico}">
+    <style>
+        .error-container {
+            text-align: center;
+            padding: 40px 20px;
+        }
+        .error-code {
+            font-size: 72px;
+            color: #e53935;
+            margin-bottom: 20px;
+        }
+        .error-title {
+            font-size: 24px;
+            margin-bottom: 10px;
+        }
+        .error-message {
+            color: #616161;
+            margin-bottom: 30px;
+        }
+        .back-link {
+            display: inline-block;
+            background-color: #1e88e5;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 4px;
+            text-decoration: none;
+            transition: background-color 0.2s;
+        }
+        .back-link:hover {
+            background-color: #1976d2;
+        }
+    </style>
+</head>
+<body>
+    <div class="auth-container">
+        <div class="auth-box">
+            <div class="auth-header">
+                <h2>认证系统</h2>
+            </div>
+            
+            <div class="auth-content error-container">
+                <div class="error-code" th:text="${statusCode ?: ''}">500</div>
+                <h1 class="error-title" th:text="${errorTitle}">错误</h1>
+                <p class="error-message" th:text="${errorMessage}">发生了未知错误</p>
+                <a href="/" class="back-link">返回首页</a>
+            </div>
+        </div>
+    </div>
+</body>
+</html> 

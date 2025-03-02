@@ -6,6 +6,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -50,10 +51,26 @@ public class SecurityConfig {
     }
 
     @Bean
+    @Order(2)
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         return http
                 .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
+                    // 静态资源
+                    .requestMatchers(
+                        "/css/**", 
+                        "/js/**", 
+                        "/images/**", 
+                        "/webjars/**", 
+                        "/error",
+                        "/favicon.ico"
+                    ).permitAll()
+                    // 登录和授权确认页面
+                    .requestMatchers(
+                        "/auth/login", 
+                        "/auth/register", 
+                        "/oauth2/consent"
+                    ).permitAll()
                     // Swagger UI 和 OpenAPI 相关路径
                     .requestMatchers(
                         "/swagger-ui.html",
@@ -90,21 +107,18 @@ public class SecurityConfig {
                     // 其他请求需要认证
                     .anyRequest().authenticated()
                 )
-                .sessionManagement(session -> session
-                    .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
-                )
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authenticationProvider(authenticationProvider())
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
-                .exceptionHandling(ex -> ex
+                .exceptionHandling(exHandling -> exHandling
                     .authenticationEntryPoint((request, response, authException) -> {
-                        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
                         response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-                        response.getWriter().write("{\"code\":300402,\"message\":\"未授权访问\"}");
-                    })
-                    .accessDeniedHandler((request, response, accessDeniedException) -> {
                         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-                        response.setStatus(HttpServletResponse.SC_FORBIDDEN);
-                        response.getWriter().write("{\"code\":300202,\"message\":\"没有操作权限\"}");
+                        response.getWriter().write("{\"code\":\"" 
+                            + HttpStatus.UNAUTHORIZED.value() 
+                            + "\",\"message\":\"" 
+                            + authException.getMessage() 
+                            + "\"}");
                     })
                 )
                 .build();

@@ -12,11 +12,13 @@ import org.springframework.security.oauth2.server.authorization.OAuth2Authorizat
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationService;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
 import org.springframework.security.oauth2.server.authorization.config.annotation.web.configuration.OAuth2AuthorizationServerConfiguration;
+import org.springframework.security.oauth2.server.authorization.config.annotation.web.configurers.OAuth2AuthorizationServerConfigurer;
 import org.springframework.security.oauth2.server.authorization.client.JdbcRegisteredClientRepository;
 import org.springframework.security.oauth2.server.authorization.JdbcOAuth2AuthorizationConsentService;
 import org.springframework.security.oauth2.server.authorization.JdbcOAuth2AuthorizationService;
 import org.springframework.security.oauth2.server.authorization.settings.AuthorizationServerSettings;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint;
 import com.double2and9.auth_service.repository.CustomJdbcRegisteredClientRepository;
 
 /**
@@ -33,7 +35,27 @@ public class AuthorizationServerConfig {
     @Order(Ordered.HIGHEST_PRECEDENCE)
     public SecurityFilterChain authorizationServerSecurityFilterChain(HttpSecurity http) throws Exception {
         OAuth2AuthorizationServerConfiguration.applyDefaultSecurity(http);
-        return http.formLogin(Customizer.withDefaults()).build();
+        
+        // 自定义授权服务器配置
+        http.getConfigurer(OAuth2AuthorizationServerConfigurer.class)
+            // 自定义授权确认页面处理
+            .authorizationEndpoint(authorizationEndpoint ->
+                authorizationEndpoint.consentPage("/oauth2/consent"))
+            // 添加OIDC支持
+            .oidc(Customizer.withDefaults());
+        
+        // 使用自定义登录页面
+        http
+            // 所有未认证的请求都重定向到登录页
+            .exceptionHandling((exceptions) -> exceptions
+                .authenticationEntryPoint(
+                    new LoginUrlAuthenticationEntryPoint("/auth/login")))
+            // 使用表单登录
+            .formLogin(formLogin -> formLogin
+                .loginPage("/auth/login")
+                .permitAll());
+            
+        return http.build();
     }
 
     /**

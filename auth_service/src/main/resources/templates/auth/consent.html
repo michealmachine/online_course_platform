@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>授权确认 - 认证系统</title>
+    <link rel="stylesheet" th:href="@{/css/auth.css}">
+    <link rel="icon" type="image/x-icon" th:href="@{/images/favicon.ico}">
+</head>
+<body>
+    <div class="auth-container">
+        <div class="auth-box">
+            <div class="auth-header">
+                <h2>授权请求</h2>
+            </div>
+            
+            <div class="auth-content">
+                <div class="client-info">
+                    <p><strong th:text="${clientName}">应用</strong> 请求访问您的账户</p>
+                </div>
+                
+                <div class="scopes-container">
+                    <h3>请求的权限：</h3>
+                    <ul class="scopes-list">
+                        <li th:each="scope : ${scopes}" class="scope-item">
+                            <span class="scope-icon" th:data-scope="${scope}">📋</span>
+                            <div class="scope-details">
+                                <strong th:text="${scopeDescriptions.get(scope)}">权限</strong>
+                                <p th:text="${scopeDescriptions.get(scope + '.description')}">权限描述</p>
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+                
+                <form th:action="@{/oauth2/authorize}" method="post">
+                    <!-- 隐藏字段，传递必要的参数 -->
+                    <input type="hidden" name="client_id" th:value="${clientId}">
+                    <input type="hidden" name="state" th:value="${state}">
+                    
+                    <div th:each="scope : ${scopes}">
+                        <input type="hidden" name="scope" th:value="${scope}">
+                    </div>
+                    
+                    <div class="auth-actions">
+                        <button type="submit" name="consent" value="approve" class="btn btn-primary">批准</button>
+                        <button type="submit" name="consent" value="deny" class="btn btn-secondary">拒绝</button>
+                    </div>
+                </form>
+            </div>
+            
+            <div class="auth-footer">
+                <p class="privacy-note">授权此应用将允许其访问您的基本信息。您可以随时在账户设置中撤销授权。</p>
+            </div>
+        </div>
+    </div>
+</body>
+</html> 

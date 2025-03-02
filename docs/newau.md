@@ -1793,3 +1793,150 @@ spring:
    - 显示授权服务管理者信息
 
 通过这些设计要点和优化措施，我们将为用户提供安全、直观且易用的授权体验，同时确保系统安全性和合规性。
+
+### 11.4 控制器单元测试优化与问题解决
+
+在实现统一登录界面和授权确认页面的过程中，我们对相关控制器进行了单元测试，并遇到了一些典型问题。本节记录这些问题及其解决方案，为未来开发提供参考。
+
+#### 11.4.1 访问修饰符调整与测试可访问性
+
+**问题描述：**
+在测试`ConsentController`时，我们需要验证`getScopeDescriptions`方法的正确性，但该方法原本被定义为`private`，测试代码无法直接访问。
+
+**解决方案：**
+将方法访问修饰符从`private`改为`public`，使测试代码可以直接调用和验证该方法：
+```java
+// 修改前
+private Map<String, String> getScopeDescriptions() {
+    // 方法实现...
+}
+
+// 修改后
+public Map<String, String> getScopeDescriptions() {
+    // 方法实现不变...
+}
+```
+
+**讨论：**
+- 虽然通常建议保持方法的封装性，但对于需要单独测试的复杂逻辑方法，适当放宽访问修饰符是合理的
+- 其他替代方案包括：
+  1. 使用反射API访问私有方法（不推荐，会使测试代码复杂且脆弱）
+  2. 将方法逻辑提取到单独的服务类中（更好的架构设计，但需要更大的重构）
+  3. 只测试公共API，通过调用公共方法间接测试私有方法（不够精确）
+
+#### 11.4.2 Mockito严格存根验证问题
+
+**问题描述：**
+测试运行时遇到`UnnecessaryStubbingException`异常，表明测试中存在未使用的mock设置。具体问题在于`mockPrincipal.getName()`被设置为返回"testuser"，但实际测试执行中并未调用此方法。
+
+**解决方案：**
+移除未使用的mock设置：
+```java
+// 修改前
+Principal mockPrincipal = mock(Principal.class);
+when(mockPrincipal.getName()).thenReturn("testuser");  // 未使用的存根
+
+// 修改后
+Principal mockPrincipal = mock(Principal.class);
+// 移除未使用的存根设置
+```
+
+**讨论：**
+- Mockito默认使用严格存根验证，这是一种良好实践，可以避免测试中的"死代码"
+- 未使用的存根通常表明：
+  1. 测试代码过时，未跟上被测代码的变化
+  2. 对被测代码行为的误解
+  3. 复制粘贴导致的冗余代码
+- 其他可能的解决方案：
+  1. 使用`Mockito.lenient()`放宽严格性（不推荐作为默认做法）
+  2. 配置Mockito使用`LENIENT`严格性（仅适用于特殊场景）
+
+#### 11.4.3 RegisteredClient构建中的必需参数
+
+**问题描述：**
+测试中构建模拟`RegisteredClient`对象时，遇到以下错误：
+1. `java.lang.IllegalArgumentException: authorizationGrantTypes cannot be empty`
+2. `java.lang.IllegalArgumentException: redirectUris cannot be empty`
+
+这表明在构建`RegisteredClient`对象时，这些属性是必需的，即使在实际测试场景中可能不会用到。
+
+**解决方案：**
+在构建模拟客户端时添加必需的属性：
+```java
+// 修改前
+RegisteredClient mockClient = RegisteredClient.withId("1")
+    .clientId(clientId)
+    .clientName("Test Client")
+    .build();
+
+// 修改后
+RegisteredClient mockClient = RegisteredClient.withId("1")
+    .clientId(clientId)
+    .clientName("Test Client")
+    .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)  // 添加授权类型
+    .redirectUri("http://localhost:8080/callback")                       // 添加重定向URI
+    .build();
+```
+
+**讨论：**
+- 这个问题揭示了Spring Security对象模型中的验证约束
+- 在测试中模拟复杂对象时，需要了解对象的必需属性和验证规则
+- 对于未在测试中直接使用的属性，也需要提供有效值以通过验证
+- 这种情况说明了充分阅读API文档的重要性，特别是对于具有严格验证规则的框架组件
+
+#### 11.4.4 单元测试最佳实践总结
+
+通过解决上述问题，我们总结出以下控制器单元测试的最佳实践：
+
+1. **最小化模拟对象**：
+   - 只模拟测试必需的行为
+   - 避免设置不会被使用的存根
+   - 使用简单的模拟对象而非复杂的实现
+
+2. **理解框架约束**：
+   - 了解被测试框架组件的验证规则
+   - 确保模拟对象满足所有必需的验证约束
+   - 查阅文档了解组件的预期行为
+
+3. **适当调整封装**：
+   - 对于复杂且需单独测试的逻辑，考虑适当放宽访问修饰符
+   - 更好的方案是改进架构设计，使关键逻辑自然地暴露在公共API中
+   - 在可测试性和封装之间找到平衡点
+
+4. **测试断言的针对性**：
+   - 确保测试验证关键功能和边缘情况
+   - 避免对实现细节进行过度测试
+   - 对于视图控制器，重点测试模型数据和视图名称的正确性
+
+5. **保持测试简洁**：
+   - 每个测试方法专注于一个验证点
+   - 使用描述性的方法名称清晰表达测试目的
+   - 避免在测试中添加不必要的复杂性
+
+这些实践帮助我们创建了更加健壮和维护性更高的控制器单元测试，确保授权确认页面功能的可靠性。在后续的登录界面控制器开发中，我们将继续遵循这些原则。
+
+#### 11.4.5 后续控制器测试计划
+
+基于当前的经验，我们为即将开发的控制器计划了以下测试策略：
+
+1. **LoginController测试**：
+   - 测试登录表单提交成功和失败场景
+   - 验证登录尝试限制逻辑
+   - 测试"记住我"功能
+   - 模拟各类验证错误
+
+2. **AuthorizationViewController测试**：
+   - 测试授权请求参数验证
+   - 验证内部客户端自动授权逻辑
+   - 测试客户端未找到的错误处理
+   - 验证重定向URI验证逻辑
+
+3. **集成测试**：
+   - 测试完整的授权流程，从登录到授权确认
+   - 验证CSRF保护机制
+   - 测试会话管理功能
+   - 验证与客户端应用集成的端到端测试
+
+通过全面的单元测试和集成测试，我们将确保新开发的授权流程界面具有高度的可靠性和安全性，同时提供良好的用户体验。
+
+### 11.5 第二阶段工作计划

@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>登录 - 认证系统</title>
+    <link rel="stylesheet" th:href="@{/css/auth.css}">
+    <link rel="icon" type="image/x-icon" th:href="@{/images/favicon.ico}">
+</head>
+<body>
+    <div class="auth-container">
+        <div class="auth-box">
+            <div class="auth-header">
+                <h2>用户登录</h2>
+            </div>
+            
+            <div class="auth-content">
+                <!-- 错误信息展示 -->
+                <div th:if="${param.error}" class="alert alert-danger">
+                    <p>用户名或密码错误</p>
+                </div>
+                <div th:if="${param.logout}" class="alert alert-success">
+                    <p>您已成功退出登录</p>
+                </div>
+                
+                <!-- 登录表单 -->
+                <form th:action="@{/auth/login}" method="post">
+                    <div class="form-group">
+                        <label for="username">用户名</label>
+                        <input type="text" id="username" name="username" required autofocus>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="password">密码</label>
+                        <input type="password" id="password" name="password" required>
+                    </div>
+                    
+                    <div class="form-group remember-me">
+                        <input type="checkbox" id="remember-me" name="remember-me">
+                        <label for="remember-me">记住我</label>
+                    </div>
+                    
+                    <!-- 保存原始请求的URL，用于登录成功后跳转 -->
+                    <input type="hidden" name="redirect_uri" th:value="${param.redirect_uri}">
+                    
+                    <button type="submit" class="btn btn-primary">登录</button>
+                </form>
+            </div>
+            
+            <div class="auth-footer">
+                <p>还没有账号? <a th:href="@{/auth/register}">注册</a></p>
+            </div>
+        </div>
+    </div>
+</body>
+</html> 
