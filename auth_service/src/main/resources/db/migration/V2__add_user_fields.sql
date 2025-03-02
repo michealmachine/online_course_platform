@@ -8,9 +8,9 @@ ALTER TABLE users
 ALTER TABLE users
     ADD COLUMN account_locked BOOLEAN DEFAULT FALSE,
     ADD COLUMN login_attempts INT DEFAULT 0,
-    ADD COLUMN lock_time TIMESTAMP;
+    ADD COLUMN lock_time TIMESTAMP DEFAULT NULL;
 
 -- 添加审计字段
 ALTER TABLE users
-    ADD COLUMN last_login_time TIMESTAMP,
+    ADD COLUMN last_login_time TIMESTAMP DEFAULT NULL,
     ADD COLUMN last_login_ip VARCHAR(50); 
