@@ -16,4 +16,7 @@ public class AuthorizationResponse {
     // 添加PKCE相关字段
     private String codeChallenge;  // PKCE挑战码
     private String codeChallengeMethod;  // PKCE挑战方法
+    
+    // 添加授权码字段，用于内部客户端自动授权场景
+    private String authorizationCode;  // 授权码，仅在内部客户端自动授权时设置
 } 

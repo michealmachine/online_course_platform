@@ -15,7 +15,7 @@ public class UpdateClientRequest {
     
     private String clientSecret; // 可选，如果不修改则保持原值
     
-    @NotEmpty(message = "认证方式不能为空")
+    @NotEmpty(message = "认证方法不能为空")
     private Set<String> authenticationMethods;
     
     @NotEmpty(message = "授权类型不能为空")
@@ -23,6 +23,12 @@ public class UpdateClientRequest {
     
     private Set<String> redirectUris;
     
-    @NotEmpty(message = "授权范围不能为空")
+    @NotEmpty(message = "作用域不能为空")
     private Set<String> scopes;
+    
+    // 新增字段：内部客户端标识
+    private Boolean isInternal;
+    
+    // 新增字段：自动授权标识
+    private Boolean autoApprove;
 } 

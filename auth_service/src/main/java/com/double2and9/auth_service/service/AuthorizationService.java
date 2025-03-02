@@ -1,11 +1,13 @@
 package com.double2and9.auth_service.service;
 
 import com.double2and9.auth_service.dto.request.AuthorizationRequest;
+import com.double2and9.auth_service.dto.request.ConsentRequest;
 import com.double2and9.auth_service.dto.response.AuthorizationResponse;
 import com.double2and9.auth_service.exception.AuthException;
 import com.double2and9.auth_service.repository.CustomJdbcRegisteredClientRepository;
 import com.double2and9.base.enums.AuthErrorCode;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
 import org.springframework.stereotype.Service;
@@ -16,12 +18,14 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class AuthorizationService {
     
     private final CustomJdbcRegisteredClientRepository clientRepository;
     private final AuthorizationConsentService authorizationConsentService;
+    private final ClientService clientService;
 
     @Transactional
     public AuthorizationResponse createAuthorizationRequest(AuthorizationRequest request, Authentication authentication) {
@@ -77,8 +81,32 @@ public class AuthorizationService {
         response.setCodeChallenge(request.getCodeChallenge());
         response.setCodeChallengeMethod(request.getCodeChallengeMethod());
 
-        // 保存授权请求
-        authorizationConsentService.savePendingAuthorization(response.getAuthorizationId(), response);
+        // 检查是否为内部客户端并且允许自动授权
+        boolean isInternalClient = clientService.isInternalClient(client.getClientId());
+        boolean isAutoApproveClient = clientService.isAutoApproveClient(client.getClientId());
+        
+        // 如果是内部客户端且允许自动授权，则自动创建授权码
+        if (isInternalClient && isAutoApproveClient) {
+            log.info("内部客户端自动授权: clientId={}, userId={}", client.getClientId(), authentication.getName());
+            
+            // 创建自动授权同意请求
+            ConsentRequest consentRequest = new ConsentRequest();
+            consentRequest.setClientId(client.getClientId());
+            consentRequest.setUserId(authentication.getName());
+            consentRequest.setRedirectUri(request.getRedirectUri());
+            consentRequest.setScopes(requestedScopes);
+            
+            // 自动生成授权码
+            String authorizationCode = authorizationConsentService.consent(consentRequest);
+            
+            // 设置授权码到响应中
+            response.setAuthorizationCode(authorizationCode);
+            
+            log.info("内部客户端自动授权完成: clientId={}, userId={}", client.getClientId(), authentication.getName());
+        } else {
+            // 普通授权流程，保存授权请求等待用户确认
+            authorizationConsentService.savePendingAuthorization(response.getAuthorizationId(), response);
+        }
 
         return response;
     }

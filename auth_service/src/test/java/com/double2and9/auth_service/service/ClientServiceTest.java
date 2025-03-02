@@ -25,7 +25,7 @@ import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -78,14 +78,14 @@ class ClientServiceTest {
         doAnswer(invocation -> {
             RegisteredClient client = invocation.getArgument(0);
             return null; // void 方法返回 null
-        }).when(clientRepository).save(any(RegisteredClient.class));
+        }).when(clientRepository).save(any(RegisteredClient.class), any(), any());
         
         var response = clientService.createClient(request);
         
         assertNotNull(response);
         assertEquals(request.getClientId(), response.getClientId());
         assertEquals(request.getClientName(), response.getClientName());
-        verify(clientRepository).save(any(RegisteredClient.class));
+        verify(clientRepository).save(any(RegisteredClient.class), eq(false), eq(false));
     }
 
     @Test
@@ -93,18 +93,22 @@ class ClientServiceTest {
         when(clientRepository.findByClientId(request.getClientId())).thenReturn(existingClient);
         
         assertThrows(AuthException.class, () -> clientService.createClient(request));
-        verify(clientRepository, never()).save(any());
+        verify(clientRepository, never()).save(any(), any(), any());
     }
 
     @Test
     void getClient_Success() {
         when(clientRepository.findByClientId("existing-client")).thenReturn(existingClient);
+        when(clientRepository.isInternalClient("existing-client")).thenReturn(false);
+        when(clientRepository.isAutoApproveClient("existing-client")).thenReturn(false);
         
         var response = clientService.getClient("existing-client");
         
         assertNotNull(response);
         assertEquals("existing-client", response.getClientId());
         assertEquals("Existing Client", response.getClientName());
+        assertFalse(response.getIsInternal());
+        assertFalse(response.getAutoApprove());
     }
 
     @Test
@@ -128,7 +132,7 @@ class ClientServiceTest {
         doAnswer(invocation -> {
             RegisteredClient client = invocation.getArgument(0);
             return null;
-        }).when(clientRepository).save(any(RegisteredClient.class));
+        }).when(clientRepository).save(any(RegisteredClient.class), any(), any());
 
         // 执行测试
         ClientResponse response = clientService.updateClient("test-client", request);
@@ -137,13 +141,16 @@ class ClientServiceTest {
         assertNotNull(response);
         assertEquals(request.getClientName(), response.getClientName());
         verify(clientRepository).findByClientId("test-client");
-        verify(clientRepository).save(any(RegisteredClient.class));
+        verify(clientRepository).save(any(RegisteredClient.class), any(), any());
     }
 
     @Test
     void updateClient_NotFound() {
         UpdateClientRequest request = new UpdateClientRequest();
         request.setClientName("Updated Client");
+        request.setAuthenticationMethods(Set.of("client_secret_basic"));
+        request.setAuthorizationGrantTypes(Set.of("authorization_code"));
+        request.setScopes(Set.of("read"));
         
         when(clientRepository.findByClientId("non-existent")).thenReturn(null);
 
@@ -173,6 +180,8 @@ class ClientServiceTest {
         // 准备测试数据
         List<RegisteredClient> clients = List.of(existingClient);
         when(clientRepository.findAll()).thenReturn(clients);
+        when(clientRepository.isInternalClient(anyString())).thenReturn(false);
+        when(clientRepository.isAutoApproveClient(anyString())).thenReturn(false);
 
         // 执行测试
         PageResult<ClientResponse> result = clientService.listClients(new PageParams(1L, 10L));
@@ -204,7 +213,7 @@ class ClientServiceTest {
         doAnswer(invocation -> {
             RegisteredClient client = invocation.getArgument(0);
             return null;
-        }).when(clientRepository).save(any(RegisteredClient.class));
+        }).when(clientRepository).save(any(RegisteredClient.class), any(), any());
         
         // 执行测试
         ClientResponse response = clientService.createClient(request);
@@ -240,7 +249,7 @@ class ClientServiceTest {
             .build();
 
         when(clientRepository.findByClientId("test-client")).thenReturn(existingClient);
-        doNothing().when(clientRepository).save(any(RegisteredClient.class));
+        doNothing().when(clientRepository).save(any(RegisteredClient.class), any(), any());
 
         // 执行测试
         ClientResponse response = clientService.updateClient("test-client", request);
@@ -255,6 +264,106 @@ class ClientServiceTest {
         assertTrue(response.getAuthorizationGrantTypes().containsAll(Set.of("authorization_code", "refresh_token")));
 
         // 验证save方法被调用
-        verify(clientRepository).save(any(RegisteredClient.class));
+        verify(clientRepository).save(any(RegisteredClient.class), any(), any());
+    }
+    
+    // 新增测试：测试创建内部客户端
+    @Test
+    void createClient_InternalClient_Success() {
+        // 准备测试数据
+        CreateClientRequest request = new CreateClientRequest();
+        request.setClientId("internal-client");
+        request.setClientSecret("secret");
+        request.setClientName("Internal Client");
+        request.setAuthenticationMethods(Set.of("client_secret_basic"));
+        request.setAuthorizationGrantTypes(Set.of("authorization_code", "refresh_token"));
+        request.setRedirectUris(Set.of("http://localhost:8080/callback"));
+        request.setScopes(Set.of("read", "write"));
+        request.setIsInternal(true);
+        request.setAutoApprove(true);
+
+        when(clientRepository.findByClientId(request.getClientId())).thenReturn(null);
+        when(passwordEncoder.encode(any())).thenReturn("encoded-secret");
+        
+        doAnswer(invocation -> null).when(clientRepository)
+            .save(any(RegisteredClient.class), eq(true), eq(true));
+        
+        // 执行测试
+        ClientResponse response = clientService.createClient(request);
+        
+        // 验证结果
+        assertNotNull(response);
+        assertEquals("internal-client", response.getClientId());
+        assertEquals("Internal Client", response.getClientName());
+        assertTrue(response.getIsInternal());
+        assertTrue(response.getAutoApprove());
+        
+        // 验证使用了正确的参数调用save方法
+        verify(clientRepository).save(any(RegisteredClient.class), eq(true), eq(true));
+    }
+    
+    // 新增测试：测试更新客户端的内部客户端标识
+    @Test
+    void updateClient_ToInternalClient_Success() {
+        // 准备测试数据
+        UpdateClientRequest request = new UpdateClientRequest();
+        request.setClientName("Updated Client");
+        request.setAuthenticationMethods(Set.of("client_secret_basic"));
+        request.setAuthorizationGrantTypes(Set.of("authorization_code"));
+        request.setScopes(Set.of("read"));
+        request.setIsInternal(true);
+        request.setAutoApprove(true);
+
+        when(clientRepository.findByClientId("test-client")).thenReturn(existingClient);
+        doAnswer(invocation -> null).when(clientRepository)
+            .save(any(RegisteredClient.class), eq(true), eq(true));
+
+        // 执行测试
+        ClientResponse response = clientService.updateClient("test-client", request);
+
+        // 验证结果
+        assertNotNull(response);
+        assertEquals("Updated Client", response.getClientName());
+        assertTrue(response.getIsInternal());
+        assertTrue(response.getAutoApprove());
+        
+        // 验证使用了正确的参数调用save方法
+        verify(clientRepository).save(any(RegisteredClient.class), eq(true), eq(true));
+    }
+    
+    // 新增测试：测试isInternalClient方法
+    @Test
+    void isInternalClient_True() {
+        when(clientRepository.isInternalClient("internal-client")).thenReturn(true);
+        
+        assertTrue(clientService.isInternalClient("internal-client"));
+        verify(clientRepository).isInternalClient("internal-client");
+    }
+    
+    // 新增测试：测试isInternalClient方法返回false
+    @Test
+    void isInternalClient_False() {
+        when(clientRepository.isInternalClient("external-client")).thenReturn(false);
+        
+        assertFalse(clientService.isInternalClient("external-client"));
+        verify(clientRepository).isInternalClient("external-client");
+    }
+    
+    // 新增测试：测试isAutoApproveClient方法
+    @Test
+    void isAutoApproveClient_True() {
+        when(clientRepository.isAutoApproveClient("auto-client")).thenReturn(true);
+        
+        assertTrue(clientService.isAutoApproveClient("auto-client"));
+        verify(clientRepository).isAutoApproveClient("auto-client");
+    }
+    
+    // 新增测试：测试isAutoApproveClient方法返回false
+    @Test
+    void isAutoApproveClient_False() {
+        when(clientRepository.isAutoApproveClient("manual-client")).thenReturn(false);
+        
+        assertFalse(clientService.isAutoApproveClient("manual-client"));
+        verify(clientRepository).isAutoApproveClient("manual-client");
     }
 } 

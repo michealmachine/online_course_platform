@@ -43,6 +43,12 @@ public class ClientService {
             throw new AuthException(AuthErrorCode.CLIENT_ID_EXISTS);
         }
 
+        // 构建ClientSettings，考虑内部客户端自动授权
+        ClientSettings clientSettings = ClientSettings.builder()
+                .requireAuthorizationConsent(!Boolean.TRUE.equals(request.getAutoApprove()))
+                .requireProofKey(true)
+                .build();
+
         RegisteredClient.Builder builder = RegisteredClient.withId(UUID.randomUUID().toString())
                 .clientId(request.getClientId())
                 .clientSecret(passwordEncoder.encode(request.getClientSecret()))
@@ -56,10 +62,7 @@ public class ClientService {
                         types.add(resolveAuthorizationGrantType(type))))
                 .scopes(scopes -> 
                     request.getScopes().forEach(scopes::add))
-                .clientSettings(ClientSettings.builder()
-                        .requireAuthorizationConsent(true)
-                        .requireProofKey(true)
-                        .build())
+                .clientSettings(clientSettings)
                 .tokenSettings(TokenSettings.builder()
                         .accessTokenTimeToLive(Duration.ofHours(1))
                         .refreshTokenTimeToLive(Duration.ofDays(30))
@@ -71,8 +74,10 @@ public class ClientService {
         }
 
         RegisteredClient client = builder.build();
-        clientRepository.save(client);
-        return toClientResponse(client);
+        
+        // 设置内部客户端标识和自动授权标识
+        clientRepository.save(client, request.getIsInternal(), request.getAutoApprove());
+        return toClientResponse(client, request.getIsInternal(), request.getAutoApprove());
     }
 
     public ClientResponse getClient(String clientId) {
@@ -80,7 +85,9 @@ public class ClientService {
         if (client == null) {
             throw new AuthException(AuthErrorCode.CLIENT_NOT_FOUND);
         }
-        return toClientResponse(client);
+        Boolean isInternal = clientRepository.isInternalClient(clientId);
+        Boolean autoApprove = clientRepository.isAutoApproveClient(clientId);
+        return toClientResponse(client, isInternal, autoApprove);
     }
 
     @Transactional
@@ -89,6 +96,12 @@ public class ClientService {
         if (existingClient == null) {
             throw new AuthException(AuthErrorCode.CLIENT_NOT_FOUND);
         }
+
+        // 构建ClientSettings，考虑内部客户端自动授权
+        ClientSettings clientSettings = ClientSettings.builder()
+                .requireAuthorizationConsent(!Boolean.TRUE.equals(request.getAutoApprove()))
+                .requireProofKey(true)
+                .build();
 
         RegisteredClient.Builder builder = RegisteredClient.from(existingClient)
                 .clientName(request.getClientName())
@@ -105,7 +118,8 @@ public class ClientService {
                 .scopes(scopes -> {
                     scopes.clear();
                     request.getScopes().forEach(scopes::add);
-                });
+                })
+                .clientSettings(clientSettings);
 
         // 如果提供了新的密钥，则更新密钥
         if (request.getClientSecret() != null && !request.getClientSecret().isEmpty()) {
@@ -121,8 +135,8 @@ public class ClientService {
         }
 
         RegisteredClient updatedClient = builder.build();
-        clientRepository.save(updatedClient);
-        return toClientResponse(updatedClient);
+        clientRepository.save(updatedClient, request.getIsInternal(), request.getAutoApprove());
+        return toClientResponse(updatedClient, request.getIsInternal(), request.getAutoApprove());
     }
 
     @Transactional
@@ -144,7 +158,11 @@ public class ClientService {
         
         List<ClientResponse> clientResponses = clients.subList(start, end)
                 .stream()
-                .map(this::toClientResponse)
+                .map(client -> {
+                    Boolean isInternal = clientRepository.isInternalClient(client.getClientId());
+                    Boolean autoApprove = clientRepository.isAutoApproveClient(client.getClientId());
+                    return toClientResponse(client, isInternal, autoApprove);
+                })
                 .collect(Collectors.toList());
                 
         return new PageResult<>(
@@ -153,6 +171,20 @@ public class ClientService {
             pageParams.getPageNo(),
             pageParams.getPageSize()
         );
+    }
+
+    /**
+     * 检查客户端是否为内部客户端
+     */
+    public boolean isInternalClient(String clientId) {
+        return clientRepository.isInternalClient(clientId);
+    }
+
+    /**
+     * 检查客户端是否自动授权
+     */
+    public boolean isAutoApproveClient(String clientId) {
+        return clientRepository.isAutoApproveClient(clientId);
     }
 
     /**
@@ -183,7 +215,7 @@ public class ClientService {
     /**
      * 转换为响应对象
      */
-    private ClientResponse toClientResponse(RegisteredClient client) {
+    private ClientResponse toClientResponse(RegisteredClient client, Boolean isInternal, Boolean autoApprove) {
         ClientResponse response = new ClientResponse();
         response.setId(client.getId());
         response.setClientId(client.getClientId());
@@ -197,6 +229,8 @@ public class ClientService {
                 .collect(Collectors.toSet()));
         response.setRedirectUris(new HashSet<>(client.getRedirectUris()));
         response.setScopes(new HashSet<>(client.getScopes()));
+        response.setIsInternal(isInternal);
+        response.setAutoApprove(autoApprove);
         return response;
     }
 } 

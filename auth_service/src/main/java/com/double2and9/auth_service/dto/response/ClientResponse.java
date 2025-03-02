@@ -15,4 +15,6 @@ public class ClientResponse {
     private Set<String> authorizationGrantTypes;
     private Set<String> redirectUris;
     private Set<String> scopes;
+    private Boolean isInternal;
+    private Boolean autoApprove;
 } 
