@@ -2226,3 +2226,236 @@ RegisteredClient mockClient = RegisteredClient.withId("1")
 通过这些工作，我们将完成从API认证模式向标准OAuth2授权流程的完整转变，同时保持系统的安全性和用户体验的一致性。这种转变将使我们的认证服务与行业标准实践保持一致，同时为未来的功能扩展和第三方集成奠定基础。
 
 ### 11.6 页面控制器的安全性与CSRF保护
+
+在实现页面控制器时，我们需要特别注意安全性问题，尤其是CSRF（跨站请求伪造）保护。本节记录了我们在开发过程中的安全考虑和实现细节。
+
+#### 11.6.1 LoginController 的实现与安全考虑
+
+##### 实现登录表单处理逻辑
+
+我们首先实现了 `LoginController` 的表单处理逻辑，将其与现有的 `AuthService` 集成，主要完成了以下工作：
+
+1. **基本功能实现**：
+   - 添加了处理登录表单提交的 `processLogin` 方法
+   - 集成 `AuthService` 进行用户身份验证
+   - 实现了"记住我"功能的基本支持
+   - 处理登录成功后的重定向（返回原始请求URL或默认首页）
+
+2. **安全增强措施**：
+   - 用户IP地址记录，有助于安全审计和防止账户滥用
+   - 对JWT令牌进行安全存储，设置 HttpOnly 标志防止XSS攻击
+   - 表单验证确保数据完整性
+   - 异常处理提供用户友好的错误信息，同时不泄露敏感信息
+
+3. **用户体验优化**：
+   - 在GET请求时预填充表单对象，简化Thymeleaf模板绑定
+   - 错误和成功消息的统一处理
+   - 登录成功后智能重定向，提升用户体验
+
+##### 关键实现细节
+
+`LoginController` 的核心处理逻辑如下：
+
+```java
+@PostMapping("/login")
+public String processLogin(
+        @Valid LoginRequest loginRequest,
+        BindingResult bindingResult,
+        @RequestParam(name = "remember-me", required = false) boolean rememberMe,
+        HttpServletRequest request,
+        HttpServletResponse response,
+        RedirectAttributes redirectAttributes
+) {
+    // 验证表单数据
+    if (bindingResult.hasErrors()) {
+        redirectAttributes.addAttribute("error", "请输入有效的用户名和密码");
+        return "redirect:/auth/login";
+    }
+
+    try {
+        // 获取客户端IP地址
+        String clientIp = getClientIp(request);
+        
+        // 调用AuthService进行身份验证，传递IP地址
+        AuthResponse authResponse = authService.login(loginRequest, clientIp);
+        
+        // 如果登录成功，设置JWT令牌到Cookie
+        if (authResponse != null && authResponse.getToken() != null) {
+            setCookieToken(response, authResponse.getToken(), rememberMe);
+            
+            // 登录成功后，重定向到原始请求URL或默认首页
+            SavedRequest savedRequest = requestCache.getRequest(request, response);
+            if (savedRequest != null) {
+                String redirectUrl = savedRequest.getRedirectUrl();
+                requestCache.removeRequest(request, response);
+                response.sendRedirect(redirectUrl);
+                return null;
+            } else {
+                return "redirect:/";
+            }
+        } else {
+            // 登录失败
+            redirectAttributes.addAttribute("error", "认证失败，请检查用户名和密码");
+            return "redirect:/auth/login";
+        }
+    } catch (Exception e) {
+        // 处理登录异常
+        redirectAttributes.addAttribute("error", e.getMessage());
+        return "redirect:/auth/login";
+    }
+}
+```
+
+其中，`getClientIp` 方法用于获取客户端真实IP地址，处理代理服务器情况：
+
+```java
+private String getClientIp(HttpServletRequest request) {
+    String xForwardedFor = request.getHeader("X-Forwarded-For");
+    if (xForwardedFor != null && !xForwardedFor.isEmpty()) {
+        return xForwardedFor.split(",")[0].trim();
+    }
+    return request.getRemoteAddr();
+}
+```
+
+JWT令牌存储使用安全的Cookie设置：
+
+```java
+private void setCookieToken(HttpServletResponse response, String token, boolean rememberMe) {
+    Cookie cookie = new Cookie("auth_token", token);
+    cookie.setPath("/");
+    cookie.setHttpOnly(true);
+    
+    // 根据"记住我"选项设置不同的过期时间
+    if (rememberMe) {
+        cookie.setMaxAge(604800); // 7天
+    } else {
+        cookie.setMaxAge(7200);   // 2小时
+    }
+    
+    response.addCookie(cookie);
+}
+```
+
+#### 11.6.2 登录表单与Thymeleaf绑定
+
+为了支持表单验证和错误处理，我们更新了登录页面模板，主要有以下改进：
+
+1. **表单对象绑定**：
+   - 使用 `th:object="${loginRequest}"` 实现对象级别的表单绑定
+   - 字段绑定使用 `th:field="*{username}"` 和 `th:field="*{password}"`
+   - 支持验证错误显示 `th:errors="*{username}"`
+
+2. **错误信息显示增强**：
+   - 支持显示不同来源的错误信息（模型属性和URL参数）
+   - 使用 `th:text` 动态显示错误内容
+   - 同时支持成功信息的展示
+
+#### 11.6.3 开发过程中遇到的问题与解决方案
+
+在开发过程中，我们遇到了以下问题，并找到了相应的解决方案：
+
+##### 问题1：方法参数不匹配
+
+**问题描述**：调用 `AuthService.login` 方法时编译错误：方法需要 `LoginRequest` 和 `String` 类型的IP地址，但我们的控制器方法只提供了一个参数。
+
+**错误信息**：
+```
+java: 无法将类 com.double2and9.auth_service.service.AuthService中的方法 login应用到给定类型;
+需要: com.double2and9.auth_service.dto.request.LoginRequest,java.lang.String
+找到: @jakarta.validation.Valid com.double2and9.auth_service.dto.request.LoginRequest
+原因: 实际参数列表和形式参数列表长度不同
+```
+
+**解决方案**：
+- 添加 `getClientIp` 方法提取请求中的客户端IP地址
+- 修改控制器方法，获取IP地址并传递给 `authService.login` 方法
+- 支持代理服务器环境下的IP提取（通过X-Forwarded-For头）
+
+##### 问题2：Builder模式对象创建问题
+
+**问题描述**：在测试类中创建 `AuthResponse` 实例时出现编译错误，因为该类使用了 `@Builder` 注解。
+
+**错误信息**：
+```
+java: 无法将类 com.double2and9.auth_service.dto.response.AuthResponse中的构造器 AuthResponse应用到给定类型;
+需要: java.lang.String,java.lang.String,java.util.Set<java.lang.String>
+找到: 没有参数
+原因: 实际参数列表和形式参数列表长度不同
+```
+
+**解决方案**：
+- 使用Builder模式创建对象：`AuthResponse.builder()...build()`
+- 提供所有必需的属性：`token`, `username`, 和 `roles`
+- 对于测试中的默认值，使用 `Collections.emptySet()` 作为空角色集合
+
+**代码示例**：
+```java
+AuthResponse authResponse = AuthResponse.builder()
+        .token("jwt-token")
+        .username("testuser")
+        .roles(Collections.emptySet())
+        .build();
+```
+
+##### 经验与最佳实践
+
+通过解决这些问题，我们总结出以下经验和最佳实践：
+
+1. **Lombok注解使用注意事项**：
+   - `@Builder` 注解生成构建器而非默认构造函数，测试中应使用构建器模式创建对象
+   - 使用 `@Data` 与 `@Builder` 组合时，如需默认构造函数，可添加 `@NoArgsConstructor`
+   - 对于复杂对象的测试，应了解其构造方式，避免错误
+
+2. **服务方法签名变更的影响**：
+   - 当服务接口方法签名变更时，要全面审查所有调用点
+   - 添加参数时考虑向后兼容性，如可选参数或默认值
+   - 变更API时更新相关测试用例
+
+3. **请求处理中的IP获取**：
+   - 在处理用户登录等敏感操作时，记录客户端IP有助于安全审计
+   - 必须考虑代理场景，正确处理X-Forwarded-For等HTTP头
+   - 从请求中提取IP的逻辑最好封装为可重用的工具方法
+
+#### 11.6.4 CSRF保护实现计划
+
+Spring Security默认启用CSRF保护，我们在表单设计中需要考虑以下几点：
+
+1. **CSRF令牌集成**：
+   - 在登录表单中添加隐藏的CSRF令牌字段
+   - 使用Thymeleaf的`${_csrf.token}`和`${_csrf.parameterName}`自动处理
+
+2. **安全配置**：
+   - 将后续实现的API接口从CSRF保护中排除（如有必要）
+   - 为CSRF令牌配置基于Cookie的存储，增强安全性
+
+3. **测试策略**：
+   - 开发专门的测试用例验证CSRF保护的有效性
+   - 测试缺少或无效CSRF令牌时的行为
+   - 验证合法请求能够正常处理
+
+#### 11.6.5 下一步开发计划
+
+我们已经完成了登录表单处理与认证服务的基本集成，下一步工作计划如下：
+
+1. **实现OAuth2与登录表单的无缝衔接**：
+   - 捕获并保存OAuth2授权请求参数
+   - 登录成功后自动恢复授权流程
+   - 处理内部客户端自动授权
+
+2. **增强安全性**：
+   - 完善CSRF保护实现
+   - 实现基于数据库的持久化"记住我"功能
+   - 添加敏感操作的二次验证机制
+
+3. **完善用户体验**：
+   - 改进前端表单验证
+   - 实现国际化支持
+   - 优化错误信息展示
+
+4. **增强测试覆盖**：
+   - 补充边缘情况测试
+   - 添加集成测试
+   - 实现端到端授权流程测试
+
+### 11.7 OAuth2流程与登录表单的无缝衔接
