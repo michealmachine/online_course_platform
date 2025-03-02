@@ -48,6 +48,14 @@ jwt:
   secret: ZDY1NmE3ZjI0ODdiNGZkZWJmZjk5MjExYjU4MzRlMzE2NzIwZWM0MjJmNmFlOWY5NzM2ZmRkMGM5NTYzYzE3YQ
   expiration: 86400000  # 24 hours
 
+# 内部客户端配置
+app:
+  client:
+    web:
+      secret: web-client-test-secret
+    mobile:
+      secret: mobile-client-test-secret
+
 oidc:
   issuer: http://localhost:8084
   authorization-endpoint: /oauth2/authorize

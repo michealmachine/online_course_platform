@@ -8,6 +8,7 @@ import com.double2and9.base.enums.AuthErrorCode;
 import com.double2and9.base.model.PageParams;
 import com.double2and9.base.model.PageResult;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
@@ -28,13 +29,17 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import java.util.Optional;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class ClientService {
     
     private final CustomJdbcRegisteredClientRepository clientRepository;
     private final PasswordEncoder passwordEncoder;
+    private final RegisteredClientRepository registeredClientRepository;
 
     @Transactional
     public ClientResponse createClient(CreateClientRequest request) {
@@ -174,14 +179,36 @@ public class ClientService {
     }
 
     /**
+     * 根据客户端ID查找客户端
+     * 
+     * @param clientId 客户端ID
+     * @return 客户端Optional包装，不存在时为empty
+     */
+    public Optional<RegisteredClient> findByClientId(String clientId) {
+        try {
+            RegisteredClient client = clientRepository.findByClientId(clientId);
+            return Optional.ofNullable(client);
+        } catch (Exception e) {
+            log.error("Error finding client by clientId: {}", clientId, e);
+            return Optional.empty();
+        }
+    }
+
+    /**
      * 检查客户端是否为内部客户端
+     *
+     * @param clientId 客户端ID
+     * @return 是否为内部客户端
      */
     public boolean isInternalClient(String clientId) {
         return clientRepository.isInternalClient(clientId);
     }
 
     /**
-     * 检查客户端是否自动授权
+     * 检查客户端是否允许自动授权
+     *
+     * @param clientId 客户端ID
+     * @return 是否允许自动授权
      */
     public boolean isAutoApproveClient(String clientId) {
         return clientRepository.isAutoApproveClient(clientId);

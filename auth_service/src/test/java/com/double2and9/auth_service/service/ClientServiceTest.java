@@ -21,6 +21,7 @@ import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -36,6 +37,9 @@ class ClientServiceTest {
 
     @Mock
     private PasswordEncoder passwordEncoder;
+
+    @Mock
+    private RegisteredClientRepository registeredClientRepository;
 
     @InjectMocks
     private ClientService clientService;
@@ -365,5 +369,48 @@ class ClientServiceTest {
         
         assertFalse(clientService.isAutoApproveClient("manual-client"));
         verify(clientRepository).isAutoApproveClient("manual-client");
+    }
+
+    // 新增测试：测试findByClientId方法 - 成功查找客户端
+    @Test
+    void findByClientId_Success() {
+        // 准备测试数据
+        when(clientRepository.findByClientId("existing-client")).thenReturn(existingClient);
+        
+        // 执行测试
+        Optional<RegisteredClient> result = clientService.findByClientId("existing-client");
+        
+        // 验证结果
+        assertTrue(result.isPresent());
+        assertEquals("existing-client", result.get().getClientId());
+        verify(clientRepository).findByClientId("existing-client");
+    }
+    
+    // 新增测试：测试findByClientId方法 - 客户端不存在
+    @Test
+    void findByClientId_NotFound() {
+        // 准备测试数据
+        when(clientRepository.findByClientId("non-existent")).thenReturn(null);
+        
+        // 执行测试
+        Optional<RegisteredClient> result = clientService.findByClientId("non-existent");
+        
+        // 验证结果
+        assertFalse(result.isPresent());
+        verify(clientRepository).findByClientId("non-existent");
+    }
+    
+    // 新增测试：测试findByClientId方法 - 发生异常
+    @Test
+    void findByClientId_Exception() {
+        // 准备测试数据
+        when(clientRepository.findByClientId("error-client")).thenThrow(new RuntimeException("Database error"));
+        
+        // 执行测试
+        Optional<RegisteredClient> result = clientService.findByClientId("error-client");
+        
+        // 验证结果
+        assertFalse(result.isPresent());
+        verify(clientRepository).findByClientId("error-client");
     }
 } 
