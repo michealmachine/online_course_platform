@@ -38,4 +38,12 @@ public class AuthorizationCode {
 
     @Column(nullable = false)
     private boolean used;  // 是否已使用
+
+    @Column(nullable = false)
+    private LocalDateTime createdAt;  // 创建时间
+
+    @PrePersist
+    protected void onCreate() {
+        createdAt = LocalDateTime.now();
+    }
 } 

@@ -6,7 +6,6 @@ import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -22,6 +21,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.oauth2.server.authorization.config.annotation.web.configurers.OAuth2AuthorizationServerConfigurer;
 
 @Configuration
 @EnableWebSecurity
@@ -51,10 +51,13 @@ public class SecurityConfig {
     }
 
     @Bean
-    @Order(2)
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        OAuth2AuthorizationServerConfigurer authorizationServerConfigurer = new OAuth2AuthorizationServerConfigurer();
+
         return http
                 .csrf(AbstractHttpConfigurer::disable)
+                .apply(authorizationServerConfigurer)
+                .and()
                 .authorizeHttpRequests(auth -> auth
                     // 静态资源
                     .requestMatchers(
@@ -65,10 +68,11 @@ public class SecurityConfig {
                         "/error",
                         "/favicon.ico"
                     ).permitAll()
-                    // 登录和授权确认页面
+                    // 登录、注册和授权确认页面
                     .requestMatchers(
                         "/auth/login", 
                         "/auth/register", 
+                        "/auth/captcha", 
                         "/oauth2/consent"
                     ).permitAll()
                     // Swagger UI 和 OpenAPI 相关路径
@@ -102,8 +106,11 @@ public class SecurityConfig {
                         "/api/oauth2/revoke",
                         "/api/oauth2/introspect"
                     ).permitAll()
-                    // UserInfo 端点需要认证
-                    .requestMatchers("/oauth2/userinfo").authenticated()
+                    // OAuth2 端点需要认证
+                    .requestMatchers(
+                        "/api/oauth2/userinfo",
+                        "/api/oauth2/authorize"
+                    ).authenticated()
                     // 其他请求需要认证
                     .anyRequest().authenticated()
                 )

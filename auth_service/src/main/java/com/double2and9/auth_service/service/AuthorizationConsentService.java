@@ -185,7 +185,7 @@ public class AuthorizationConsentService {
             // 生成授权码
             String code = authorizationCodeService.createAuthorizationCode(
                 request.getClientId(),
-                request.getUserId(),
+                request.getPrincipal(),
                 request.getRedirectUri(),
                 String.join(" ", request.getScopes()),
                 null,

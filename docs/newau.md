@@ -1829,7 +1829,7 @@ public Map<String, String> getScopeDescriptions() {
 **问题描述：**
 测试运行时遇到`UnnecessaryStubbingException`异常，表明测试中存在未使用的mock设置。具体问题在于`mockPrincipal.getName()`被设置为返回"testuser"，但实际测试执行中并未调用此方法。
 
-**解决方案：**
+**解决方案**：
 移除未使用的mock设置：
 ```java
 // 修改前
@@ -1853,14 +1853,14 @@ Principal mockPrincipal = mock(Principal.class);
 
 #### 11.4.3 RegisteredClient构建中的必需参数
 
-**问题描述：**
+**问题描述**：
 测试中构建模拟`RegisteredClient`对象时，遇到以下错误：
 1. `java.lang.IllegalArgumentException: authorizationGrantTypes cannot be empty`
 2. `java.lang.IllegalArgumentException: redirectUris cannot be empty`
 
 这表明在构建`RegisteredClient`对象时，这些属性是必需的，即使在实际测试场景中可能不会用到。
 
-**解决方案：**
+**解决方案**：
 在构建模拟客户端时添加必需的属性：
 ```java
 // 修改前
@@ -2458,4 +2458,281 @@ Spring Security默认启用CSRF保护，我们在表单设计中需要考虑以�
    - 添加集成测试
    - 实现端到端授权流程测试
 
-### 11.7 OAuth2流程与登录表单的无缝衔接
+### 11.7 授权流程问题修复与优化
+
+在实现和测试OAuth2授权流程的过程中，我们遇到并解决了一系列与用户认证、令牌生成和接口路径相关的问题。这些修复不仅确保了系统的稳定性，还优化了令牌的安全性和兼容性。
+
+#### 11.7.1 TokenService依赖注入问题修复
+
+**问题描述**：
+在运行TokenServiceTest时发现NullPointerException，原因是TokenService类中的PasswordEncoder依赖未正确初始化。
+
+**解决方案**：
+1. 更新了TokenServiceTest类，在setUp方法中正确模拟PasswordEncoder依赖：
+   ```java
+   @Mock
+   private PasswordEncoder passwordEncoder;
+   
+   @BeforeEach
+   void setUp() {
+       // 其他代码...
+       tokenService = new TokenService(
+           authorizationCodeService,
+           clientRepository,
+           jwtService,
+           passwordEncoder  // 添加这个依赖
+       );
+   }
+   ```
+
+2. 添加了必要的测试场景，验证密码编码器在不同授权流程中的正确使用
+
+**影响与收益**：
+- 修复了单元测试失败问题
+- 增强了测试覆盖率，确保依赖注入正确
+- 提高了代码质量和可维护性
+
+#### 11.7.2 授权码生成过程的用户查找问题
+
+**问题描述**：
+在FirstPartyAuthenticationTest中遇到"用户不存在"错误，虽然日志显示测试用户已成功创建，但在AuthorizationCodeService.createAuthorizationCode方法中仍报错用户不存在。
+
+**根本原因分析**：
+经过深入调查，发现问题出在以下几个地方：
+1. AuthorizationService的createAuthorizationRequest方法中创建的ConsentRequest没有设置principal字段
+2. 这导致AuthorizationConsentService的consent方法调用AuthorizationCodeService.createAuthorizationCode时传入了null用户名
+
+**解决方案**：
+1. 修改AuthorizationService类，在创建ConsentRequest时设置principal字段：
+   ```java
+   ConsentRequest consentRequest = new ConsentRequest();
+   consentRequest.setClientId(client.getClientId());
+   consentRequest.setUserId(userId);
+   consentRequest.setPrincipal(authentication.getName());  // 添加这一行
+   consentRequest.setRedirectUri(redirectUri);
+   ```
+
+2. 确保在整个授权流程中一致地使用用户标识，保持userId和principal的一致性
+
+**影响与收益**：
+- 修复了授权码生成过程中的关键错误
+- 实现了更可靠的用户身份传递
+- 提高了授权流程的健壮性
+
+#### 11.7.3 令牌架构与验证问题修复
+
+**问题描述**：
+在使用access_token访问/api/oauth2/userinfo端点时遇到401未授权错误，令牌无法通过验证。
+
+**多层面问题分析**：
+1. 路径配置问题：OidcController配置为/oauth2路径，但实际访问的是/api/oauth2/userinfo
+2. 令牌结构问题：access_token中使用userId字段标识用户，而不是标准的sub字段
+3. 令牌验证问题：JwtAuthenticationFilter尝试从token的sub字段获取用户名，但实际应从userId字段获取
+
+**综合解决方案**：
+1. 修改OidcController的路径配置，从/oauth2改为/api/oauth2：
+   ```java
+   @Tag(name = "OIDC", description = "OpenID Connect endpoints")
+   @RestController
+   @RequestMapping("/api/oauth2")  // 从/oauth2修改为/api/oauth2
+   @RequiredArgsConstructor
+   public class OidcController {
+       // ...
+   }
+   ```
+
+2. 修改JwtAuthenticationFilter，优先从sub字段获取用户名，如果没有再尝试从userId字段获取：
+   ```java
+   var claims = jwtTokenProvider.parseToken(jwt);
+   
+   // 优先使用sub字段，如果没有再使用userId
+   String userId = claims.getSubject();
+   if (userId == null) {
+       userId = claims.get("userId", String.class);
+   }
+   ```
+
+3. 修改JwtService的generateAccessToken方法，同时包含sub字段和userId字段：
+   ```java
+   Map<String, Object> claims = new HashMap<>();
+   claims.put("sub", user.getUsername());  // 添加标准的sub字段
+   claims.put("userId", userId);
+   claims.put("clientId", clientId);
+   claims.put("scope", scope);
+   claims.put("type", "access_token");
+   ```
+
+4. 增强CustomUserDetailsService，支持通过userId或username加载用户：
+   ```java
+   @Override
+   public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
+       try {
+           // 尝试将username转换为userId
+           Long userId = Long.parseLong(username);
+           return userRepository.findById(userId)
+                   .map(SecurityUser::new)
+                   .orElseThrow(() -> new UsernameNotFoundException("User not found: " + username));
+       } catch (NumberFormatException e) {
+           // 如果不是数字，则按用户名查找
+           return userRepository.findByUsername(username)
+                   .map(SecurityUser::new)
+                   .orElseThrow(() -> new UsernameNotFoundException("User not found: " + username));
+       }
+   }
+   ```
+
+**标准化与兼容性提升**：
+1. 采用OAuth2.0和OpenID Connect标准的sub字段作为用户唯一标识符
+2. 同时保留userId字段以保证向后兼容性
+3. JwtAuthenticationFilter现在能够处理两种类型的令牌
+4. CustomUserDetailsService灵活支持通过数字ID或用户名加载用户
+
+#### 11.7.4 测试用例增强
+
+为确保修复的有效性和系统的稳定性，我们增强了测试用例：
+
+1. 在FirstPartyAuthenticationTest中为测试用户添加OIDC相关字段：
+   ```java
+   // 设置OIDC相关字段
+   testUser.setPreferredUsername("testuser");
+   testUser.setGivenName("Test");
+   testUser.setFamilyName("User");
+   testUser.setEmailVerified(false);
+   testUser.setPhoneVerified(false);
+   ```
+
+2. 增加对OIDC特定属性的测试断言，确保用户信息端点正确返回这些信息：
+   ```java
+   .andExpect(jsonPath("$.sub").exists())
+   .andExpect(jsonPath("$.email").value(testUser.getEmail()))
+   .andExpect(jsonPath("$.preferred_username").value(testUser.getUsername()))
+   .andExpect(jsonPath("$.email_verified").exists());
+   ```
+
+3. 添加日志记录，跟踪授权流程各步骤中的用户状态和令牌信息，便于排查问题：
+   ```java
+   System.out.println("Test user found: " + currentUser.getUsername());
+   System.out.println("Test user ID: " + currentUser.getId());
+   System.out.println("Test user roles: " + currentUser.getRoles());
+   ```
+
+#### 11.7.5 经验总结与最佳实践
+
+通过解决这一系列问题，我们总结出以下经验与最佳实践：
+
+1. **数据传递完整性**：
+   - 在复杂的授权流程中，确保用户身份信息的完整传递至关重要
+   - 为避免null值引起的问题，关键字段应在每个环节都进行检查和设置
+
+2. **标准符合性**：
+   - 遵循OAuth2.0和OpenID Connect标准，特别是在字段命名和令牌结构方面
+   - sub字段应作为用户的唯一标识符，与用户名或用户ID保持一致
+   - 确保端点路径命名符合RESTful API最佳实践
+
+3. **兼容性设计**：
+   - 在进行API改进时，考虑向后兼容性
+   - 为新旧字段都提供支持，避免现有集成中断
+   - 灵活的服务实现可以平滑处理多种格式的请求
+
+4. **测试覆盖全面性**：
+   - 端到端测试应覆盖完整的授权流程
+   - 为每个关键环节添加详细的日志记录
+   - 测试数据应包含所有必要字段，特别是标准规范要求的字段
+
+这些修复不仅解决了当前问题，还提高了系统整体的健壮性和标准合规性，为未来的扩展和集成奠定了更坚实的基础。
+
+### 11.8 集成测试重构与增强
+
+为了全面测试重构后的 OAuth2 授权服务，我们进行了以下测试增强：
+
+#### 11.8.1 OAuth2 测试基类设计
+
+创建了 `BaseOAuth2IntegrationTest` 作为所有 OAuth2 集成测试的基类，主要功能包括：
+
+1. **环境准备**：
+   - 配置测试所需的 MockMvc、数据源和其他依赖
+   - 自动创建测试用户和客户端
+   - 生成和存储 PKCE 参数（code_verifier 和 code_challenge）
+
+2. **授权辅助方法**：
+   - 提供完整的 OAuth2 授权流程方法
+   - 封装登录、获取授权码和令牌交换过程
+   - 支持不同授权模式的测试（授权码、密码、刷新令牌等）
+
+3. **用户角色管理**：
+   - 支持创建具有不同角色的测试用户
+   - 便于测试基于角色的访问控制
+
+#### 11.8.2 OIDC 集成测试增强
+
+实现了 `OidcIntegrationTest` 测试类，专门测试 OIDC 相关功能：
+
+1. **用户信息端点测试**：
+   - 验证用户信息的完整性和正确性
+   - 确保所有必需的 OIDC 字段都正确返回
+   - 测试不同 scope 对返回字段的影响
+
+2. **OIDC 配置端点测试**：
+   - 验证 /.well-known/openid-configuration 端点
+   - 检查支持的授权类型和响应类型
+   - 确认端点 URL 的正确性
+
+#### 11.8.3 令牌操作集成测试
+
+实现了 `TokenOperationIntegrationTest` 测试类，专注于令牌管理功能：
+
+1. **令牌交换测试**：
+   - 使用不同的授权类型请求访问令牌
+   - 验证返回的令牌格式和有效期
+
+2. **令牌刷新测试**：
+   - 测试使用刷新令牌获取新的访问令牌
+   - 验证新旧令牌的区别和有效期延长
+
+3. **令牌撤销测试**：
+   - 测试访问令牌和刷新令牌的撤销
+   - 验证撤销后令牌的无效性
+
+4. **令牌内省测试**：
+   - 测试令牌内省端点的功能
+   - 验证活跃和非活跃令牌的内省结果
+
+#### 11.8.4 资源 API 授权测试
+
+实现了 `ResourceApiIntegrationTest` 测试类，针对受保护资源的访问控制：
+
+1. **用户管理 API 测试**：
+   - 测试用户创建、查询、更新和删除操作
+   - 验证不同角色的访问权限控制
+
+2. **客户端管理 API 测试**：
+   - 测试客户端注册、更新和删除
+   - 验证客户端凭证的安全处理
+
+3. **授权服务配置测试**：
+   - 测试授权服务器配置的访问控制
+   - 验证管理员特定操作的权限限制
+
+#### 11.8.5 OAuth2 授权流程测试
+
+实现了 `OAuth2AuthorizationIntegrationTest` 测试类，专注于授权流程的完整性：
+
+1. **完整授权码流程测试**：
+   - 模拟完整的用户授权过程
+   - 从登录到获取授权码再到令牌交换的全流程测试
+   - 验证每个步骤的响应和状态
+
+2. **PKCE 安全验证**：
+   - 测试 PKCE 挑战和验证机制
+   - 验证使用错误的 code_verifier 时的失败情况
+
+3. **参数验证测试**：
+   - 测试各种错误输入的处理
+   - 包括缺少必需参数、无效的响应类型、无效的客户端等
+   - 确保系统正确处理边界情况和异常输入
+
+4. **客户端认证测试**：
+   - 测试客户端凭证验证逻辑
+   - 验证无效客户端凭证时的错误处理
+
+这些测试重构和增强极大地提高了我们对 OAuth2 和 OIDC 实现的信心，确保系统在各种情况下都能正确工作，并符合相关标准和规范。

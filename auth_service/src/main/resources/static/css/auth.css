@@ -130,6 +130,77 @@ body {
     border: 1px solid #c8e6c9;
 }
 
+/* 验证码样式 */
+.captcha-group {
+    margin-bottom: 20px;
+}
+
+.captcha-container {
+    display: flex;
+    align-items: center;
+}
+
+.captcha-container input {
+    flex: 1;
+    margin-right: 10px;
+}
+
+.captcha-image {
+    display: flex;
+    align-items: center;
+}
+
+.captcha-image img {
+    height: 40px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+.btn-refresh {
+    background: none;
+    border: none;
+    color: #1e88e5;
+    cursor: pointer;
+    font-size: 0.9em;
+    margin-left: 5px;
+}
+
+.btn-refresh:hover {
+    text-decoration: underline;
+}
+
+/* 密码强度指示器 */
+.password-strength {
+    margin-top: 5px;
+    padding: 3px 8px;
+    font-size: 0.8em;
+    border-radius: 3px;
+    display: inline-block;
+}
+
+.password-strength.weak {
+    background-color: #ffcdd2;
+    color: #c62828;
+}
+
+.password-strength.medium {
+    background-color: #fff9c4;
+    color: #f57f17;
+}
+
+.password-strength.strong {
+    background-color: #c8e6c9;
+    color: #2e7d32;
+}
+
+/* 错误提示 */
+.error {
+    color: #c62828;
+    font-size: 0.8em;
+    display: block;
+    margin-top: 5px;
+}
+
 /* 授权确认页面特定样式 */
 .client-info {
     text-align: center;
@@ -170,4 +241,26 @@ body {
 .privacy-note {
     font-size: 0.85em;
     color: #666;
+}
+
+/* 响应式设计 */
+@media (max-width: 480px) {
+    .auth-box {
+        max-width: 100%;
+    }
+    
+    .captcha-container {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    .captcha-container input {
+        width: 100%;
+        margin-right: 0;
+        margin-bottom: 10px;
+    }
+    
+    .captcha-image {
+        width: 100%;
+    }
 } 

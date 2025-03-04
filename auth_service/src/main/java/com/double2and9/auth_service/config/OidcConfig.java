@@ -11,7 +11,7 @@ public class OidcConfig {
     private String issuer = "http://localhost:8084";
     private String authorizationEndpoint = "/oauth2/authorize";
     private String tokenEndpoint = "/oauth2/token";
-    private String userinfoEndpoint = "/oauth2/userinfo";
+    private String userinfoEndpoint = "/api/oauth2/userinfo";
     private String jwksUri = "/oauth2/jwks";
     private String endSessionEndpoint = "/oauth2/logout";
     private String[] scopesSupported = {"openid", "profile", "email", "phone", "address"};

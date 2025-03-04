@@ -1,10 +1,13 @@
 package com.double2and9.auth_service.cache;
 
+import com.double2and9.auth_service.config.BaseIntegrationTestConfig;
 import com.double2and9.auth_service.dto.response.PermissionTreeNode;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.ContextConfiguration;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -12,6 +15,8 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 
 @SpringBootTest
+@ContextConfiguration(classes = BaseIntegrationTestConfig.class)
+@ActiveProfiles("dev")
 class PermissionCacheManagerTest {
 
     @Autowired

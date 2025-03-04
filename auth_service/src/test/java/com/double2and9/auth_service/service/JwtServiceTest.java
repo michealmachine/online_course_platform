@@ -147,8 +147,9 @@ class JwtServiceTest {
         invalidClaims.put("type", "refresh_token");
         when(jwtTokenProvider.validateToken(TEST_TOKEN)).thenReturn(invalidClaims);
 
-        assertThrows(IllegalArgumentException.class, () -> 
+        AuthException exception = assertThrows(AuthException.class, () -> 
             jwtService.validateAccessToken(TEST_TOKEN));
+        assertEquals(AuthErrorCode.TOKEN_INVALID, exception.getErrorCode());
     }
 
     @Test

@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>注册 - 认证系统</title>
+    <link rel="stylesheet" th:href="@{/css/auth.css}">
+    <link rel="icon" type="image/x-icon" th:href="@{/images/favicon.ico}">
+</head>
+<body>
+    <div class="auth-container">
+        <div class="auth-box">
+            <div class="auth-header">
+                <h2>用户注册</h2>
+            </div>
+            
+            <div class="auth-content">
+                <!-- 错误信息展示 -->
+                <div th:if="${error}" class="alert alert-danger">
+                    <p th:text="${error}">注册失败</p>
+                </div>
+                <!-- 成功信息展示 -->
+                <div th:if="${success}" class="alert alert-success">
+                    <p th:text="${success}">操作成功</p>
+                </div>
+                <!-- 从URL参数显示错误 -->
+                <div th:if="${param.error}" class="alert alert-danger">
+                    <p th:text="${param.error}">注册失败</p>
+                </div>
+                
+                <!-- 注册表单 -->
+                <form th:action="@{/auth/register}" method="post" th:object="${registerRequest}" id="registerForm">
+                    <div class="form-group">
+                        <label for="username">用户名</label>
+                        <input type="text" id="username" th:field="*{username}" required>
+                        <small class="error" th:if="${#fields.hasErrors('username')}" th:errors="*{username}"></small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="email">邮箱</label>
+                        <input type="email" id="email" th:field="*{email}" required>
+                        <small class="error" th:if="${#fields.hasErrors('email')}" th:errors="*{email}"></small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="password">密码</label>
+                        <input type="password" id="password" th:field="*{password}" required>
+                        <small class="error" th:if="${#fields.hasErrors('password')}" th:errors="*{password}"></small>
+                        <div class="password-strength" id="passwordStrength"></div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="confirmPassword">确认密码</label>
+                        <input type="password" id="confirmPassword" th:field="*{confirmPassword}" required>
+                        <small class="error" th:if="${#fields.hasErrors('confirmPassword')}" th:errors="*{confirmPassword}"></small>
+                    </div>
+                    
+                    <div class="form-group captcha-group">
+                        <label for="captchaCode">验证码</label>
+                        <div class="captcha-container">
+                            <input type="text" id="captchaCode" th:field="*{captchaCode}" required>
+                            <input type="hidden" id="captchaId" th:field="*{captchaId}">
+                            <div class="captcha-image">
+                                <img id="captchaImg" src="" alt="验证码">
+                                <button type="button" id="refreshCaptcha" class="btn-refresh">刷新</button>
+                            </div>
+                        </div>
+                        <small class="error" th:if="${#fields.hasErrors('captchaCode')}" th:errors="*{captchaCode}"></small>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary">注册</button>
+                </form>
+            </div>
+            
+            <div class="auth-footer">
+                <p>已有账号? <a th:href="@{/auth/login}">登录</a></p>
+            </div>
+        </div>
+    </div>
+    
+    <script th:inline="javascript">
+        document.addEventListener('DOMContentLoaded', function() {
+            // 获取验证码
+            fetchCaptcha();
+            
+            // 刷新验证码按钮
+            document.getElementById('refreshCaptcha').addEventListener('click', function(e) {
+                e.preventDefault();
+                fetchCaptcha();
+            });
+            
+            // 密码强度检查
+            document.getElementById('password').addEventListener('input', checkPasswordStrength);
+            
+            // 确认密码验证
+            document.getElementById('confirmPassword').addEventListener('input', validateConfirmPassword);
+            
+            // 表单提交前验证
+            document.getElementById('registerForm').addEventListener('submit', function(e) {
+                if (!validateForm()) {
+                    e.preventDefault();
+                }
+            });
+        });
+        
+        // 获取验证码
+        function fetchCaptcha() {
+            fetch('/auth/captcha')
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('captchaImg').src = data.imageBase64;
+                    document.getElementById('captchaId').value = data.captchaId;
+                })
+                .catch(error => console.error('获取验证码失败:', error));
+        }
+        
+        // 检查密码强度
+        function checkPasswordStrength() {
+            const password = document.getElementById('password').value;
+            const strengthBar = document.getElementById('passwordStrength');
+            
+            // 清除之前的样式
+            strengthBar.className = 'password-strength';
+            
+            if (password.length === 0) {
+                strengthBar.textContent = '';
+                return;
+            }
+            
+            // 密码强度评估
+            let strength = 0;
+            
+            // 长度检查
+            if (password.length >= 8) strength += 1;
+            if (password.length >= 12) strength += 1;
+            
+            // 复杂度检查
+            if (/[A-Z]/.test(password)) strength += 1;
+            if (/[a-z]/.test(password)) strength += 1;
+            if (/[0-9]/.test(password)) strength += 1;
+            if (/[^A-Za-z0-9]/.test(password)) strength += 1;
+            
+            // 显示强度
+            if (strength < 3) {
+                strengthBar.textContent = '弱';
+                strengthBar.classList.add('weak');
+            } else if (strength < 5) {
+                strengthBar.textContent = '中';
+                strengthBar.classList.add('medium');
+            } else {
+                strengthBar.textContent = '强';
+                strengthBar.classList.add('strong');
+            }
+        }
+        
+        // 验证确认密码
+        function validateConfirmPassword() {
+            const password = document.getElementById('password').value;
+            const confirmPassword = document.getElementById('confirmPassword').value;
+            const confirmField = document.getElementById('confirmPassword');
+            
+            if (confirmPassword && password !== confirmPassword) {
+                confirmField.setCustomValidity('两次输入的密码不一致');
+            } else {
+                confirmField.setCustomValidity('');
+            }
+        }
+        
+        // 表单提交前验证
+        function validateForm() {
+            const password = document.getElementById('password').value;
+            const confirmPassword = document.getElementById('confirmPassword').value;
+            const captchaCode = document.getElementById('captchaCode').value;
+            
+            if (password !== confirmPassword) {
+                alert('两次输入的密码不一致');
+                return false;
+            }
+            
+            if (!captchaCode) {
+                alert('请输入验证码');
+                return false;
+            }
+            
+            return true;
+        }
+    </script>
+</body>
+</html> 

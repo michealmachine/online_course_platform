@@ -1,6 +1,5 @@
 package com.double2and9.auth_service.controller;
 
-import com.double2and9.auth_service.dto.request.TokenRevokeRequest;
 import com.double2and9.auth_service.exception.AuthException;
 import com.double2and9.auth_service.service.JwtService;
 import com.double2and9.base.enums.AuthErrorCode;
@@ -12,10 +11,12 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.nio.charset.StandardCharsets;
@@ -37,8 +38,15 @@ public class TokenRevokeController {
     @ApiResponse(responseCode = "200", description = "令牌撤销成功")
     @ApiResponse(responseCode = "400", description = "请求参数错误")
     @ApiResponse(responseCode = "401", description = "客户端认证失败")
-    @PostMapping("/revoke")
-    public void revokeToken(@RequestBody @Valid TokenRevokeRequest request, HttpServletRequest httpRequest) {
+    @PostMapping(
+        value = "/revoke",
+        consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE
+    )
+    public void revokeToken(
+        @RequestParam("token") String token,
+        @RequestParam(value = "token_type_hint", required = false) String tokenTypeHint,
+        HttpServletRequest httpRequest
+    ) {
         // 从HTTP Basic认证头提取客户端凭证
         String[] clientCredentials = extractClientCredentials(httpRequest);
         
@@ -47,7 +55,7 @@ public class TokenRevokeController {
             throw new AuthException(AuthErrorCode.INVALID_CLIENT_CREDENTIALS, HttpStatus.UNAUTHORIZED);
         }
         
-        jwtService.revokeToken(request.getToken());
+        jwtService.revokeToken(token);
     }
 
     /**

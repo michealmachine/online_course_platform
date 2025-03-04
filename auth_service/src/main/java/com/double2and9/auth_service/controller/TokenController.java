@@ -12,11 +12,13 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.util.StringUtils;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.nio.charset.StandardCharsets;
@@ -34,8 +36,15 @@ public class TokenController {
     @ApiResponse(responseCode = "200", description = "成功返回令牌")
     @ApiResponse(responseCode = "400", description = "请求参数错误")
     @ApiResponse(responseCode = "401", description = "客户端认证失败")
-    @PostMapping("/token")
-    public TokenResponse token(@Valid @RequestBody TokenRequest request, HttpServletRequest httpRequest) {
+    @PostMapping(value = "/token", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE)
+    public TokenResponse token(
+            @RequestParam("grant_type") String grantType,
+            @RequestParam(value = "code", required = false) String code,
+            @RequestParam(value = "redirect_uri", required = false) String redirectUri,
+            @RequestParam(value = "refresh_token", required = false) String refreshToken,
+            @RequestParam(value = "scope", required = false) String scope,
+            @RequestParam(value = "code_verifier", required = false) String codeVerifier,
+            HttpServletRequest httpRequest) {
         // 1. 从HTTP Basic认证头提取客户端凭证
         String[] clientCredentials = extractClientCredentials(httpRequest);
         
@@ -44,10 +53,19 @@ public class TokenController {
             throw new AuthException(AuthErrorCode.INVALID_CLIENT_CREDENTIALS, HttpStatus.UNAUTHORIZED);
         }
         
-        // 3. 验证请求参数
+        // 3. 构建 TokenRequest 对象
+        TokenRequest request = new TokenRequest();
+        request.setGrantType(grantType);
+        request.setCode(code);
+        request.setRedirectUri(redirectUri);
+        request.setRefreshToken(refreshToken);
+        request.setScope(scope);
+        request.setCodeVerifier(codeVerifier);
+        
+        // 4. 验证请求参数
         validateTokenRequest(request);
         
-        // 4. 调用service处理令牌请求，传入客户端凭证和请求参数
+        // 5. 调用service处理令牌请求，传入客户端凭证和请求参数
         return tokenService.createToken(clientCredentials[0], clientCredentials[1], request);
     }
     
@@ -98,7 +116,7 @@ public class TokenController {
                 throw new AuthException(AuthErrorCode.PARAMETER_VALIDATION_FAILED, HttpStatus.BAD_REQUEST);
             }
         } else {
-            throw new AuthException(AuthErrorCode.INVALID_GRANT_TYPE);
+            throw new AuthException(AuthErrorCode.INVALID_GRANT_TYPE, HttpStatus.BAD_REQUEST);
         }
     }
 } 

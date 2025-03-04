@@ -9,12 +9,9 @@ import com.double2and9.base.enums.AuthErrorCode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.AfterEach;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
-import org.springframework.security.test.context.support.WithMockUser;
-import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 import com.double2and9.auth_service.cache.PermissionCacheManager;
 
@@ -25,16 +22,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
-@SpringBootTest
-@AutoConfigureMockMvc
-@Transactional
-class RoleControllerIntegrationTest {
-
-    @Autowired
-    private MockMvc mockMvc;
-
-    @Autowired
-    private ObjectMapper objectMapper;
+class RoleControllerIntegrationTest extends BaseOAuth2IntegrationTest {
 
     @Autowired
     private RoleRepository roleRepository;
@@ -43,15 +31,15 @@ class RoleControllerIntegrationTest {
     private PermissionRepository permissionRepository;
 
     @Autowired
-    private PermissionCacheManager cacheManager;
+    private PermissionCacheManager permissionCacheManager;
 
     private Role testRole;
     private Permission testPermission;
-    @Autowired
-    private PermissionCacheManager permissionCacheManager;
 
     @BeforeEach
-    void setUp() {
+    public void setUp() throws Exception {
+        super.setUp();
+        
         permissionCacheManager.clearPermissionTree();
         // 创建测试角色
         testRole = new Role();
@@ -69,47 +57,55 @@ class RoleControllerIntegrationTest {
         testPermission = permissionRepository.save(testPermission);
     }
 
+    @AfterEach
+    public void tearDown() {
+        permissionCacheManager.clearPermissionTree();
+    }
+
     @Test
-    @WithMockUser(roles = "ADMIN")
     void assignPermissions_Success() throws Exception {
         AssignPermissionRequest request = new AssignPermissionRequest();
         request.setPermissionIds(List.of(testPermission.getId()));
 
         mockMvc.perform(post("/api/roles/{roleId}/permissions", testRole.getId())
                 .contentType(MediaType.APPLICATION_JSON)
+                .header("Authorization", "Bearer " + accessToken)
                 .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated());
     }
 
     @Test
-    @WithMockUser(roles = "ADMIN")
     void assignPermissions_RoleNotFound() throws Exception {
         AssignPermissionRequest request = new AssignPermissionRequest();
         request.setPermissionIds(List.of(testPermission.getId()));
 
         mockMvc.perform(post("/api/roles/{roleId}/permissions", 999L)
                 .contentType(MediaType.APPLICATION_JSON)
+                .header("Authorization", "Bearer " + accessToken)
                 .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value(AuthErrorCode.ROLE_NOT_EXISTS.getCode()));
     }
 
     @Test
-    @WithMockUser(roles = "USER")
     void assignPermissions_NoPermission() throws Exception {
+        // 使用普通用户token
+        setupUserWithToken();
+
         AssignPermissionRequest request = new AssignPermissionRequest();
         request.setPermissionIds(List.of(testPermission.getId()));
 
         mockMvc.perform(post("/api/roles/{roleId}/permissions", testRole.getId())
                 .contentType(MediaType.APPLICATION_JSON)
+                .header("Authorization", "Bearer " + accessToken)
                 .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isForbidden());
     }
 
     @Test
-    @WithMockUser(roles = "ADMIN")
     void getRolePermissions_Success() throws Exception {
-        mockMvc.perform(get("/api/roles/{roleId}/permissions", testRole.getId()))
+        mockMvc.perform(get("/api/roles/{roleId}/permissions", testRole.getId())
+                .header("Authorization", "Bearer " + accessToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.roleId").value(testRole.getId()))
                 .andExpect(jsonPath("$.roleName").value(testRole.getName()))
@@ -117,22 +113,22 @@ class RoleControllerIntegrationTest {
     }
 
     @Test
-    @WithMockUser(roles = "ADMIN")
     void revokePermission_Success() throws Exception {
         // 先分配权限
         testRole.getPermissions().add(testPermission);
         roleRepository.save(testRole);
 
         mockMvc.perform(delete("/api/roles/{roleId}/permissions/{permissionId}",
-                testRole.getId(), testPermission.getId()))
+                testRole.getId(), testPermission.getId())
+                .header("Authorization", "Bearer " + accessToken))
                 .andExpect(status().isNoContent());
     }
 
     @Test
-    @WithMockUser(roles = "ADMIN")
     void assignPermissions_ShouldClearCache() throws Exception {
         // 先获取权限树并缓存
-        mockMvc.perform(get("/api/permissions/tree"))
+        mockMvc.perform(get("/api/permissions/tree")
+                .header("Authorization", "Bearer " + accessToken))
                 .andExpect(status().isOk());
 
         // 分配权限
@@ -141,10 +137,11 @@ class RoleControllerIntegrationTest {
 
         mockMvc.perform(post("/api/roles/{roleId}/permissions", testRole.getId())
                 .contentType(MediaType.APPLICATION_JSON)
+                .header("Authorization", "Bearer " + accessToken)
                 .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated());
 
         // 验证缓存已被清除
-        assertNull(cacheManager.getPermissionTree());
+        assertNull(permissionCacheManager.getPermissionTree());
     }
 } 

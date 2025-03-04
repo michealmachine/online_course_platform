@@ -38,9 +38,20 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final AuthenticationManager authenticationManager;
     private final AuthJwtTokenProvider tokenProvider;
+    private final CaptchaService captchaService;
 
     @Transactional
     public AuthResponse register(RegisterRequest request) {
+        // 验证密码是否一致
+        if (!request.getPassword().equals(request.getConfirmPassword())) {
+            throw new AuthException(AuthErrorCode.PASSWORD_MISMATCH, HttpStatus.BAD_REQUEST);
+        }
+
+        // 验证验证码
+        if (!captchaService.validateCaptcha(request.getCaptchaId(), request.getCaptchaCode())) {
+            throw new AuthException(AuthErrorCode.INVALID_CAPTCHA, HttpStatus.BAD_REQUEST);
+        }
+
         if (userRepository.existsByUsername(request.getUsername())) {
             throw new AuthException(AuthErrorCode.USERNAME_ALREADY_EXISTS, HttpStatus.BAD_REQUEST);
         }
@@ -56,7 +67,9 @@ public class AuthService {
         user.setUsername(request.getUsername());
         user.setPassword(passwordEncoder.encode(request.getPassword()));
         user.setEmail(request.getEmail());
+        user.setEmailVerified(true); // 暂时默认邮箱已验证，后续实现验证功能
         user.setRoles(Collections.singleton(userRole));
+        user.setCreatedAt(LocalDateTime.now());
         
         userRepository.save(user);
 

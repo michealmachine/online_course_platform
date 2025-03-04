@@ -1,15 +1,19 @@
 package com.double2and9.auth_service.controller;
 
 import com.double2and9.auth_service.config.OidcConfig;
+import com.double2and9.auth_service.dto.response.TokenIntrospectionResponse;
 import com.double2and9.auth_service.dto.response.UserInfoResponse;
+import com.double2and9.auth_service.exception.AuthException;
 import com.double2and9.auth_service.service.JwtService;
 import com.double2and9.auth_service.service.UserService;
 import com.double2and9.auth_service.service.OidcSessionService;
+import com.double2and9.base.enums.AuthErrorCode;
 import com.nimbusds.jose.jwk.JWKSet;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
@@ -20,7 +24,7 @@ import java.util.Map;
 
 @Tag(name = "OIDC", description = "OpenID Connect endpoints")
 @RestController
-@RequestMapping("/oauth2")
+@RequestMapping("/api/oauth2")
 @RequiredArgsConstructor
 public class OidcController {
 
@@ -33,6 +37,23 @@ public class OidcController {
     @Operation(summary = "获取用户信息", security = @SecurityRequirement(name = "bearer-jwt"))
     @GetMapping("/userinfo")
     public ResponseEntity<UserInfoResponse> getUserInfo(Authentication authentication) {
+        // 从请求头中获取令牌
+        String token = null;
+        if (authentication.getCredentials() != null) {
+            token = authentication.getCredentials().toString();
+        }
+        
+        // 如果没有令牌，抛出未授权异常
+        if (token == null) {
+            throw new AuthException(AuthErrorCode.AUTHENTICATION_FAILED, HttpStatus.UNAUTHORIZED);
+        }
+        
+        // 检查令牌是否被撤销
+        TokenIntrospectionResponse introspectionResponse = jwtService.introspectToken(token);
+        if (!introspectionResponse.isActive()) {
+            throw new AuthException(AuthErrorCode.TOKEN_REVOKED, HttpStatus.UNAUTHORIZED);
+        }
+        
         String username = authentication.getName();
         return ResponseEntity.ok(userService.getUserInfoByUsername(username));
     }

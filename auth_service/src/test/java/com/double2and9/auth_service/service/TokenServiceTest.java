@@ -19,6 +19,7 @@ import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClient.Builder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import io.jsonwebtoken.Claims;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -39,6 +40,9 @@ class TokenServiceTest {
 
     @Mock
     private JwtService jwtService;
+
+    @Mock
+    private PasswordEncoder passwordEncoder;
 
     @InjectMocks
     private TokenService tokenService;
@@ -69,6 +73,10 @@ class TokenServiceTest {
         authCode = new AuthorizationCode();
         authCode.setUserId("test_user");
         authCode.setScope("read write");
+
+        // 配置 PasswordEncoder 的行为
+        when(passwordEncoder.matches(eq("test_secret"), any())).thenReturn(true);
+        when(passwordEncoder.matches(eq("wrong_secret"), any())).thenReturn(false);
     }
 
     @Test

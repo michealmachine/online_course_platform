@@ -77,10 +77,9 @@ public class LoginController {
      * 显示注册页面
      * @return 注册页面视图
      */
-    @GetMapping("/register")
+    @GetMapping("/auth/register")
     public String showRegisterPage() {
-        // 先返回登录页面，后续实现注册页面
-        return "auth/login";
+        return "redirect:/auth/register-page";
     }
 
     @PostMapping("/login")

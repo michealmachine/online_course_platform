@@ -40,7 +40,7 @@ import java.util.Set;
 @SpringBootTest(classes = AuthServiceApplication.class)
 @AutoConfigureMockMvc
 @Transactional
-class UserControllerIntegrationTest {
+class UserControllerIntegrationTest extends BaseOAuth2IntegrationTest {
 
     @Autowired
     private WebApplicationContext context;
@@ -67,25 +67,21 @@ class UserControllerIntegrationTest {
     private UserService userService;
 
     private User testUser;
-    private String adminToken;
 
     @BeforeEach
-    void setUp() {
+    public void setUp() throws Exception {
+        super.setUp();  // 先调用父类的 setUp
+        testUser = super.testUser;  // 获取父类创建的 testUser
         mockMvc = MockMvcBuilders
                 .webAppContextSetup(context)
                 .apply(SecurityMockMvcConfigurers.springSecurity())
                 .build();
-
-        // 创建测试用户
-        testUser = createTestUser("testuser", "ROLE_USER");
-        // 创建管理员用户并获取token
-        adminToken = getAdminToken();
     }
 
     @Test
-    @WithMockUser(roles = "ADMIN")
     void getUsers_Success() throws Exception {
         mockMvc.perform(get("/api/users")
+                .header("Authorization", "Bearer " + accessToken)
                 .param("page", "0")
                 .param("size", "10")
                 .param("username", "test"))
@@ -95,23 +91,25 @@ class UserControllerIntegrationTest {
     }
 
     @Test
-    @WithMockUser(roles = "ADMIN")
     void getUser_Success() throws Exception {
-        mockMvc.perform(get("/api/users/{id}", testUser.getId()))
+        setupAdminUser();  // 添加管理员权限
+        mockMvc.perform(get("/api/users/{id}", testUser.getId())
+                .header("Authorization", "Bearer " + accessToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.username").value(testUser.getUsername()))
                 .andExpect(jsonPath("$.email").value(testUser.getEmail()));
     }
 
     @Test
-    @WithMockUser(roles = "ADMIN")
     void updateUser_Success() throws Exception {
+        setupAdminUser();  // 添加管理员权限
         UpdateUserRequest request = new UpdateUserRequest();
         request.setNickname("新昵称");
         request.setPhone("13800138000");
 
         mockMvc.perform(put("/api/users/{id}", testUser.getId())
                 .contentType(MediaType.APPLICATION_JSON)
+                .header("Authorization", "Bearer " + accessToken)
                 .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.nickname").value("新昵称"))
@@ -119,7 +117,6 @@ class UserControllerIntegrationTest {
     }
 
     @Test
-    @WithMockUser(roles = "ADMIN")
     void createUser_Success() throws Exception {
         CreateUserRequest request = new CreateUserRequest();
         request.setUsername("newuser");
@@ -131,8 +128,9 @@ class UserControllerIntegrationTest {
 
         mockMvc.perform(post("/api/users")
                 .contentType(MediaType.APPLICATION_JSON)
+                .header("Authorization", "Bearer " + accessToken)
                 .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isOk())
+                .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.username").value("newuser"))
                 .andExpect(jsonPath("$.email").value("newuser@example.com"))
                 .andExpect(jsonPath("$.nickname").value("New User"))
@@ -141,17 +139,17 @@ class UserControllerIntegrationTest {
 
     @Test
     void createUser_NoPermission() throws Exception {
+        // 使用普通用户token
+        setupUserWithToken();
+
         CreateUserRequest request = new CreateUserRequest();
         request.setUsername("newuser");
         request.setPassword("password123");
         request.setEmail("newuser@example.com");
         request.setRoles(Set.of("ROLE_USER"));
 
-        // 使用普通用户token
-        String userToken = getUserToken();
-
         mockMvc.perform(post("/api/users")
-                .header("Authorization", "Bearer " + userToken)
+                .header("Authorization", "Bearer " + accessToken)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isForbidden())
@@ -160,7 +158,6 @@ class UserControllerIntegrationTest {
     }
 
     @Test
-    @WithMockUser(roles = "ADMIN")
     void createUser_DuplicateUsername() throws Exception {
         // 先创建一个用户
         CreateUserRequest request = new CreateUserRequest();
@@ -168,12 +165,18 @@ class UserControllerIntegrationTest {
         request.setPassword("password123");
         request.setEmail("existing@example.com");
         request.setRoles(Set.of("ROLE_USER"));
-        userService.createUser(request);
+
+        mockMvc.perform(post("/api/users")
+                .contentType(MediaType.APPLICATION_JSON)
+                .header("Authorization", "Bearer " + accessToken)
+                .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isCreated());
 
         // 尝试创建同名用户
         request.setEmail("another@example.com");
         mockMvc.perform(post("/api/users")
                 .contentType(MediaType.APPLICATION_JSON)
+                .header("Authorization", "Bearer " + accessToken)
                 .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value(AuthErrorCode.USERNAME_ALREADY_EXISTS.getCode()))
@@ -181,7 +184,6 @@ class UserControllerIntegrationTest {
     }
 
     @Test
-    @WithMockUser(roles = "ADMIN")
     void createUser_InvalidRole() throws Exception {
         CreateUserRequest request = new CreateUserRequest();
         request.setUsername("newuser");
@@ -191,13 +193,13 @@ class UserControllerIntegrationTest {
 
         mockMvc.perform(post("/api/users")
                 .contentType(MediaType.APPLICATION_JSON)
+                .header("Authorization", "Bearer " + accessToken)
                 .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value(AuthErrorCode.INVALID_ROLE.getCode()));
     }
 
     @Test
-    @WithMockUser(roles = "ADMIN")
     void createUser_WithOidcInfo_Success() throws Exception {
         CreateUserRequest request = new CreateUserRequest();
         request.setUsername("oidcuser");
@@ -221,8 +223,9 @@ class UserControllerIntegrationTest {
 
         mockMvc.perform(post("/api/users")
                 .contentType(MediaType.APPLICATION_JSON)
+                .header("Authorization", "Bearer " + accessToken)
                 .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isOk())
+                .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.username").value("oidcuser"))
                 .andExpect(jsonPath("$.email").value("oidc@example.com"))
                 .andExpect(jsonPath("$.givenName").value("John"))
@@ -236,11 +239,8 @@ class UserControllerIntegrationTest {
     }
 
     @Test
-    @WithMockUser(roles = "ADMIN")
     void updateUser_WithOidcInfo_Success() throws Exception {
-        // 先创建一个用户
-        User user = createTestUser("updateoidc", "ROLE_USER");
-
+        setupAdminUser();  // 添加管理员权限
         UpdateUserRequest request = new UpdateUserRequest();
         request.setNickname("Updated OIDC User");
         request.setPhone("13900139000");
@@ -253,8 +253,9 @@ class UserControllerIntegrationTest {
         request.setZoneinfo("America/New_York");
         request.setLocale("en-US");
 
-        mockMvc.perform(put("/api/users/{id}", user.getId())
+        mockMvc.perform(put("/api/users/{id}", testUser.getId())
                 .contentType(MediaType.APPLICATION_JSON)
+                .header("Authorization", "Bearer " + accessToken)
                 .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.nickname").value("Updated OIDC User"))

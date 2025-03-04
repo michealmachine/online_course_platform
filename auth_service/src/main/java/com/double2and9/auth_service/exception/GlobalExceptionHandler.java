@@ -12,6 +12,7 @@ import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
@@ -55,9 +56,12 @@ public class GlobalExceptionHandler {
                  INVALID_GRANT_TYPE,
                  INVALID_AUTHORIZATION_CODE,
                  AUTHORIZATION_CODE_GENERATE_ERROR,
+                 TOKEN_INVALID,
+                 TOKEN_UNSUPPORTED,
                  // PKCE相关错误
                  PKCE_REQUIRED,
                  INVALID_CODE_CHALLENGE_METHOD,
+                 INVALID_CODE_CHALLENGE,
                  // 账户状态相关错误
                  ACCOUNT_DISABLED,
                  ACCOUNT_LOCKED,
@@ -67,9 +71,7 @@ public class GlobalExceptionHandler {
             // 401 - Unauthorized
             case PASSWORD_ERROR,
                  TOKEN_EXPIRED,
-                 TOKEN_INVALID,
                  TOKEN_SIGNATURE_INVALID,
-                 TOKEN_UNSUPPORTED,
                  TOKEN_CLAIMS_EMPTY,
                  TOKEN_REVOKED,
                  INVALID_CLIENT_CREDENTIALS,
@@ -104,6 +106,16 @@ public class GlobalExceptionHandler {
                 .code(AuthErrorCode.PARAMETER_VALIDATION_FAILED.getCode())
                 .message(AuthErrorCode.PARAMETER_VALIDATION_FAILED.getMessage())
                 .details(details)
+                .build();
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+    }
+
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<ErrorResponse> handleMissingServletRequestParameterException(MissingServletRequestParameterException ex) {
+        ErrorResponse response = ErrorResponse.builder()
+                .code(AuthErrorCode.PARAMETER_VALIDATION_FAILED.getCode())
+                .message("缺少必要的请求参数: " + ex.getParameterName())
+                .details(ex.getMessage())
                 .build();
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
     }

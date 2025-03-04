@@ -17,6 +17,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.double2and9.auth_service.repository.UserRepository;
 import com.double2and9.auth_service.config.OidcConfig;
+import org.springframework.http.HttpStatus;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -59,14 +60,16 @@ public class JwtService {
             User user = userRepository.findById(userIdLong)
                     .orElseThrow(() -> {
                         log.error("User not found with ID: {}", userId);
-                        return new AuthException(AuthErrorCode.USER_NOT_FOUND);
+                        return new AuthException(AuthErrorCode.USER_NOT_FOUND, HttpStatus.NOT_FOUND);
                     });
 
             Map<String, Object> claims = new HashMap<>();
+            claims.put("sub", user.getUsername());  // 添加 sub 字段，使用用户名
             claims.put("userId", userId);
             claims.put("clientId", clientId);
             claims.put("scope", scope);
             claims.put("type", "access_token");
+            claims.put("username", user.getUsername());  // 添加 username 字段
             
             // 如果是机构用户，添加机构ID
             if (user.getOrganizationId() != null) {
@@ -76,10 +79,10 @@ public class JwtService {
             return generateToken(claims, ACCESS_TOKEN_EXPIRES_IN);
         } catch (NumberFormatException e) {
             log.error("Invalid user ID format: {}", userId);
-            throw new AuthException(AuthErrorCode.USER_NOT_FOUND);
+            throw new AuthException(AuthErrorCode.USER_NOT_FOUND, HttpStatus.BAD_REQUEST);
         } catch (Exception e) {
             log.error("Failed to generate access token for user {}: {}", userId, e.getMessage());
-            throw new AuthException(AuthErrorCode.TOKEN_GENERATE_ERROR);
+            throw new AuthException(AuthErrorCode.TOKEN_GENERATE_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 
@@ -97,7 +100,7 @@ public class JwtService {
             User user = userRepository.findById(userIdLong)
                     .orElseThrow(() -> {
                         log.error("User not found with ID: {}", userId);
-                        return new AuthException(AuthErrorCode.USER_NOT_FOUND);
+                        return new AuthException(AuthErrorCode.USER_NOT_FOUND, HttpStatus.NOT_FOUND);
                     });
 
             Map<String, Object> claims = new HashMap<>();
@@ -114,10 +117,10 @@ public class JwtService {
             return generateToken(claims, REFRESH_TOKEN_EXPIRES_IN);
         } catch (NumberFormatException e) {
             log.error("Invalid user ID format: {}", userId);
-            throw new AuthException(AuthErrorCode.USER_NOT_FOUND);
+            throw new AuthException(AuthErrorCode.USER_NOT_FOUND, HttpStatus.BAD_REQUEST);
         } catch (Exception e) {
             log.error("Failed to generate refresh token for user {}: {}", userId, e.getMessage());
-            throw new AuthException(AuthErrorCode.TOKEN_GENERATE_ERROR);
+            throw new AuthException(AuthErrorCode.TOKEN_GENERATE_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 
@@ -130,7 +133,7 @@ public class JwtService {
         // 验证令牌类型
         String type = claims.get("type", String.class);
         if (!"access_token".equals(type)) {
-            throw new IllegalArgumentException("Invalid token type");
+            throw new AuthException(AuthErrorCode.TOKEN_INVALID, HttpStatus.BAD_REQUEST);
         }
 
         return claims;
@@ -143,15 +146,26 @@ public class JwtService {
      * @throws AuthException 如果令牌无效或已过期
      */
     public Claims validateRefreshToken(String refreshToken) {
-        Claims claims = parseToken(refreshToken);
-        
-        // 验证令牌类型
-        String tokenType = claims.get("type", String.class);
-        if (!"refresh_token".equals(tokenType)) {
-            throw new AuthException(AuthErrorCode.TOKEN_INVALID);
+        try {
+            Claims claims = parseToken(refreshToken);
+            
+            // 验证令牌类型
+            String tokenType = claims.get("type", String.class);
+            if (!"refresh_token".equals(tokenType)) {
+                throw new AuthException(AuthErrorCode.TOKEN_INVALID, HttpStatus.BAD_REQUEST);
+            }
+            
+            return claims;
+        } catch (AuthException e) {
+            // 如果是令牌格式错误，返回 400 Bad Request
+            if (e.getCause() instanceof io.jsonwebtoken.MalformedJwtException) {
+                throw new AuthException(AuthErrorCode.TOKEN_INVALID, HttpStatus.BAD_REQUEST);
+            }
+            throw e;
+        } catch (Exception e) {
+            // 其他未知错误也视为请求格式错误
+            throw new AuthException(AuthErrorCode.TOKEN_INVALID, HttpStatus.BAD_REQUEST);
         }
-        
-        return claims;
     }
 
     /**
@@ -190,7 +204,7 @@ public class JwtService {
                 tokenBlacklistService.addToBlacklist(token, expirationTime);
             }
         } catch (Exception e) {
-            throw new AuthException(AuthErrorCode.TOKEN_INVALID);
+            throw new AuthException(AuthErrorCode.TOKEN_INVALID, HttpStatus.BAD_REQUEST);
         }
     }
 
@@ -206,26 +220,29 @@ public class JwtService {
             // 检查令牌是否被撤销
             if (tokenBlacklistService.isBlacklisted(token)) {
                 log.debug("Token is blacklisted");
-                throw new AuthException(AuthErrorCode.TOKEN_REVOKED);
+                throw new AuthException(AuthErrorCode.TOKEN_REVOKED, HttpStatus.UNAUTHORIZED);
             }
             log.debug("Token validation successful");
             return claims;
         } catch (ExpiredJwtException e) {
             log.debug("Token expired");
-            throw new AuthException(AuthErrorCode.TOKEN_EXPIRED);
+            throw new AuthException(AuthErrorCode.TOKEN_EXPIRED, HttpStatus.UNAUTHORIZED);
         } catch (SignatureException e) {
             log.debug("Invalid token signature");
-            throw new AuthException(AuthErrorCode.TOKEN_SIGNATURE_INVALID);
+            throw new AuthException(AuthErrorCode.TOKEN_SIGNATURE_INVALID, HttpStatus.UNAUTHORIZED);
         } catch (UnsupportedJwtException e) {
             log.debug("Unsupported token format");
-            throw new AuthException(AuthErrorCode.TOKEN_UNSUPPORTED);
+            throw new AuthException(AuthErrorCode.TOKEN_UNSUPPORTED, HttpStatus.BAD_REQUEST);
+        } catch (io.jsonwebtoken.MalformedJwtException e) {
+            log.debug("Malformed token");
+            throw new AuthException(AuthErrorCode.TOKEN_INVALID, HttpStatus.BAD_REQUEST);
         } catch (AuthException e) {
             // 直接抛出 AuthException，不做转换
             log.debug("Auth exception while parsing token: {}", e.getMessage());
             throw e;
         } catch (Exception e) {
             log.debug("Unexpected error while parsing token: {}", e.getMessage());
-            throw new AuthException(AuthErrorCode.TOKEN_INVALID);
+            throw new AuthException(AuthErrorCode.TOKEN_INVALID, HttpStatus.BAD_REQUEST);
         }
     }
 
@@ -253,6 +270,7 @@ public class JwtService {
                 .active(true)
                 .clientId(claims.get("clientId", String.class))
                 .userId(claims.get("userId", String.class))
+                .username(claims.get("username", String.class))
                 .scope(claims.get("scope", String.class))
                 .exp(claims.getExpiration().getTime() / 1000)
                 .iat(claims.getIssuedAt().getTime() / 1000)
@@ -378,6 +396,7 @@ public class JwtService {
             response.setActive(true);
             response.setUserId(claims.get("sub", String.class));  // ID Token 使用 sub 作为用户ID
             response.setClientId(claims.get("aud", String.class));  // ID Token 使用 aud 作为客户端ID
+            response.setUsername(claims.get("preferred_username", String.class));  // 从 preferred_username 获取用户名
             response.setScope("openid profile email");  // ID Token 的默认作用域
             response.setExp(claims.getExpiration().getTime() / 1000);  // 转换为秒
             response.setIat(claims.getIssuedAt().getTime() / 1000);  // 转换为秒

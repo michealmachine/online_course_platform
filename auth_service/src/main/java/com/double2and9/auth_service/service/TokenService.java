@@ -11,6 +11,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import io.jsonwebtoken.Claims;
@@ -23,6 +24,7 @@ public class TokenService {
     private final CustomJdbcRegisteredClientRepository clientRepository;
     private final AuthorizationCodeService authorizationCodeService;
     private final JwtService jwtService;
+    private final PasswordEncoder passwordEncoder;
     
     private static final String GRANT_TYPE_AUTHORIZATION_CODE = "authorization_code";
     private static final String GRANT_TYPE_REFRESH_TOKEN = "refresh_token";
@@ -64,7 +66,7 @@ public class TokenService {
         // 验证PKCE
         if (authCode.getCodeChallenge() != null) {
             if (request.getCodeVerifier() == null) {
-                throw new AuthException(AuthErrorCode.CODE_VERIFIER_REQUIRED);
+                throw new AuthException(AuthErrorCode.CODE_VERIFIER_REQUIRED, HttpStatus.BAD_REQUEST);
             }
 
             boolean isValidVerifier = PKCEUtils.verifyCodeChallenge(
@@ -74,7 +76,7 @@ public class TokenService {
             );
 
             if (!isValidVerifier) {
-                throw new AuthException(AuthErrorCode.INVALID_CODE_VERIFIER);
+                throw new AuthException(AuthErrorCode.INVALID_CODE_VERIFIER, HttpStatus.BAD_REQUEST);
             }
         }
 
@@ -166,8 +168,8 @@ public class TokenService {
      */
     private RegisteredClient validateClient(String clientId, String clientSecret) {
         RegisteredClient client = clientRepository.findByClientId(clientId);
-        if (client == null || !client.getClientSecret().equals(clientSecret)) {
-            throw new AuthException(AuthErrorCode.INVALID_CLIENT_CREDENTIALS);
+        if (client == null || !passwordEncoder.matches(clientSecret, client.getClientSecret())) {
+            throw new AuthException(AuthErrorCode.INVALID_CLIENT_CREDENTIALS, HttpStatus.UNAUTHORIZED);
         }
         return client;
     }

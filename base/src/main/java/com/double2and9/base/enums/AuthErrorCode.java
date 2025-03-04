@@ -20,6 +20,7 @@ public enum AuthErrorCode {
     CREDENTIALS_EXPIRED(300108, "凭证已过期"),
     USERNAME_EXISTS(300109, "用户名已存在"),
     EMAIL_EXISTS(300110, "邮箱已被注册"),
+    PASSWORD_MISMATCH(300111, "两次输入的密码不一致"),
 
     // 角色权限相关错误 3002xx
     ROLE_NOT_EXISTS(300201, "角色不存在"),
@@ -44,6 +45,7 @@ public enum AuthErrorCode {
     UNAUTHORIZED(300402, "未授权访问"),
     LOGIN_FAILED(300403, "登录失败"),
     LOGOUT_FAILED(300404, "登出失败"),
+    INVALID_CAPTCHA(300405, "验证码错误或已过期"),
 
     // 参数验证错误 3005xx
     PARAMETER_VALIDATION_FAILED(300501, "参数验证失败"),

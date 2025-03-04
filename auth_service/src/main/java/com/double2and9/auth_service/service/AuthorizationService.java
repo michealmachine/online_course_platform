@@ -8,6 +8,7 @@ import com.double2and9.auth_service.repository.CustomJdbcRegisteredClientReposit
 import com.double2and9.base.enums.AuthErrorCode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
 import org.springframework.stereotype.Service;
@@ -59,13 +60,18 @@ public class AuthorizationService {
 
         // 验证PKCE参数
         if (request.getCodeChallenge() == null || request.getCodeChallengeMethod() == null) {
-            throw new AuthException(AuthErrorCode.PKCE_REQUIRED);
+            throw new AuthException(AuthErrorCode.PKCE_REQUIRED, HttpStatus.BAD_REQUEST);
         }
 
         // 验证code_challenge_method
         if (!("plain".equals(request.getCodeChallengeMethod()) || 
               "S256".equals(request.getCodeChallengeMethod()))) {
-            throw new AuthException(AuthErrorCode.INVALID_CODE_CHALLENGE_METHOD);
+            throw new AuthException(AuthErrorCode.INVALID_CODE_CHALLENGE_METHOD, HttpStatus.BAD_REQUEST);
+        }
+
+        // 验证code_challenge格式
+        if (!request.getCodeChallenge().matches("^[A-Za-z0-9\\-._~]{43,128}$")) {
+            throw new AuthException(AuthErrorCode.INVALID_CODE_CHALLENGE, HttpStatus.BAD_REQUEST);
         }
 
         // 创建授权响应
@@ -93,6 +99,7 @@ public class AuthorizationService {
             ConsentRequest consentRequest = new ConsentRequest();
             consentRequest.setClientId(client.getClientId());
             consentRequest.setUserId(authentication.getName());
+            consentRequest.setPrincipal(authentication.getName());
             consentRequest.setRedirectUri(request.getRedirectUri());
             consentRequest.setScopes(requestedScopes);
             

@@ -152,7 +152,7 @@ public class LoginControllerTest {
     @Test
     public void testShowRegisterPage() {
         String viewName = loginController.showRegisterPage();
-        assertEquals("auth/login", viewName);
+        assertEquals("redirect:/auth/register-page", viewName);
     }
 
     @Test

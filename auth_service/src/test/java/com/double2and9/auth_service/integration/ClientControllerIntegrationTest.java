@@ -25,7 +25,7 @@ import static org.hamcrest.Matchers.*;
 @SpringBootTest
 @AutoConfigureMockMvc
 @Transactional
-class ClientControllerIntegrationTest {
+class ClientControllerIntegrationTest extends BaseOAuth2IntegrationTest {
 
     @Autowired
     private MockMvc mockMvc;
@@ -39,7 +39,9 @@ class ClientControllerIntegrationTest {
     private CreateClientRequest request;
 
     @BeforeEach
-    void setUp() {
+    public void setUp() throws Exception {
+        super.setUp();
+
         request = new CreateClientRequest();
         request.setClientId("test-client");
         request.setClientSecret("secret");
@@ -51,10 +53,11 @@ class ClientControllerIntegrationTest {
     }
 
     @Test
-    @WithMockUser(roles = {"ADMIN"}, username = "admin")
     void createClient_Success() throws Exception {
+        setupAdminUser();
         mockMvc.perform(post("/api/clients")
                 .contentType(MediaType.APPLICATION_JSON)
+                .header("Authorization", "Bearer " + accessToken)
                 .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.clientId").value(request.getClientId()))
@@ -65,27 +68,31 @@ class ClientControllerIntegrationTest {
     }
 
     @Test
-    @WithMockUser(roles = "ADMIN")
     void createClient_DuplicateId() throws Exception {
         // 先创建一个客户端
         mockMvc.perform(post("/api/clients")
                 .contentType(MediaType.APPLICATION_JSON)
+                .header("Authorization", "Bearer " + accessToken)
                 .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated());
 
         // 尝试创建相同ID的客户端
         mockMvc.perform(post("/api/clients")
                 .contentType(MediaType.APPLICATION_JSON)
+                .header("Authorization", "Bearer " + accessToken)
                 .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value(AuthErrorCode.CLIENT_ID_EXISTS.getCode()));
     }
 
     @Test
-    @WithMockUser(roles = "USER")
     void createClient_InsufficientPermissions() throws Exception {
+        // 使用普通用户token
+        setupUserWithToken();
+
         mockMvc.perform(post("/api/clients")
                 .contentType(MediaType.APPLICATION_JSON)
+                .header("Authorization", "Bearer " + accessToken)
                 .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isForbidden());
     }
@@ -99,35 +106,36 @@ class ClientControllerIntegrationTest {
     }
 
     @Test
-    @WithMockUser(roles = "ADMIN")
     void getClient_Success() throws Exception {
         // 先创建一个客户端
         mockMvc.perform(post("/api/clients")
                 .contentType(MediaType.APPLICATION_JSON)
+                .header("Authorization", "Bearer " + accessToken)
                 .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated());
 
         // 获取创建的客户端
-        mockMvc.perform(get("/api/clients/{clientId}", request.getClientId()))
+        mockMvc.perform(get("/api/clients/{clientId}", request.getClientId())
+                .header("Authorization", "Bearer " + accessToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.clientId").value(request.getClientId()))
                 .andExpect(jsonPath("$.clientName").value(request.getClientName()));
     }
 
     @Test
-    @WithMockUser(roles = "ADMIN")
     void getClient_NotFound() throws Exception {
-        mockMvc.perform(get("/api/clients/{clientId}", "non-existent"))
+        mockMvc.perform(get("/api/clients/{clientId}", "non-existent")
+                .header("Authorization", "Bearer " + accessToken))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value(AuthErrorCode.CLIENT_NOT_FOUND.getCode()));
     }
 
     @Test
-    @WithMockUser(roles = "ADMIN")
     void updateClient_Success() throws Exception {
         // 先创建一个客户端
         mockMvc.perform(post("/api/clients")
                 .contentType(MediaType.APPLICATION_JSON)
+                .header("Authorization", "Bearer " + accessToken)
                 .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated());
 
@@ -141,31 +149,33 @@ class ClientControllerIntegrationTest {
         // 执行更新
         mockMvc.perform(put("/api/clients/{clientId}", request.getClientId())
                 .contentType(MediaType.APPLICATION_JSON)
+                .header("Authorization", "Bearer " + accessToken)
                 .content(objectMapper.writeValueAsString(updateRequest)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.clientName").value(updateRequest.getClientName()));
     }
 
     @Test
-    @WithMockUser(roles = "ADMIN")
     void deleteClient_Success() throws Exception {
         // 先创建一个客户端
         mockMvc.perform(post("/api/clients")
                 .contentType(MediaType.APPLICATION_JSON)
+                .header("Authorization", "Bearer " + accessToken)
                 .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated());
 
         // 删除客户端
-        mockMvc.perform(delete("/api/clients/{clientId}", request.getClientId()))
+        mockMvc.perform(delete("/api/clients/{clientId}", request.getClientId())
+                .header("Authorization", "Bearer " + accessToken))
                 .andExpect(status().isNoContent());
 
         // 验证客户端已被删除
-        mockMvc.perform(get("/api/clients/{clientId}", request.getClientId()))
+        mockMvc.perform(get("/api/clients/{clientId}", request.getClientId())
+                .header("Authorization", "Bearer " + accessToken))
                 .andExpect(status().isNotFound());
     }
 
     @Test
-    @WithMockUser(roles = "ADMIN")
     void listClients_Success() throws Exception {
         // 创建多个客户端
         for (int i = 0; i < 3; i++) {
@@ -180,23 +190,24 @@ class ClientControllerIntegrationTest {
 
             mockMvc.perform(post("/api/clients")
                     .contentType(MediaType.APPLICATION_JSON)
+                    .header("Authorization", "Bearer " + accessToken)
                     .content(objectMapper.writeValueAsString(newRequest)))
                     .andExpect(status().isCreated());
         }
 
-        // 获取客户端列表 - 注意：测试环境中会有预设的web-client和mobile-client
+        // 获取客户端列表
         mockMvc.perform(get("/api/clients")
+                .header("Authorization", "Bearer " + accessToken)
                 .param("pageNo", "1")
                 .param("pageSize", "10"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.items", hasSize(greaterThanOrEqualTo(3))))  // 至少有3个客户端
-                .andExpect(jsonPath("$.counts", greaterThanOrEqualTo(3)))         // 总数至少为3
+                .andExpect(jsonPath("$.items", hasSize(greaterThanOrEqualTo(3))))
+                .andExpect(jsonPath("$.counts", greaterThanOrEqualTo(3)))
                 .andExpect(jsonPath("$.page").value(1))
                 .andExpect(jsonPath("$.pageSize").value(10));
     }
 
     @Test
-    @WithMockUser(roles = "ADMIN")
     void createClient_WithOidcScopes_Success() throws Exception {
         CreateClientRequest request = new CreateClientRequest();
         request.setClientId("oidc-client");
@@ -209,6 +220,7 @@ class ClientControllerIntegrationTest {
 
         mockMvc.perform(post("/api/clients")
                 .contentType(MediaType.APPLICATION_JSON)
+                .header("Authorization", "Bearer " + accessToken)
                 .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.clientId").value("oidc-client"))
@@ -218,7 +230,6 @@ class ClientControllerIntegrationTest {
     }
 
     @Test
-    @WithMockUser(roles = "ADMIN")
     void updateClient_WithOidcScopes_Success() throws Exception {
         // 先创建一个客户端
         CreateClientRequest createRequest = new CreateClientRequest();
@@ -232,6 +243,7 @@ class ClientControllerIntegrationTest {
 
         mockMvc.perform(post("/api/clients")
                 .contentType(MediaType.APPLICATION_JSON)
+                .header("Authorization", "Bearer " + accessToken)
                 .content(objectMapper.writeValueAsString(createRequest)))
                 .andExpect(status().isCreated());
 
@@ -244,6 +256,7 @@ class ClientControllerIntegrationTest {
 
         mockMvc.perform(put("/api/clients/{clientId}", "update-oidc-client")
                 .contentType(MediaType.APPLICATION_JSON)
+                .header("Authorization", "Bearer " + accessToken)
                 .content(objectMapper.writeValueAsString(updateRequest)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.clientName").value("Updated OIDC Client"))

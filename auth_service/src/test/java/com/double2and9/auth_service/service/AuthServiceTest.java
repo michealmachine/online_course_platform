@@ -51,6 +51,9 @@ class AuthServiceTest {
     @Mock
     private AuthJwtTokenProvider tokenProvider;
 
+    @Mock
+    private CaptchaService captchaService;
+
     @InjectMocks
     private AuthService authService;
 
@@ -68,7 +71,10 @@ class AuthServiceTest {
         registerRequest = new RegisterRequest();
         registerRequest.setUsername("testuser");
         registerRequest.setPassword("password123");
+        registerRequest.setConfirmPassword("password123");
         registerRequest.setEmail("test@example.com");
+        registerRequest.setCaptchaId("test-captcha-id");
+        registerRequest.setCaptchaCode("123456");
 
         // 设置登录请求数据
         loginRequest = new LoginRequest();
@@ -105,6 +111,7 @@ class AuthServiceTest {
         when(userRepository.save(any(User.class))).thenReturn(user);
         when(authenticationManager.authenticate(any())).thenReturn(authentication);
         when(tokenProvider.generateToken(any())).thenReturn("jwt.token.here");
+        when(captchaService.validateCaptcha(anyString(), anyString())).thenReturn(true);
 
         // 执行注册
         AuthResponse response = authService.register(registerRequest);
@@ -122,11 +129,13 @@ class AuthServiceTest {
         verify(roleRepository).findByName("ROLE_USER");
         verify(passwordEncoder).encode("password123");
         verify(userRepository).save(any(User.class));
+        verify(captchaService).validateCaptcha(anyString(), anyString());
     }
 
     @Test
     void register_WhenUsernameExists_ThrowsException() {
         when(userRepository.existsByUsername("testuser")).thenReturn(true);
+        when(captchaService.validateCaptcha(anyString(), anyString())).thenReturn(true);
 
         AuthException exception = assertThrows(AuthException.class, () -> {
             authService.register(registerRequest);
@@ -141,6 +150,7 @@ class AuthServiceTest {
     void register_WhenEmailExists_ThrowsException() {
         when(userRepository.existsByUsername("testuser")).thenReturn(false);
         when(userRepository.existsByEmail("test@example.com")).thenReturn(true);
+        when(captchaService.validateCaptcha(anyString(), anyString())).thenReturn(true);
 
         AuthException exception = assertThrows(AuthException.class, () -> {
             authService.register(registerRequest);
