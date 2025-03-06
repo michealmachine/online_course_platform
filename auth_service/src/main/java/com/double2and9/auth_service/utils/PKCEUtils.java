@@ -5,6 +5,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
+import java.security.SecureRandom;
 import com.double2and9.auth_service.exception.AuthException;
 import com.double2and9.base.enums.AuthErrorCode;
 
@@ -43,5 +44,25 @@ public class PKCEUtils {
         }
         
         throw new AuthException(AuthErrorCode.INVALID_CODE_VERIFIER);
+    }
+    
+    /**
+     * 生成一个随机的 code_verifier
+     * 按照 RFC 7636 规范，code_verifier 应该是一个长度在43到128之间的随机字符串
+     * 包含字母、数字、"-"、"."、"_"和"~"
+     */
+    public static String generateCodeVerifier() {
+        SecureRandom secureRandom = new SecureRandom();
+        byte[] codeVerifier = new byte[64]; // 生成一个64字节的随机字符串
+        secureRandom.nextBytes(codeVerifier);
+        return Base64.getUrlEncoder().withoutPadding()
+                .encodeToString(codeVerifier);
+    }
+    
+    /**
+     * 使用 S256 方法生成 code_challenge
+     */
+    public static String generateCodeChallenge(String codeVerifier) {
+        return computeCodeChallenge(codeVerifier, "S256");
     }
 } 

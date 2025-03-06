@@ -22,9 +22,13 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 
-@Tag(name = "OIDC", description = "OpenID Connect endpoints")
+/**
+ * OIDC扩展控制器 
+ * 提供标准OAuth2/OIDC端点之外的附加功能
+ */
+@Tag(name = "OIDC扩展", description = "OpenID Connect额外扩展端点")
 @RestController
-@RequestMapping("/api/oauth2")
+@RequestMapping("/api/oidc")
 @RequiredArgsConstructor
 public class OidcController {
 
@@ -84,7 +88,11 @@ public class OidcController {
         return ResponseEntity.ok(jwkSet);
     }
 
-    @Operation(summary = "检查会话状态")
+    /**
+     * 检查会话状态API
+     * 注意：标准的会话检查已由OAuth2框架处理，这是一个扩展功能
+     */
+    @Operation(summary = "检查会话状态(扩展)")
     @GetMapping("/check-session")
     public ResponseEntity<String> checkSession(
             @RequestParam("client_id") String clientId,
@@ -92,24 +100,17 @@ public class OidcController {
         return ResponseEntity.ok(String.valueOf(sessionService.checkSession(clientId, sessionState)));
     }
 
-    @Operation(summary = "结束会话")
-    @GetMapping("/end-session")
+    /**
+     * 自定义会话结束API
+     * 注意：标准的登出流程已由OAuth2框架处理，这是一个扩展功能
+     */
+    @Operation(summary = "自定义结束会话(扩展)")
+    @GetMapping("/custom-end-session")
     public ResponseEntity<Void> endSession(
             @RequestParam(required = false) String idTokenHint,
             @RequestParam(required = false) String postLogoutRedirectUri,
             @RequestParam(required = false) String state) {
         sessionService.endSession(idTokenHint, postLogoutRedirectUri, state);
         return ResponseEntity.ok().build();
-    }
-
-    @Operation(summary = "RP发起的登出")
-    @GetMapping("/session/end")
-    public ResponseEntity<String> rpInitiatedLogout(
-            @RequestParam(name = "id_token_hint", required = false) String idTokenHint,
-            @RequestParam(name = "post_logout_redirect_uri") String postLogoutRedirectUri,
-            @RequestParam(name = "state", required = false) String state) {
-        String redirectUri = sessionService.handleRpInitiatedLogout(
-            idTokenHint, postLogoutRedirectUri, state);
-        return ResponseEntity.ok(redirectUri);
     }
 } 

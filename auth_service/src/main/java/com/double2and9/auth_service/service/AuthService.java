@@ -106,6 +106,36 @@ public class AuthService {
         }
     }
 
+    /**
+     * 使用用户名和密码直接登录（用于OAuth2流程）
+     */
+    public String login(String username, String password, String ip) {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new AuthException(AuthErrorCode.USER_NOT_FOUND, HttpStatus.BAD_REQUEST));
+
+        if (user.isAccountLocked()) {
+            if (isLockExpired(user)) {
+                resetLockStatus(user);
+            } else {
+                throw new AuthException(AuthErrorCode.ACCOUNT_LOCKED, HttpStatus.BAD_REQUEST);
+            }
+        }
+
+        try {
+            Authentication authentication = authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(username, password)
+            );
+
+            handleLoginSuccess(user, ip);
+            
+            // 返回JWT令牌
+            return tokenProvider.generateToken(authentication);
+        } catch (BadCredentialsException e) {
+            handleLoginFailure(user);
+            throw e;
+        }
+    }
+
     private AuthResponse generateAuthResponse(Authentication authentication) {
         SecurityContextHolder.getContext().setAuthentication(authentication);
         String jwt = tokenProvider.generateToken(authentication);

@@ -116,6 +116,8 @@ class UserControllerIntegrationTest extends BaseOAuth2IntegrationTest {
                 .andExpect(jsonPath("$.phone").value("13800138000"));
     }
 
+
+
     @Test
     void createUser_Success() throws Exception {
         CreateUserRequest request = new CreateUserRequest();
@@ -311,5 +313,12 @@ class UserControllerIntegrationTest extends BaseOAuth2IntegrationTest {
         loginRequest.setPassword("password123");
         AuthResponse response = authService.login(loginRequest, "127.0.0.1");
         return response.getToken();
+    }
+
+    /**
+     * 设置普通用户的令牌
+     */
+    public void setupUserWithToken() throws Exception {
+        setupUserToken();
     }
 } 

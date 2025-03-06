@@ -100,7 +100,14 @@ public enum AuthErrorCode {
     INVALID_CODE_CHALLENGE(301102, "无效的 code_challenge"),
     CODE_VERIFIER_MISMATCH(301105, "code_verifier 不匹配"),
 
-    INVALID_CODE(301003, "无效的授权码"); // 添加这个
+    // OAuth2标准错误 3012xx
+    OAUTH2_ERROR(301201, "OAuth2认证错误"),
+    RESOURCE_NOT_FOUND(301202, "请求的资源不存在"),
+    SESSION_ERROR(301203, "会话认证失败"),
+    CSRF_ERROR(301204, "CSRF令牌错误"),
+    METHOD_NOT_ALLOWED(301205, "不支持的HTTP请求方法"),
+
+    INVALID_CODE(301003, "无效的授权码");
 
     private final int code;
     private final String message;

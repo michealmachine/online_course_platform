@@ -230,4 +230,72 @@ class AuthServiceTest {
         assertEquals(0, user.getLoginAttempts());
         assertNull(user.getLockTime());
     }
+
+    @Test
+    void loginWithCredentials_Success() {
+        when(authenticationManager.authenticate(any(Authentication.class)))
+                .thenReturn(authentication);
+        when(tokenProvider.generateToken(authentication))
+                .thenReturn("test.jwt.token");
+        when(userRepository.findByUsername("testuser"))
+                .thenReturn(Optional.of(user));
+
+        String token = authService.login("testuser", "password123", TEST_IP);
+
+        assertNotNull(token);
+        assertEquals("test.jwt.token", token);
+
+        verify(userRepository).save(user);
+        assertEquals(0, user.getLoginAttempts());
+        assertNotNull(user.getLastLoginTime());
+        assertEquals(TEST_IP, user.getLastLoginIp());
+    }
+
+    @Test
+    void loginWithCredentials_WrongPassword() {
+        when(userRepository.findByUsername("testuser"))
+                .thenReturn(Optional.of(user));
+        when(authenticationManager.authenticate(any(Authentication.class)))
+                .thenThrow(new BadCredentialsException("Bad credentials"));
+
+        assertThrows(BadCredentialsException.class,
+                () -> authService.login("testuser", "wrong_password", TEST_IP));
+
+        verify(userRepository).save(user);
+        assertEquals(1, user.getLoginAttempts());
+    }
+
+    @Test
+    void loginWithCredentials_AccountLocked() {
+        user.setAccountLocked(true);
+        user.setLockTime(LocalDateTime.now());
+        when(userRepository.findByUsername("testuser"))
+                .thenReturn(Optional.of(user));
+
+        AuthException exception = assertThrows(AuthException.class,
+                () -> authService.login("testuser", "password123", TEST_IP));
+
+        assertEquals(AuthErrorCode.ACCOUNT_LOCKED, exception.getErrorCode());
+        verify(authenticationManager, never()).authenticate(any());
+    }
+
+    @Test
+    void loginWithCredentials_LockExpired() {
+        user.setAccountLocked(true);
+        user.setLockTime(LocalDateTime.now().minusMinutes(31));
+        when(userRepository.findByUsername("testuser"))
+                .thenReturn(Optional.of(user));
+        when(authenticationManager.authenticate(any(Authentication.class)))
+                .thenReturn(authentication);
+        when(tokenProvider.generateToken(authentication))
+                .thenReturn("test.jwt.token");
+
+        String token = authService.login("testuser", "password123", TEST_IP);
+
+        assertNotNull(token);
+        assertEquals("test.jwt.token", token);
+        assertFalse(user.isAccountLocked());
+        assertEquals(0, user.getLoginAttempts());
+        assertNull(user.getLockTime());
+    }
 } 

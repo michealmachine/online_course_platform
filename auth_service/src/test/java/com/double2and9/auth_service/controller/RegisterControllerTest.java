@@ -46,7 +46,7 @@ public class RegisterControllerTest {
 
     @Test
     public void testShowRegisterPage() throws Exception {
-        mockMvc.perform(get("/auth/register-page"))
+        mockMvc.perform(get("/auth/register"))
                 .andExpect(status().isOk())
                 .andExpect(view().name("auth/register"))
                 .andExpect(model().attributeExists("registerRequest"));
@@ -54,7 +54,7 @@ public class RegisterControllerTest {
 
     @Test
     public void testShowRegisterPage_WithErrorAndSuccess() throws Exception {
-        mockMvc.perform(get("/auth/register-page")
+        mockMvc.perform(get("/auth/register")
                 .param("error", "测试错误")
                 .param("success", "测试成功"))
                 .andExpect(status().isOk())
@@ -112,7 +112,7 @@ public class RegisterControllerTest {
         mockMvc.perform(post("/auth/register")
                 .flashAttr("registerRequest", request))
                 .andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrl("/auth/register-page"))
+                .andExpect(redirectedUrl("/auth/register"))
                 .andExpect(flash().attributeExists("org.springframework.validation.BindingResult.registerRequest"))
                 .andExpect(flash().attributeExists("registerRequest"));
 
@@ -142,7 +142,7 @@ public class RegisterControllerTest {
         mockMvc.perform(post("/auth/register")
                 .flashAttr("registerRequest", request))
                 .andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrl("/auth/register-page"))
+                .andExpect(redirectedUrl("/auth/register"))
                 .andExpect(flash().attributeExists("error"))
                 .andExpect(flash().attributeExists("registerRequest"));
     }

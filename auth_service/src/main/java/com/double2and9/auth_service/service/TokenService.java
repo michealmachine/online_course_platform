@@ -29,7 +29,7 @@ public class TokenService {
     private static final String GRANT_TYPE_AUTHORIZATION_CODE = "authorization_code";
     private static final String GRANT_TYPE_REFRESH_TOKEN = "refresh_token";
     private static final String TOKEN_TYPE = "Bearer";
-    private static final int ACCESS_TOKEN_EXPIRES_IN = 3600;  // 访问令牌1小时过期
+    private static final long ACCESS_TOKEN_EXPIRES_IN = 3600L;  // 访问令牌1小时过期
 
     @Transactional
     public TokenResponse createToken(String clientId, String clientSecret, TokenRequest request) {

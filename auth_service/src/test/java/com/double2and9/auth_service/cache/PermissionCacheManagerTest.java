@@ -1,21 +1,25 @@
 package com.double2and9.auth_service.cache;
 
-import com.double2and9.auth_service.config.BaseIntegrationTestConfig;
+import com.double2and9.auth_service.config.CompleteTestConfig;
 import com.double2and9.auth_service.dto.response.PermissionTreeNode;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.ContextConfiguration;
+import org.springframework.test.context.TestPropertySource;
 
 import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-@SpringBootTest
-@ContextConfiguration(classes = BaseIntegrationTestConfig.class)
+@SpringBootTest(classes = {PermissionCacheManager.class})
+@Import(CompleteTestConfig.class)
+@TestPropertySource(properties = {
+    "spring.main.allow-bean-definition-overriding=true"
+})
 @ActiveProfiles("dev")
 class PermissionCacheManagerTest {
 

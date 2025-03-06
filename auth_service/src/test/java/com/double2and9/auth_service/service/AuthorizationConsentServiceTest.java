@@ -23,6 +23,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.mockito.MockitoAnnotations;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationConsentService;
+import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationConsentService;
 
 import java.time.Instant;
 import java.util.Set;
@@ -52,7 +53,7 @@ class AuthorizationConsentServiceTest {
     private AuthorizationCodeService authorizationCodeService;
 
     @InjectMocks
-    private AuthorizationConsentService authorizationConsentService;
+    private CustomAuthorizationConsentService authorizationConsentService;
 
     private AuthorizationConsentRequest request;
     private AuthorizationResponse authorizationResponse;

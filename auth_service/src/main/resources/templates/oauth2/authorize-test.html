@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OAuth2授权测试</title>
+    <link th:href="@{/css/bootstrap.min.css}" rel="stylesheet">
+    <style>
+        body {
+            padding: 2rem;
+            background-color: #f8f9fa;
+        }
+        .card {
+            margin-top: 2rem;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .btn-oauth {
+            background-color: #4285f4;
+            color: white;
+            font-weight: 500;
+            padding: 0.5rem 1.5rem;
+            border-radius: 5px;
+            border: none;
+        }
+        .btn-oauth:hover {
+            background-color: #357ae8;
+            color: white;
+        }
+        .flow-description {
+            background-color: #e9ecef;
+            padding: 1rem;
+            border-radius: 5px;
+            margin-bottom: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="text-center mb-4">OAuth2授权测试</h1>
+        
+        <div class="card">
+            <div class="card-header">
+                <h4>标准OAuth2授权码流程测试</h4>
+            </div>
+            <div class="card-body">
+                <div class="flow-description">
+                    <h5>OAuth2授权码流程说明：</h5>
+                    <ol>
+                        <li>点击下方"启动授权流程"按钮</li>
+                        <li>系统将重定向到OAuth2授权端点</li>
+                        <li>如未登录，将首先跳转到登录页面</li>
+                        <li>登录后，可能需要确认授权范围</li>
+                        <li>确认后，系统将重定向回测试回调页面</li>
+                        <li>测试回调页面将显示获取的授权码</li>
+                    </ol>
+                </div>
+                
+                <div class="text-center">
+                    <a th:href="${authorizeUrl}" class="btn btn-oauth">启动授权流程</a>
+                </div>
+                
+                <div class="mt-4">
+                    <h5>授权请求详情：</h5>
+                    <pre class="bg-light p-3 rounded" th:text="${authorizeUrl}">授权URL</pre>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card mt-4">
+            <div class="card-header">
+                <h4>已配置的OAuth2终端</h4>
+            </div>
+            <div class="card-body">
+                <ul class="list-group">
+                    <li class="list-group-item">
+                        <strong>授权端点：</strong> /oauth2/authorize
+                    </li>
+                    <li class="list-group-item">
+                        <strong>令牌端点：</strong> /oauth2/token
+                    </li>
+                    <li class="list-group-item">
+                        <strong>令牌内省端点：</strong> /oauth2/introspect
+                    </li>
+                    <li class="list-group-item">
+                        <strong>令牌撤销端点：</strong> /oauth2/revoke
+                    </li>
+                    <li class="list-group-item">
+                        <strong>用户信息端点：</strong> /oauth2/userinfo
+                    </li>
+                    <li class="list-group-item">
+                        <strong>JWKS端点：</strong> /oauth2/jwks
+                    </li>
+                    <li class="list-group-item">
+                        <strong>OIDC配置端点：</strong> /.well-known/openid-configuration
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <script th:src="@{/js/bootstrap.bundle.min.js}"></script>
+</body>
+</html> 

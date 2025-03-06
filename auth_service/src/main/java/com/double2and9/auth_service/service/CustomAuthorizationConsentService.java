@@ -36,10 +36,18 @@ import java.util.concurrent.TimeUnit;
 import java.util.UUID;
 import java.time.LocalDateTime;
 
+/**
+ * 自定义授权确认服务
+ * 
+ * @deprecated 此类已被标准的Spring Security OAuth2授权服务器实现所取代。
+ * 不再需要自定义授权控制器和服务，请使用Spring Security提供的标准OAuth2实现。
+ * 此类仅为保持测试兼容性而保留。
+ */
 @Slf4j
 @Service
+@Deprecated
 @RequiredArgsConstructor
-public class AuthorizationConsentService {
+public class CustomAuthorizationConsentService {
     
     private final RegisteredClientRepository clientRepository;
     private final OAuth2AuthorizationService oauth2AuthorizationService;
@@ -81,6 +89,9 @@ public class AuthorizationConsentService {
         return authorizationResponse;
     }
 
+    /**
+     * 处理用户对授权请求的同意操作
+     */
     @Transactional
     public AuthorizationConsentResponse consent(AuthorizationConsentRequest request, Authentication authentication) {
         // 验证用户是否已认证
@@ -150,6 +161,9 @@ public class AuthorizationConsentService {
         return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
     }
 
+    /**
+     * 处理授权同意请求
+     */
     @Transactional
     public String consent(ConsentRequest request) {
         try {

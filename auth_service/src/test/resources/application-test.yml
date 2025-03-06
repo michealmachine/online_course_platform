@@ -1,3 +1,0 @@
-jwt:
-  secret: ZDY1NmE3ZjI0ODdiNGZkZWJmZjk5MjExYjU4MzRlMzE2NzIwZWM0MjJmNmFlOWY5NzM2ZmRkMGM5NTYzYzE3YQ
-  expiration: 86400000  # 24小时 

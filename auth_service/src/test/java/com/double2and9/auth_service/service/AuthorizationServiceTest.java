@@ -31,7 +31,7 @@ class AuthorizationServiceTest {
     private CustomJdbcRegisteredClientRepository clientRepository;
 
     @Mock
-    private AuthorizationConsentService authorizationConsentService;
+    private CustomAuthorizationConsentService authorizationConsentService;
     
     @Mock
     private ClientService clientService;
@@ -40,7 +40,7 @@ class AuthorizationServiceTest {
     private Authentication authentication;
 
     @InjectMocks
-    private AuthorizationService authorizationService;
+    private CustomAuthorizationService authorizationService;
 
     private AuthorizationRequest request;
     private RegisteredClient client;

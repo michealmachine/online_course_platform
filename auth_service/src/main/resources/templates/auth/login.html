@@ -25,7 +25,7 @@
                 </div>
                 <!-- 从URL参数显示错误 -->
                 <div th:if="${param.error}" class="alert alert-danger">
-                    <p th:text="${param.error}">登录失败</p>
+                    <p>登录失败：用户名或密码不正确</p>
                 </div>
                 <div th:if="${param.logout}" class="alert alert-success">
                     <p>您已成功退出登录</p>
@@ -35,13 +35,13 @@
                 <form th:action="@{/auth/login}" method="post" th:object="${loginRequest}">
                     <div class="form-group">
                         <label for="username">用户名</label>
-                        <input type="text" id="username" th:field="*{username}" required autofocus>
+                        <input type="text" id="username" name="username" th:field="*{username}" required autofocus>
                         <small class="error" th:if="${#fields.hasErrors('username')}" th:errors="*{username}"></small>
                     </div>
                     
                     <div class="form-group">
                         <label for="password">密码</label>
-                        <input type="password" id="password" th:field="*{password}" required>
+                        <input type="password" id="password" name="password" th:field="*{password}" required>
                         <small class="error" th:if="${#fields.hasErrors('password')}" th:errors="*{password}"></small>
                     </div>
                     

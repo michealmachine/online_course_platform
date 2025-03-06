@@ -27,7 +27,7 @@ public class RegisterController {
      * 显示注册页面
      * @return 注册页面视图
      */
-    @GetMapping("/register-page")
+    @GetMapping({"/register", "/register-page"})
     public String showRegisterPage(
             @RequestParam(required = false) String error,
             @RequestParam(required = false) String success,
@@ -72,7 +72,7 @@ public class RegisterController {
         if (bindingResult.hasErrors()) {
             redirectAttributes.addFlashAttribute("org.springframework.validation.BindingResult.registerRequest", bindingResult);
             redirectAttributes.addFlashAttribute("registerRequest", registerRequest);
-            return "redirect:/auth/register-page";
+            return "redirect:/auth/register";
         }
         
         try {
@@ -83,7 +83,7 @@ public class RegisterController {
         } catch (Exception e) {
             redirectAttributes.addFlashAttribute("registerRequest", registerRequest);
             redirectAttributes.addFlashAttribute("error", e.getMessage());
-            return "redirect:/auth/register-page";
+            return "redirect:/auth/register";
         }
     }
 } 

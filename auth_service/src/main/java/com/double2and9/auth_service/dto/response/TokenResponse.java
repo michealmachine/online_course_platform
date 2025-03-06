@@ -15,7 +15,7 @@ public class TokenResponse {
     private String refreshToken;     // 刷新令牌
     private String idToken;         // ID Token（OIDC）
     private String tokenType;        // 令牌类型，固定为 "Bearer"
-    private Integer expiresIn;       // 访问令牌过期时间（秒）
+    private Long expiresIn;       // 访问令牌过期时间（秒）
     private String scope;            // 授权范围
 
     @JsonProperty("access_token")
@@ -59,12 +59,12 @@ public class TokenResponse {
     }
 
     @JsonProperty("expires_in")
-    public Integer getExpiresIn() {
+    public Long getExpiresIn() {
         return expiresIn;
     }
 
     @JsonProperty("expires_in")
-    public void setExpiresIn(Integer expiresIn) {
+    public void setExpiresIn(Long expiresIn) {
         this.expiresIn = expiresIn;
     }
 } 

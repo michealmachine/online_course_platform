@@ -33,8 +33,8 @@ public class JwtService {
     private final OidcConfig oidcConfig;
     private static final Logger log = LoggerFactory.getLogger(JwtService.class);
     
-    private static final int ACCESS_TOKEN_EXPIRES_IN = 3600;  // 1小时
-    private static final int REFRESH_TOKEN_EXPIRES_IN = 2592000;  // 30天
+    private static final long ACCESS_TOKEN_EXPIRES_IN = 3600L;  // 1小时
+    private static final long REFRESH_TOKEN_EXPIRES_IN = 2592000L;  // 30天
 
     /**
      * 生成JWT令牌

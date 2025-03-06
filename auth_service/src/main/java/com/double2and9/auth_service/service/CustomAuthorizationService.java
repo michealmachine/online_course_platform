@@ -19,13 +19,21 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+/**
+ * 自定义授权服务
+ * 
+ * @deprecated 此类已被标准的Spring Security OAuth2授权服务器实现所取代。
+ * 不再需要自定义授权控制器和服务，请使用Spring Security提供的标准OAuth2实现。
+ * 此类仅为保持测试兼容性而保留。
+ */
 @Slf4j
 @Service
+@Deprecated
 @RequiredArgsConstructor
-public class AuthorizationService {
+public class CustomAuthorizationService {
     
     private final CustomJdbcRegisteredClientRepository clientRepository;
-    private final AuthorizationConsentService authorizationConsentService;
+    private final CustomAuthorizationConsentService authorizationConsentService;
     private final ClientService clientService;
 
     @Transactional

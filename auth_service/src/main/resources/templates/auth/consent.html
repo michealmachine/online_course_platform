@@ -37,9 +37,18 @@
                     <input type="hidden" name="client_id" th:value="${clientId}">
                     <input type="hidden" name="state" th:value="${state}">
                     
+                    <!-- 授权范围 -->
                     <div th:each="scope : ${scopes}">
                         <input type="hidden" name="scope" th:value="${scope}">
                     </div>
+                    
+                    <!-- 已批准的授权范围 -->
+                    <div th:each="scope : ${previouslyApprovedScopes}">
+                        <input type="hidden" name="scope" th:value="${scope}">
+                    </div>
+                    
+                    <!-- 用户代码 (设备流) -->
+                    <input type="hidden" name="user_code" th:value="${userCode}" th:if="${userCode != null}">
                     
                     <div class="auth-actions">
                         <button type="submit" name="consent" value="approve" class="btn btn-primary">批准</button>

@@ -90,4 +90,49 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
         return null;
     }
+    
+    @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) throws ServletException {
+        String path = request.getRequestURI();
+        
+        // 检查请求路径是否是OAuth2相关端点
+        boolean isOAuth2Endpoint = path.startsWith("/oauth2/") 
+            || path.equals("/oauth2/authorize")
+            || path.equals("/oauth2/token")
+            || path.equals("/oauth2/introspect")
+            || path.equals("/oauth2/revoke")
+            || path.equals("/oauth2/userinfo")
+            || path.startsWith("/.well-known/");
+            
+        // 检查请求路径是否是认证相关页面
+        boolean isAuthPage = path.startsWith("/auth/login") 
+            || path.startsWith("/auth/register")
+            || path.equals("/auth/captcha")
+            || path.equals("/error");
+            
+        // 检查请求路径是否是静态资源
+        boolean isStaticResource = path.startsWith("/css/") 
+            || path.startsWith("/js/") 
+            || path.startsWith("/images/") 
+            || path.startsWith("/webjars/")
+            || path.equals("/favicon.ico");
+            
+        // 检查Accept或Content-Type是否表明这是一个认证API请求
+        // 如果请求期望返回JSON或提交JSON，可能是API调用而非页面访问
+        String acceptHeader = request.getHeader("Accept");
+        String contentType = request.getHeader("Content-Type");
+        boolean isApiCall = (acceptHeader != null && acceptHeader.contains("application/json"))
+            || (contentType != null && contentType.contains("application/json"));
+            
+        // 对于OAuth2端点、认证页面和静态资源，不应用JWT过滤器
+        // 对于API请求或期望JSON响应的请求，应用JWT过滤器
+        boolean shouldSkip = isOAuth2Endpoint || isAuthPage || isStaticResource;
+        
+        // 为特定API请求启用JWT认证，即使它们在OAuth2端点下
+        if (isOAuth2Endpoint && isApiCall && path.startsWith("/api/")) {
+            return false; // 不跳过过滤，应用JWT认证
+        }
+        
+        return shouldSkip;
+    }
 } 
